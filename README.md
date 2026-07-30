@@ -51,17 +51,26 @@
 
 <br clear="right" />
 
-## 시작하기
+## 설치와 업데이트
+
+[Releases](https://github.com/when630/claude-office/releases/latest)에서 `Claude Office Setup x.y.z.exe`를
+받아 실행한다. 코드 서명이 없어 SmartScreen 경고가 뜨면 `추가 정보 > 실행`.
+
+설치본은 4시간마다 새 릴리즈를 확인해 백그라운드로 받아 둔다. 준비되면 알림이 뜨고,
+**트레이 메뉴 > 업데이트 설치하고 재시작**으로 바로 적용하거나 그냥 두면 다음 종료 때 조용히 설치된다.
+
+## 개발
 
 ```powershell
 npm install       # 아이콘은 postinstall이 굽는다
 npm start         # 개발 실행
 npm run usage-tap # 세션·주간 사용률을 앱이 읽게 statusline에 한 줄 심는다 (선택)
 npm run build     # dist/ 에 설치본(NSIS) 생성
+npm run release   # 빌드해서 GitHub Releases 초안까지 올린다 (GH_TOKEN 필요)
 ```
 
-Electron 43 · 런타임 의존성 없음. `claude agents`가 쓰는 것과 같은 `~/.claude` 파일들을
-직접 읽으므로 Claude Code 외에 아무것도 필요 없다.
+Electron 43 · 런타임 의존성은 자동 업데이트(electron-updater) 하나.
+`claude agents`가 쓰는 것과 같은 `~/.claude` 파일들을 직접 읽으므로 Claude Code 외에 아무것도 필요 없다.
 
 ## 트레이 상주
 
