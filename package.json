@@ -1,0 +1,48 @@
+{
+  "name": "claude-office",
+  "version": "0.2.1",
+  "private": true,
+  "type": "module",
+  "description": "로컬 Claude Code 세션들을 픽셀 사무실로 보여주는 트레이 상주 앱",
+  "main": "main/index.mjs",
+  "scripts": {
+    "start": "electron .",
+    "icons": "node tools/make-icons.mjs",
+    "usage-tap": "node tools/install-usage-tap.mjs",
+    "usage-tap:remove": "node tools/install-usage-tap.mjs --remove",
+    "build": "electron-builder --win",
+    "postinstall": "node tools/make-icons.mjs"
+  },
+  "devDependencies": {
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.when630.claude-office",
+    "productName": "Claude Office",
+    "files": [
+      "main/**/*",
+      "renderer/**/*",
+      "shared/**/*",
+      "build/*.png"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Claude Office"
+    }
+  }
+}
