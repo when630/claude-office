@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { collect } from './collect.mjs';
 import { CLAUDE_DIR, USAGE_FILE } from './paths.mjs';
 import { installTap, removeTap, tapStatus, manualGuide, REASONS } from './usage-tap.mjs';
+import { initUpdater, installNow } from './updater.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -22,6 +23,7 @@ let firstTick = true;
 let quitting = false;
 let trayState = null;
 let lastBounds = null; // 창을 다시 열 때 있던 자리로 돌려놓는다
+let updateReady = null; // 받아 둔 새 버전 — 트레이 메뉴에 재시작 항목이 생긴다
 
 // ── 설정 (userData/settings.json)
 //
@@ -247,6 +249,12 @@ function toggleTap(want) {
 
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
+    ...(updateReady
+      ? [
+          { label: `업데이트 설치하고 재시작 (v${updateReady})`, click: installNow },
+          { type: 'separator' },
+        ]
+      : []),
     { label: '사무실 열기', click: showWindow },
     { type: 'separator' },
     {
@@ -351,6 +359,19 @@ if (!app.requestSingleInstanceLock()) {
     createTray();
     const hidden = process.argv.includes('--hidden');
     createWindow(!hidden);
+
+    // 새 버전은 받아만 두고 강제 재시작하지 않는다 — 재시작은 트레이 메뉴에서,
+    // 아니면 다음 종료 때 조용히 설치된다.
+    initUpdater({
+      onReady: (version) => {
+        updateReady = version;
+        if (tray) tray.setContextMenu(buildTrayMenu());
+        notify(
+          `Claude Office ${version} 준비됨`,
+          '트레이 메뉴에서 재시작하면 적용됩니다. 그냥 두면 다음 종료 때 설치됩니다.',
+        );
+      },
+    });
 
     await tick();
     timer = setInterval(tick, POLL_MS);

@@ -7,6 +7,7 @@ main/collect.mjs    세션·잡·트랜스크립트·사용량 → 스냅샷 한
 main/transcript.mjs 대화 파일 꼬리에서 제목·상황·MR·컨텍스트·비서 캐내기
 main/usage.mjs      office-usage.json → 5시간·주간 사용률
 main/usage-tap.mjs  statusline에 사용량 tap 심기/빼기 (트레이·CLI 공용 로직)
+main/updater.mjs    GitHub Releases 자동 업데이트 — 받아두고 트레이 재시작 또는 종료 시 설치
 main/preload.cjs    contextBridge (샌드박스라 CJS여야 한다)
 renderer/           픽셀 렌더러 (app · render · sprites · themes · talk · style)
 renderer/fonts/     사무실 영역 픽셀 폰트 (Mona S 12px, OFL 1.1)
