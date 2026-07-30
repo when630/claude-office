@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'"
+    />
+    <title>Claude Office</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🦀</text></svg>" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header id="topbar">
+      <h1>Claw'd Office</h1>
+      <div id="stats"></div>
+      <div class="right">
+        <span id="clock"></span>
+        <button id="cfg-open" type="button" title="설정">설정</button>
+      </div>
+    </header>
+
+    <main>
+      <div id="stage"><canvas id="office"></canvas></div>
+      <aside id="panel"></aside>
+    </main>
+
+    <!-- 설정. <dialog>를 쓰면 배경 차단과 Esc 닫기가 공짜로 따라온다.
+         내용은 app.mjs가 열 때마다 지금 떠 있는 방으로 다시 짠다. -->
+    <dialog id="cfg">
+      <header>
+        <h2>설정</h2>
+        <button id="cfg-close" type="button" title="닫기">닫기</button>
+      </header>
+      <div id="cfg-body"></div>
+    </dialog>
+
+    <script type="module" src="./app.mjs"></script>
+  </body>
+</html>
