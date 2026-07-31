@@ -13,9 +13,11 @@
       "Read(./.env*)",
       "Read(./**/*.pem)",
       "Bash(rm -rf *)",
+      "Bash(curl *)",
       "Bash(*electron-builder*--publish*)"
     ]
   },
+  "attribution": { "commit": "" },
   "hooks": {
     "PostToolUse": [
       {
