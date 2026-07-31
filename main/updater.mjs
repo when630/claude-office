@@ -4,6 +4,7 @@
 //
 // electron-updater는 CJS 모듈이라 named import가 ESM에서 깨진다 — default로 받아 푼다.
 // (electron-userland/electron-builder#7976)
+import { app } from 'electron';
 import electronUpdater from 'electron-updater';
 
 const { autoUpdater } = electronUpdater;
@@ -11,8 +12,18 @@ const CHECK_EVERY_MS = 4 * 60 * 60 * 1000;
 
 // onReady(version): 새 버전을 받아 뒀을 때 한 번 불린다.
 // onManual(version): 받아둘 수 없는 플랫폼에서 새 버전을 발견했을 때 한 번 불린다.
-// 패키징 안 된 개발 실행에서는 electron-updater가 스스로 검사를 건너뛴다.
 export function initUpdater({ onReady, onManual }) {
+  // 개발 실행에서는 아무것도 걸지 않는다.
+  //
+  // electron-updater는 이 경우에도 스스로 검사를 건너뛰지만, `checkForUpdates()`를 부를 때마다
+  // `isUpdaterActive()`가 "Skip checkForUpdates because application is not packed and dev update
+  // config is not forced"를 info로 찍는다 — 고칠 것이 없는데 콘솔에 경고처럼 남고, 하는 일도
+  // 없는 4시간 타이머가 함께 걸린다.
+  //
+  // 개발 실행에서 정말 검사를 돌려보려면 `autoUpdater.forceDevUpdateConfig = true`로 두고
+  // 저장소 루트에 `dev-app-update.yml`(publish 설정과 같은 내용)을 둔다.
+  if (!app.isPackaged) return;
+
   autoUpdater.on('error', (err) => console.error('[updater]', err.message));
 
   // 맥은 Squirrel.Mac이 코드 서명을 검증해서, 서명 없는 빌드는 받아도 설치가 거부된다.
