@@ -95,7 +95,7 @@ const defaults = {
   bounds: { normal: null, mini: null },
   history: true,
   trayHintShown: false,
-  view: { names: 'show', roomThemes: {} },
+  view: { names: 'show', roomThemes: {}, pinned: [], collapsed: [] },
 };
 const NAME_MODES = ['show', 'mask', 'hide'];
 const LANG_PREFS = ['auto', ...LANGS];
@@ -280,7 +280,16 @@ function sanitizeView(v) {
   return {
     names: NAME_MODES.includes(v?.names) ? v.names : defaults.view.names,
     roomThemes,
+    pinned: keyList(v?.pinned),
+    collapsed: keyList(v?.collapsed),
   };
+}
+
+// 방 이름 목록(고정·접기). 중복을 걷어내고 길이를 막는다 — 사라진 방의 이름도 그대로
+// 들고 있어야 다시 떴을 때 고정·접기가 살아난다(방 종류와 같은 규칙).
+function keyList(v) {
+  if (!Array.isArray(v)) return [];
+  return [...new Set(v.filter((k) => typeof k === 'string' && k))].slice(0, 200);
 }
 
 // 창 자리는 다음에 켤 때 그대로 되살릴 값이라 모양을 확인하고 받는다 —

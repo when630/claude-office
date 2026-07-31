@@ -195,6 +195,49 @@ body.mini #stage::-webkit-scrollbar {
   padding: 12px;
 }
 
+/* 전부 걸러졌을 때의 안내 — 빈 캔버스는 고장으로 읽힌다 */
+#stage-empty {
+  margin: 40px auto;
+  max-width: 380px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #5d6779;
+}
+
+/* 방 거르기. 평소엔 배경에 묻어 있다가 초점이 오면 드러난다 — 방이 서넛일 땐 쓸 일이 없다 */
+#room-filter {
+  width: 108px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: #141821;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+#room-filter:hover {
+  border-color: var(--line);
+}
+#room-filter:focus {
+  outline: none;
+  border-color: #39414f;
+  background: #171b23;
+}
+#room-shown {
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+#room-shown:hover {
+  border-color: var(--accent);
+}
+
 #office {
   display: block;
   image-rendering: pixelated;
@@ -946,6 +989,32 @@ b.lv-na {
 /* 방 행은 종류와 알림 세기 두 칸이 나란히 선다 — 이름이 설 자리를 남기려면 좁아야 한다 */
 .cfg-room select {
   width: 108px;
+}
+
+/* 고정·접기. 이름 아래 작은 표시 — 자주 쓰는 값이 아니라 칸을 하나 더 세울 정도는 아니다 */
+.cfg-marks {
+  display: inline-flex;
+  gap: 4px;
+  margin-top: 3px;
+}
+.cfg-mark {
+  padding: 0 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #171b23;
+  color: #5d6779;
+  font: inherit;
+  font-size: 11px;
+  line-height: 17px;
+  cursor: pointer;
+}
+.cfg-mark:hover {
+  border-color: #39414f;
+  color: var(--text);
+}
+.cfg-mark.on {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* 알림 종류 — 켜고 끄는 것뿐이라 한 줄에 체크박스와 이름만 둔다 */

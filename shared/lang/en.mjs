@@ -34,6 +34,10 @@ export default {
     attendance: 'Attendance',
     settings: 'Settings',
     mini: 'Shrink to a corner',
+    filter: 'Room name',
+    hidden: '{n} hidden',
+    hiddenTitle: 'Clear the filter and unfold every room',
+    allHidden: 'No room matches. Clear the name box in the top bar, or unfold a room you collapsed.',
     in: 'in',
     typing: 'working',
     waiting: 'waiting on you',
@@ -186,10 +190,12 @@ export default {
       'Masking calls them <code>Clawd 1, 2…</code>. Use it when showing your screen to someone — the working directory path still shows in the panel.',
     roomsSection: 'Rooms — type and alerts',
     roomNotify: 'Alert level',
+    roomPin: 'Pin to the front',
+    roomCollapse: 'Collapse in the office',
     roomsEmpty: 'No rooms are up right now. Once a session attaches you can pick its type here.',
     roomsReset: 'Reset all to auto',
     roomsHint:
-      'Auto assigns by hashing the room name. A type you pick is remembered by working-directory name, so it survives the room going away and coming back. The box on the right is how loudly that room may call you — <b>No alerts</b> keeps its sessions from notifying at all (they still show up in the office), and <b>Keen</b> pulls the repeat nudges in to <code>1 · 3 · 10 · 30 min</code>.',
+      'Auto assigns by hashing the room name. A type you pick is remembered by working-directory name, so it survives the room going away and coming back. The box on the right is how loudly that room may call you — <b>No alerts</b> keeps its sessions from notifying at all (they still show up in the office), and <b>Keen</b> pulls the repeat nudges in to <code>1 · 3 · 10 · 30 min</code>. Under the name, <b>☆</b> pins the room to the front and <b>▥</b> collapses it out of the office — both change the view only; alerts and attendance carry on.',
   },
 
   // ── Attendance
