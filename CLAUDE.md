@@ -23,14 +23,14 @@
 
 ```powershell
 npm run icons                        # 아이콘이 다시 구워지는지 (렌더 결과를 눈으로 확인)
-node --check main/index.mjs          # 고친 .mjs마다
 npx electron-builder --win --dir     # 설치본 없이 패키징 회귀 확인
 ```
 
+`.mjs`/`.cjs` 문법 검사는 PostToolUse 훅(`.claude/hooks/check-syntax.mjs`)이 편집마다 자동으로 돈다.
 맥 빌드는 Windows에서 못 굽는다 — CI(태그 푸시)에서 확인한다.
 
 ## 릴리스
 
 `git tag vX.Y.Z && git push origin vX.Y.Z` → CI가 Windows·macOS를 빌드해 draft 릴리스
-하나에 모은다 → 릴리스 노트 쓰고 Publish. 로컬에서 `--publish`를 돌리지 않는다
-(같은 태그에 릴리스가 갈라졌던 전례가 있다).
+하나에 모은다 → 릴리스 노트 쓰고 Publish. 로컬에서 `--publish`를 돌리지 않는다 —
+같은 태그에 릴리스가 갈라졌던 전례가 있어 `.claude/settings.json`의 deny로 막아 두었다.
