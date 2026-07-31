@@ -441,8 +441,48 @@ function workerPanel(w) {
         : ''
     }
 
-    ${cmd ? `<button class="copy" data-cmd="${esc(cmd)}"><code>${esc(cmd)}</code><span>복사</span></button>` : ''}
+    ${
+      cmd
+        ? `<div class="jump">
+            <button class="go" type="button">터미널에서 열기</button>
+            <button class="copy" data-cmd="${esc(cmd)}"><code>${esc(cmd)}</code><span>복사</span></button>
+          </div>
+          <p class="hint jump-msg" id="jump-msg"></p>`
+        : ''
+    }
   `;
+}
+
+const GO_LABEL = '터미널에서 열기';
+
+// 터미널을 띄우는 일은 main이 한다(main/terminal.mjs). 여기서는 누구인지만 넘긴다 —
+// 명령 문자열을 넘기면 그게 임의 명령 실행 통로가 되므로 id만 보낸다.
+function wireJump() {
+  const btn = panel.querySelector('.go');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    const w = selected ? findWorker(selected) : null;
+    const msg = panel.querySelector('#jump-msg');
+    if (!w) return;
+    btn.disabled = true;
+    const res = await window.office?.openTerminal?.({ cwd: w.cwd, jobId: w.jobId, sessionId: w.sessionId }).catch(
+      () => null,
+    );
+    btn.disabled = false;
+    if (res?.ok) {
+      btn.textContent = '열었습니다';
+      if (msg) msg.textContent = '';
+      setTimeout(() => {
+        btn.textContent = GO_LABEL;
+      }, 1500);
+      return;
+    }
+    // 못 띄웠으면 명령을 클립보드에 넣어준다 — 손으로 붙여넣을 수 있어야 한다
+    if (res?.cmd) window.office?.copy(res.cmd);
+    if (msg) {
+      msg.textContent = [res?.message, res?.cmd && '명령을 클립보드에 복사했습니다.'].filter(Boolean).join(' ');
+    }
+  });
 }
 
 function drawPanel() {
@@ -455,6 +495,7 @@ function drawPanel() {
     btn.classList.add('done');
     setTimeout(() => btn.classList.remove('done'), 1200);
   });
+  wireJump();
   paintBars();
   tickPanel();
 }

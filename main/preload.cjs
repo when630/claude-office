@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld('office', {
   meta: () => ipcRenderer.invoke('office:meta'),
   openExternal: (url) => ipcRenderer.send('office:open-external', url),
   copy: (text) => ipcRenderer.send('office:copy', text),
+  // 세션의 작업 디렉터리에서 attach 명령을 실행하는 터미널을 띄운다 — id만 넘긴다
+  openTerminal: (target) => ipcRenderer.invoke('office:openTerminal', target),
   // 설정 창의 표시 설정 — 저장된 뒤의 값을 되돌려준다
   getView: () => ipcRenderer.invoke('office:getView'),
   setView: (patch) => ipcRenderer.invoke('office:setView', patch),

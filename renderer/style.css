@@ -508,6 +508,41 @@ b.lv-na {
   background: var(--blue);
 }
 
+/* ── 패널 맨 아래: 터미널 열기 + 명령 복사. 열기가 주 동작이라 왼쪽에 두고 초록으로 구분한다. */
+.jump {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+.jump .copy {
+  flex: 1;
+  min-width: 0;
+  margin-top: 0;
+}
+.go {
+  flex: none;
+  padding: 8px 12px;
+  border: 1px solid #2d6a4a;
+  border-radius: 6px;
+  background: #142019;
+  color: #bfe3cd;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.go:hover {
+  border-color: var(--green);
+}
+.go:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+/* 실패 안내는 있을 때만 자리를 차지한다 */
+.jump-msg:empty {
+  display: none;
+}
+
 .copy {
   display: flex;
   align-items: center;

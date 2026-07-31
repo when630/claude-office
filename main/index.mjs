@@ -15,6 +15,7 @@ import {
   sanitizeNotify,
   BLINK_AFTER_MS,
 } from './notify.mjs';
+import { openTerminal, REASONS as TERMINAL_REASONS } from './terminal.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -420,6 +421,17 @@ if (!app.requestSingleInstanceLock()) {
     }));
     ipcMain.on('office:open-external', (_e, url) => openExternal(url));
     ipcMain.on('office:copy', (_e, text) => clipboard.writeText(String(text ?? '')));
+
+    // 발견한 세션의 터미널을 열어 준다. 렌더러가 만든 명령 문자열은 받지 않는다 —
+    // id만 받아 main/terminal.mjs가 조립한다(그러지 않으면 임의 명령 실행 통로가 된다).
+    ipcMain.handle('office:openTerminal', async (_e, target) => {
+      const res = await openTerminal({
+        cwd: target?.cwd,
+        jobId: target?.jobId,
+        sessionId: target?.sessionId,
+      });
+      return { ...res, message: res.ok ? null : (TERMINAL_REASONS[res.reason] ?? '터미널을 열지 못했습니다.') };
+    });
 
     // 설정 창(렌더러)이 쓰는 표시 설정. 저장된 값을 되돌려주므로 렌더러는 반영만 하면 된다.
     ipcMain.handle('office:getView', () => settings.view);
