@@ -551,7 +551,6 @@ if (!app.requestSingleInstanceLock()) {
       claudeDir: CLAUDE_DIR,
       usageFile: USAGE_FILE,
       version: app.getVersion(),
-      electron: process.versions.electron,
     }));
     ipcMain.on('office:open-external', (_e, url) => openExternal(url));
     ipcMain.on('office:copy', (_e, text) => clipboard.writeText(String(text ?? '')));

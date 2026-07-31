@@ -350,9 +350,13 @@ function idlePanel() {
         ? `<section class="block">
             <h3>읽고 있는 곳</h3>
             <p><code>${esc(meta.claudeDir)}</code></p>
-            <p class="hint">Claude Office ${esc(meta.version)} · Electron ${esc(meta.electron)}</p>
           </section>`
         : ''
+    }
+
+    ${
+      // 버전은 맨 아래 한 줄로. Electron 버전은 쓰는 사람에게 아무 뜻이 없어 적지 않는다.
+      meta ? `<p class="version">Claude Office ${esc(meta.version)}</p>` : ''
     }
   `;
 }
