@@ -313,7 +313,11 @@ function idlePanel() {
         여기에 표시됩니다.</p>
        <p class="hint"><b>트레이 아이콘 &gt; 사용량 연동</b>을 켜면 자동으로 심어줍니다.</p>`;
 
+  // 버전을 패널 바닥에 붙이려면 패널이 flex 열이어야 한다. 그런데 내용을 flex item으로
+  // 흩어 놓으면 블록 사이 margin 병합이 사라져 간격이 벌어진다 — 그래서 내용은 한 덩어리로
+  // 싸 두고(`idle-body`) 버전만 형제로 둔다. 미는 일은 CSS의 `margin-top: auto`가 한다.
   return `
+    <div class="idle-body">
     <div class="now">
       <div class="now-time" id="p-clock">--:--:--</div>
       <div class="now-date" id="p-date"></div>
@@ -354,8 +358,10 @@ function idlePanel() {
         : ''
     }
 
+    </div>
+
     ${
-      // 버전은 맨 아래 한 줄로. Electron 버전은 쓰는 사람에게 아무 뜻이 없어 적지 않는다.
+      // 버전은 패널 바닥에. Electron 버전은 쓰는 사람에게 아무 뜻이 없어 적지 않는다.
       meta ? `<p class="version">Claude Office ${esc(meta.version)}</p>` : ''
     }
   `;
@@ -510,6 +516,8 @@ function wireJump() {
 
 function drawPanel() {
   const w = selected ? findWorker(selected) : null;
+  // 기본 화면에서만 패널을 flex 열로 둔다 — 버전을 바닥으로 밀기 위해서다(style.css의 .version)
+  panel.classList.toggle('idle', !w);
   panel.innerHTML = w ? workerPanel(w) : idlePanel();
 
   panel.querySelector('.copy')?.addEventListener('click', (e) => {

@@ -232,10 +232,18 @@ b.lv-na {
   color: #5d6779;
 }
 
-/* 패널 맨 아래 한 줄 — 버전. 위 블록과 확실히 떨어뜨려 꼬리표처럼 둔다. */
+/* 패널 바닥에 붙는 버전 한 줄. 기본 화면에서만 패널이 flex 열이 되고(app.mjs가 .idle을 붙인다)
+   margin-top: auto가 남은 공간을 위로 몰아 버전을 맨 밑으로 내린다.
+   내용이 길어 스크롤이 생기면 auto가 0이 되어 자연스럽게 내용 끝에 붙는다. */
+#panel.idle {
+  display: flex;
+  flex-direction: column;
+}
 .version {
-  margin: 20px 0 0;
-  padding-top: 10px;
+  /* top이 auto — 간격은 padding으로 잡는다. 스크롤이 생기면 auto가 0이 되므로
+     margin에 기대면 내용과 붙어 버린다. */
+  margin: auto 0 0;
+  padding-top: 14px;
   border-top: 1px solid #171c25;
   font-size: 11px;
   color: #4d5768;
