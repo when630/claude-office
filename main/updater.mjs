@@ -10,12 +10,27 @@ const { autoUpdater } = electronUpdater;
 const CHECK_EVERY_MS = 4 * 60 * 60 * 1000;
 
 // onReady(version): 새 버전을 받아 뒀을 때 한 번 불린다.
+// onManual(version): 받아둘 수 없는 플랫폼에서 새 버전을 발견했을 때 한 번 불린다.
 // 패키징 안 된 개발 실행에서는 electron-updater가 스스로 검사를 건너뛴다.
-export function initUpdater({ onReady }) {
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.on('update-downloaded', (info) => onReady?.(info.version));
+export function initUpdater({ onReady, onManual }) {
   autoUpdater.on('error', (err) => console.error('[updater]', err.message));
+
+  // 맥은 Squirrel.Mac이 코드 서명을 검증해서, 서명 없는 빌드는 받아도 설치가 거부된다.
+  // 4시간마다 100MB를 헛받는 대신 검사만 하고, 새 버전이 있으면 알림으로 안내한다.
+  // 서명을 넣게 되면 이 분기를 지우면 된다 — 아래 경로가 맥에서도 그대로 돈다.
+  if (process.platform === 'darwin') {
+    autoUpdater.autoDownload = false;
+    const seen = new Set();
+    autoUpdater.on('update-available', (info) => {
+      if (seen.has(info.version)) return;
+      seen.add(info.version);
+      onManual?.(info.version);
+    });
+  } else {
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.on('update-downloaded', (info) => onReady?.(info.version));
+  }
 
   const check = () => autoUpdater.checkForUpdates().catch(() => {});
   check();

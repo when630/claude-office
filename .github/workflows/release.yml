@@ -1,0 +1,38 @@
+# v* 태그를 푸시하면 Windows·macOS 설치본을 빌드해 GitHub Releases 초안(draft)에 올린다.
+# 두 잡이 같은 태그의 초안 하나를 공유하므로, 끝난 뒤 릴리스 노트를 쓰고 Publish만 하면 된다.
+#
+#   git tag v0.4.0 && git push origin v0.4.0
+#
+# 코드 서명은 아직 없다 — 맥 잡의 CSC_IDENTITY_AUTO_DISCOVERY=false가 키체인 탐색을 꺼서
+# 서명 없이 빌드를 통과시킨다. 서명을 넣을 때 CSC_LINK 등 시크릿과 함께 이 줄을 지운다.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            args: --win
+          - os: macos-latest
+            args: --mac
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx electron-builder ${{ matrix.args }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false

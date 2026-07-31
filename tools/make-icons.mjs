@@ -135,11 +135,15 @@ function clawdIcon(size, dotHex) {
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
+// 16px 짝은 맥 메뉴바용 1x — 32px을 2x(레티나)로 묶어 넘긴다 (main/index.mjs trayImage)
 const targets = [
   ['icon.png', clawdIcon(512, null)],
   ['tray.png', clawdIcon(32, null)],
   ['tray-wait.png', clawdIcon(32, '#ffcf5c')],
   ['tray-fail.png', clawdIcon(32, '#e2624a')],
+  ['tray-16.png', clawdIcon(16, null)],
+  ['tray-wait-16.png', clawdIcon(16, '#ffcf5c')],
+  ['tray-fail-16.png', clawdIcon(16, '#e2624a')],
 ];
 
 for (const [name, bm] of targets) {
