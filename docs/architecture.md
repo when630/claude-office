@@ -1,5 +1,25 @@
 # 구조
 
+## 개발 실행
+
+README는 쓰는 사람 몫이라 명령을 적지 않는다. 소스에서 굴리는 법은 여기에 있다.
+
+```powershell
+npm install       # 아이콘은 postinstall이 굽는다
+npm start         # 개발 실행 (업데이트 검사는 걸리지 않는다)
+npm test          # 알림 문턱·attach 명령·언어 전환 판정 (의존성 없이 node --test)
+npm run icons     # 캐릭터 픽셀 → PNG 다시 굽기
+npm run usage-tap # 세션·주간 사용률을 앱이 읽게 statusline에 한 줄 심는다 (선택)
+npm run build     # dist/ 에 Windows 설치본(NSIS) 생성
+npm run build:mac # 맥에서 실행하면 dmg+zip 생성 (Windows에서는 못 굽는다)
+```
+
+Electron 43 · 런타임 의존성은 자동 업데이트(electron-updater) 하나.
+`claude agents`가 쓰는 것과 같은 `~/.claude` 파일들을 직접 읽으므로 Claude Code 외에 아무것도 필요 없다.
+브랜치·커밋·릴리스 규약은 [CLAUDE.md](../CLAUDE.md)에 있다.
+
+## 파일 지도
+
 ```
 main/index.mjs      앱 수명주기 · 창 · 트레이 · 알림 · 폴링 · 설정(settings.json)
 main/paths.mjs      ~/.claude 위치 (서로 import하지 않게 여기로 뺐다)
@@ -62,4 +82,8 @@ DevTools 콘솔에서 `__office.push(state)` / `__office.select(key)`로 임의 
 입력 대기·실패처럼 평소 안 나오는 화면을 확인할 수 있다. `__office.view({ names, roomThemes })`와
 `__office.lang('en')`은 설정을 **저장하지 않고** 바꿔 보는 입구다 — 헤드리스로 화면을 굽어
 확인할 때 쓴다(`lang`은 main을 거치지 않으므로 `'auto'`는 뜻이 없다).
-(이 README·docs의 캡처도 그렇게 구운 것이다.)
+
+README의 캡처(`docs/images/en`·`docs/images/ko`)도 그렇게 구운 것이다 — 가짜 preload로
+`window.office`를 세워 스냅샷을 밀어 넣고, 화면 밖에 **보이게** 띄운 창을 `capturePage`로 찍는다.
+숨긴 창은 컴포지터가 프레임을 제시하지 않아 애니메이션 순간이 잡히지 않는다.
+두 언어 캡처는 같은 시각(로드 후 경과 ms)에 찍어야 배치가 겹친다.
