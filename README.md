@@ -45,8 +45,10 @@
 - 붙어 있는 **서브에이전트**와 받은 지시
 - **지금 상황 · 최근 지시 · 연결된 MR**
 - **타임라인** — 받은 지시(노랑) ↔ 한 말(파랑)
-- 맨 아래 `claude attach <id>` / `claude --resume <sessionId>` **복사 버튼** —
-  발견한 놈에게 바로 돌아갈 수 있다
+- 맨 아래 **터미널에서 열기** — 그 세션의 작업 디렉터리에서 `claude attach <id>`
+  (터미널 세션은 `claude --resume <sessionId>`)를 실행하는 터미널을 띄운다.
+  Windows Terminal이 있으면 열려 있는 창에 새 탭으로 붙는다. 옆의 **복사 버튼**으로
+  명령만 받아 갈 수도 있다
 
 아무것도 선택하지 않으면 시계와 **계정 사용량**(세션 5시간 · 주간 7일)이 기본 화면이다.
 사용량은 statusline에 tap을 심어야 나온다 — [사용량 연동](docs/panel.md#사용량은-왜-tap이-필요한가) 참고.
@@ -77,7 +79,7 @@ xattr -cr "/Applications/Claude Office.app"
 ```powershell
 npm install       # 아이콘은 postinstall이 굽는다
 npm start         # 개발 실행
-npm test          # 알림 문턱 판정 (의존성 없이 node --test)
+npm test          # 알림 문턱·attach 명령 판정 (의존성 없이 node --test)
 npm run usage-tap # 세션·주간 사용률을 앱이 읽게 statusline에 한 줄 심는다 (선택)
 npm run build     # dist/ 에 Windows 설치본(NSIS) 생성
 npm run build:mac # 맥에서 실행하면 dmg+zip 생성 (Windows에서는 못 굽는다)
@@ -121,7 +123,8 @@ Electron 43 · 런타임 의존성은 자동 업데이트(electron-updater) 하�
 ## 한계
 
 - **로컬 전용**이다. `claude.ai/code`(웹)나 데스크톱 앱에서 돌린 세션은 이 파일들에 남지 않아 보이지 않는다
-- 읽기 전용 — 여기서 세션에 답장하거나 정지시킬 수는 없다. 대기 중인 놈을 발견하면 터미널로 가야 한다
+- 세션에 **답장하거나 정지시킬 수는 없다.** 남의 터미널 stdin을 건드리는 일이라 하지 않는다 —
+  대기 중인 놈을 발견하면 [터미널에서 열기](docs/panel.md#터미널에서-열기)로 그 자리까지 데려다주는 것까지가 전부다
 - 계정 사용량은 statusline tap에 의존한다. Claude Code 세션에서 statusline이 한 번 그려져야 값이 생기고,
   30분 넘게 갱신이 없으면 "오래됨"으로 표시한다
 - 창이 가려져 있거나 다른 가상 데스크톱에 있으면 Chromium이 `requestAnimationFrame`을 멈춘다 —

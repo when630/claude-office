@@ -9,6 +9,7 @@ main/usage.mjs      office-usage.json → 5시간·주간 사용률
 main/notify.mjs     무엇을 알릴지 — 대기 재알림·컨텍스트·사용량 문턱 판정.
                     Electron을 모르고 `now`를 인자로 받는다(그래서 테스트가 된다)
 main/usage-tap.mjs  statusline에 사용량 tap 심기/빼기 (트레이·CLI 공용 로직)
+main/terminal.mjs   세션의 터미널 열기 (Windows Terminal · Terminal.app) — id만 받아 명령을 조립한다
 main/updater.mjs    GitHub Releases 자동 업데이트 — 받아두고 트레이 재시작 또는 종료 시 설치
                     (서명 없는 맥은 설치가 거부되므로 검사만 하고 알림으로 안내)
 main/preload.cjs    contextBridge (샌드박스라 CJS여야 한다)
@@ -17,7 +18,7 @@ renderer/fonts/     사무실 영역 픽셀 폰트 (Mona S 12px, OFL 1.1)
 shared/pixels.mjs   픽셀 데이터 — 렌더러와 아이콘 생성기가 공유
 tools/make-icons.mjs        캐릭터 픽셀 → PNG (의존성 없이 직접 인코딩) — 맥 메뉴바용 16px 변형도 굽는다
 tools/install-usage-tap.mjs 위 로직의 CLI 껍데기 (npm run usage-tap)
-test/               `npm test` (node --test, 의존성 없음) — 지금은 알림 문턱 판정
+test/               `npm test` (node --test, 의존성 없음) — 알림 문턱 판정 · attach 명령 조립
 .github/workflows/release.yml  v* 태그 푸시 → Windows·macOS를 빌드해 Releases 초안 하나에 올린다
 ```
 
@@ -40,6 +41,8 @@ test/               `npm test` (node --test, 의존성 없음) — 지금은 알
 - `main/notify.mjs` — 재알림 문턱(`WAIT_STEPS_MS`), 트레이가 깜빡이기 시작하는 시점(`BLINK_AFTER_MS`),
   컨텍스트·사용량 문턱(`CONTEXT_STEPS`·`USAGE_STEPS`), 알림 종류(`NOTIFY_KINDS` — 트레이 메뉴와 짝이다).
   문턱을 건드렸으면 `npm test`로 확인한다 (시각을 인자로 받으므로 30분을 기다릴 필요가 없다)
+- `main/terminal.mjs` — 터미널을 띄우는 방법(`openWindows`·`openMac`), 셸에 넘길 id의 허용 문자(`ID_OK`).
+  다른 터미널 앱을 쓰려면 여기에 분기를 넣는다
 - `main/index.mjs` — `POLL_MS`, `BLINK_MS`(깜빡임 주기), `signature`(스냅샷 중복 전송 판정에서 뺄 필드)
 
 ## 디버그 입구
