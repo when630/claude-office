@@ -88,10 +88,36 @@ npm run usage-tap          # statusline 스크립트에 심기 (.bak 백업을 �
 npm run usage-tap:remove   # 빼기
 ```
 
-`settings.json`의 `statusLine.command`에서 `.ps1` 경로를 찾아 stdin을 읽는 줄 바로 뒤에
-네 줄짜리 `try { … } catch { }` 블록을 넣는다. 실패해도 statusline 자체는 그대로 돌고,
-`# >>> claude-office usage tap >>>` 마커로 감싸 두어 여러 번 실행해도 한 번만 심긴다.
-PowerShell 5.1이 한글 주석을 cp949로 읽지 않도록 저장할 때 BOM을 붙인다.
+`settings.json`의 `statusLine.command`에서 `.ps1` 경로를 찾아 **stdin을 읽는 줄 앞뒤로** 두
+블록을 넣는다. 각각 마커(`# >>> claude-office … >>>`)로 감싸 두어 여러 번 실행해도 한 번만 심기고,
+실패해도 statusline 자체는 그대로 돈다. PowerShell 5.1이 한글 주석을 cp949로 읽지 않도록
+저장할 때 BOM을 붙인다.
+
+| 위치 | 하는 일 |
+|---|---|
+| 읽는 줄 **앞** | `[Console]::InputEncoding`을 UTF-8로 맞춘다 (아래 참고) |
+| 읽는 줄 **뒤** | payload를 `office-usage.json`에 그대로 쓴다 |
+
+파일 맨 앞에 넣지 않는 이유는 PowerShell의 `param()`이 **첫 실행문이어야 하기 때문이다** —
+그 앞에 문장을 끼우면 스크립트가 깨진다. stdin 읽기는 언제나 `param()` 뒤에 있다.
+
+### stdin 인코딩을 왜 맞추나
+
+PowerShell 5.1은 `[Console]::In`을 `[Console]::InputEncoding`으로 읽고, **Korean Windows
+기본값이 cp949다.** payload에 한글이 있으면 — 세션 이름은 첫 지시에서 나오므로 한국어로 쓰면
+거의 항상 있다 — **그 자리에서 글자가 깨진다.** 매핑 못한 바이트가 `?`로 대체되므로 뒤에서
+UTF-8로 다시 써도 복구되지 않고, JSON이 부서져 사용량이 아예 안 읽힌다.
+
+```
+…"effort":{"level":"high"},"session_name":"異붽??좊쭔??湲곕뒫 寃??,"model":{…
+```
+
+실제로 이렇게 닫는 따옴표까지 사라져 뒤가 통째로 못 읽혔다. 머리말 한 줄이 그걸 막고,
+statusline 자신의 한글 출력도 같이 고쳐 준다.
+
+**예전 버전이 심어둔 tap에는 이 머리말이 없다.** 앱을 켤 때 알아보고 조용히 보태고
+(`.bak`은 남는다) 알림으로 알려준다. 파일을 계속 못 읽는 동안에는 패널이 마지막으로 읽힌
+값이라고 밝힌다 — 옛 숫자를 현재값처럼 보여주면 그게 거짓말이 된다.
 
 **자동 설치는 statusline이 PowerShell(.ps1)일 때만 된다.** bash 등 다른 statusline이면 —
 맥은 항상 이 경우다 — 직접 넣을 수 있는 코드를 알려준다(트레이는 대화상자로, CLI는 표준출력으로).

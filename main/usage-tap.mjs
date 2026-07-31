@@ -18,6 +18,11 @@ import { CLAUDE_DIR, USAGE_FILE } from './paths.mjs';
 export const BEGIN = '# >>> claude-office usage tap >>>';
 export const END = '# <<< claude-office usage tap <<<';
 
+// stdin을 읽는 줄 **앞**에 들어가는 머리말. payload 저장(BEGIN)과 따로 관리한다 —
+// 예전 버전이 심어둔 tap에는 이것만 없으므로 나중에 보태 줄 수 있어야 한다.
+export const PRE_BEGIN = '# >>> claude-office stdin encoding >>>';
+export const PRE_END = '# <<< claude-office stdin encoding <<<';
+
 // 실패 사유. 트레이는 이걸로 안내 문구를 고르고, CLI는 그대로 찍는다.
 export const REASONS = {
   'no-statusline': '~/.claude/settings.json에 statusLine 설정이 없습니다.',
@@ -27,6 +32,23 @@ export const REASONS = {
   'already-installed': '이미 심어져 있습니다.',
   'write-failed': 'statusline 스크립트를 고쳐 쓰지 못했습니다.',
 };
+
+// stdin을 읽기 **전에** 인코딩을 UTF-8로 맞춘다.
+//
+// PowerShell 5.1은 `[Console]::In`을 `[Console]::InputEncoding`으로 읽고, Korean Windows
+// 기본값이 cp949다. payload에 한글이 있으면(세션 이름은 첫 지시에서 나오므로 한국어로 쓰면
+// 거의 항상 있다) **그 자리에서 글자가 깨진다** — 매핑 못한 바이트가 '?'로 대체되므로
+// 뒤에서 UTF-8로 다시 써도 복구되지 않는다. JSON이 부서져 앱은 사용량을 아예 못 읽는다.
+//
+// 이 줄은 statusline 자신의 한글 출력도 같이 고쳐 주므로 손해가 없다.
+export function preSnippet() {
+  return [
+    PRE_BEGIN,
+    `# stdin(JSON)을 UTF-8로 읽게 맞춘다. 이게 없으면 한글이 든 payload가 cp949로 깨진다.`,
+    `try { [Console]::InputEncoding = New-Object System.Text.UTF8Encoding $false } catch { }`,
+    PRE_END,
+  ].join('\r\n');
+}
 
 export function snippet(varName) {
   return [
@@ -90,19 +112,34 @@ function save(file, next) {
   return backup;
 }
 
-const BLOCK = new RegExp(
-  `\\r?\\n?${BEGIN.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]*?${END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
-  'g',
-);
+function blockOf(begin, end) {
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`\\r?\\n?${esc(begin)}[\\s\\S]*?${esc(end)}`, 'g');
+}
+
+const BLOCK = blockOf(BEGIN, END);
+const PRE_BLOCK = blockOf(PRE_BEGIN, PRE_END);
 
 // 지금 상태. 트레이 메뉴를 그릴 때마다 부른다 — 작은 파일 두세 개만 읽는다.
+//
+// `hasEncoding`이 따로 있는 이유: 예전 버전이 심어둔 tap에는 인코딩 머리말이 없어서
+// 한글 payload가 깨진다. 그걸 알아보고 조용히 보태 주려면 두 상태를 구분해야 한다.
 export function tapStatus() {
   const found = findStatusline();
-  if (!found.file) return { installed: false, file: null, command: found.command, reason: found.reason };
+  if (!found.file) {
+    return { installed: false, hasEncoding: false, file: null, command: found.command, reason: found.reason };
+  }
   try {
-    return { installed: read(found.file).text.includes(BEGIN), file: found.file, command: found.command, reason: null };
+    const { text } = read(found.file);
+    return {
+      installed: text.includes(BEGIN),
+      hasEncoding: text.includes(PRE_BEGIN),
+      file: found.file,
+      command: found.command,
+      reason: null,
+    };
   } catch {
-    return { installed: false, file: found.file, command: found.command, reason: 'not-powershell' };
+    return { installed: false, hasEncoding: false, file: found.file, command: found.command, reason: 'not-powershell' };
   }
 }
 
@@ -117,17 +154,32 @@ export function installTap() {
   } catch {
     return { ok: false, reason: 'not-powershell', file: found.file };
   }
-  if (text.includes(BEGIN)) return { ok: true, already: true, file: found.file };
+  const hasTap = text.includes(BEGIN);
+  const hasEncoding = text.includes(PRE_BEGIN);
+  if (hasTap && hasEncoding) return { ok: true, already: true, file: found.file };
 
-  // stdin을 읽는 줄 바로 뒤에 끼워 넣는다 — 그 시점에 payload가 온전히 손에 있다.
+  // stdin을 읽는 줄을 찾는다. 저장 코드는 그 **뒤**(payload가 온전히 손에 있는 시점),
+  // 인코딩 머리말은 그 **앞**에 들어간다(읽기 전에 맞춰야 의미가 있다).
+  //
+  // 머리말을 파일 맨 앞에 넣지 않는 이유: PowerShell의 `param()`은 첫 실행문이어야 하므로
+  // 그 앞에 문장을 끼우면 스크립트가 깨진다. stdin 읽기는 언제나 param 뒤에 있다.
   const stdinLine = text.match(/^([ \t]*)\$(\w+)\s*=\s*\[Console\]::In\.ReadToEnd\(\)[ \t]*$/m);
   if (!stdinLine) return { ok: false, reason: 'no-stdin-line', file: found.file };
 
-  const insertAt = stdinLine.index + stdinLine[0].length;
-  const next = `${text.slice(0, insertAt)}\r\n${snippet(stdinLine[2])}${text.slice(insertAt)}`;
+  const lineStart = stdinLine.index;
+  const lineEnd = lineStart + stdinLine[0].length;
+  const next = [
+    text.slice(0, lineStart),
+    hasEncoding ? '' : `${preSnippet()}\r\n`,
+    text.slice(lineStart, lineEnd),
+    hasTap ? '' : `\r\n${snippet(stdinLine[2])}`,
+    text.slice(lineEnd),
+  ].join('');
+
   try {
     const backup = save(found.file, next);
-    return { ok: true, file: found.file, backup, varName: stdinLine[2], hadBom };
+    // upgraded = 예전에 심어둔 tap에 인코딩 머리말만 보탠 경우
+    return { ok: true, upgraded: hasTap, file: found.file, backup, varName: stdinLine[2], hadBom };
   } catch (err) {
     return { ok: false, reason: 'write-failed', file: found.file, error: err.message };
   }
@@ -143,10 +195,11 @@ export function removeTap() {
   } catch {
     return { ok: false, reason: 'not-powershell', file: found.file };
   }
-  if (!text.includes(BEGIN)) return { ok: true, already: true, file: found.file };
+  if (!text.includes(BEGIN) && !text.includes(PRE_BEGIN)) return { ok: true, already: true, file: found.file };
 
   try {
-    const backup = save(found.file, text.replace(BLOCK, ''));
+    // 두 블록을 다 뺀다 — 심을 때 둘로 나눠 넣었으므로
+    const backup = save(found.file, text.replace(BLOCK, '').replace(PRE_BLOCK, ''));
     return { ok: true, file: found.file, backup };
   } catch (err) {
     return { ok: false, reason: 'write-failed', file: found.file, error: err.message };
@@ -160,7 +213,10 @@ export function manualGuide() {
     '',
     `  대상 파일: ${USAGE_FILE}`,
     '',
-    'PowerShell ($raw에 stdin이 들어 있다고 할 때):',
+    'PowerShell — stdin을 읽는 줄 **앞**에 (한글이 든 payload가 cp949로 깨지는 것을 막는다):',
+    preSnippet().replace(/\r\n/g, '\n'),
+    '',
+    'PowerShell — 읽은 **뒤**에 ($raw에 stdin이 들어 있다고 할 때):',
     snippet('raw').replace(/\r\n/g, '\n'),
     '',
     'bash ($payload에 stdin이 들어 있다고 할 때):',

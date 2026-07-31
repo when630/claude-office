@@ -44,7 +44,10 @@ export async function readUsage() {
     // statusline이 쓰는 순간과 겹치면 잘린 JSON을 볼 수 있다 — 그때는 직전 값을 유지한다
     raw = JSON.parse(await fs.readFile(USAGE_FILE, 'utf8'));
   } catch {
-    return cache.value;
+    // 겹친 순간이면 다음 틱에 풀린다. 그런데 파일이 **계속** 깨져 있는 경우도 있다 —
+    // statusline이 stdin을 cp949로 읽어 한글이 부서지면 JSON이 영구히 못 읽힌다.
+    // 그때 옛 값을 그대로 보여주면 거짓말이 되므로 깨졌다는 사실을 실어 보낸다.
+    return cache.value ? { ...cache.value, broken: true } : { at: st.mtimeMs, broken: true, session: null, week: null };
   }
 
   const value = {

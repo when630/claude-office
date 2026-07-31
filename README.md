@@ -157,7 +157,9 @@ Electron 43 · 런타임 의존성은 자동 업데이트(electron-updater) 하�
 - 빌드본은 코드 서명이 없다 — Windows는 SmartScreen 경고(`추가 정보 > 실행`),
   맥은 첫 실행 전 `xattr -cr` 한 번과 수동 업데이트를 감수해야 한다
 - 사용량 연동 자동 설치는 statusline이 PowerShell(.ps1)일 때만 된다 — bash 등은
-  트레이 메뉴가 띄우는 안내대로 한 줄을 손으로 넣으면 똑같이 동작한다
+  트레이 메뉴가 띄우는 안내대로 한 줄을 손으로 넣으면 똑같이 동작한다.
+  Korean Windows에서는 stdin 인코딩까지 맞춰야 한글이 든 payload가 깨지지 않는다
+  ([왜](docs/panel.md#stdin-인코딩을-왜-맞추나)) — 예전에 심어둔 것은 앱이 켜질 때 보태 준다
 
 ---
 
