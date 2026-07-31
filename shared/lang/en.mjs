@@ -146,6 +146,11 @@ export default {
   // ── Settings dialog
   cfg: {
     title: 'Settings',
+    notifySection: 'Notifications',
+    quiet: 'Quiet hours',
+    quietRange: 'Hours',
+    quietHint:
+      'The tray icon and the top-bar count stay exactly as they are while quiet — it goes silent, it does not let you miss anything. Ranges crossing midnight (<code>22:00 ~ 09:00</code>) work fine. To go quiet for a little while right now, use <b>tray icon &gt; Notifications &gt; Silence from now</b>.',
     langSection: 'Language',
     lang: 'Language',
     langNote: 'Language for app text and character lines',
@@ -207,6 +212,11 @@ export default {
     notifyContext: 'Context running out (85 · 95%)',
     notifyUsage: 'Account usage running out (80 · 95%)',
     notifyDone: 'Work finished (only jobs over {d})',
+    quietHours: 'Quiet hours ({from} ~ {to})',
+    quietNow: 'Silence from now',
+    quietToday: 'Rest of today (until midnight)',
+    quietUntil: 'Quiet until {when} — turn off',
+    quietNone: 'Not silenced right now',
     usageTap: 'Usage feed (statusline)',
     notifyTap: 'Find out what it is waiting for (Notification hook)',
     history: 'Attendance log',

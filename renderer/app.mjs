@@ -45,6 +45,20 @@ let selected = null;
 // 언어를 바꿨다고 저장된 값이 달라지면 안 된다.
 const NAME_MODES = ['show', 'mask', 'hide'];
 
+// 알림 설정 — main이 들고 있고(settings.json) 트레이 메뉴도 같은 값을 만진다.
+// 설정 창을 열 때마다 새로 받아 온다. IPC가 없으면(브라우저로 직접 연 경우) null로 남고
+// 알림 섹션은 그려지지 않는다.
+let notifyCfg = null;
+
+// 종류 이름은 트레이 메뉴와 같은 문구를 쓴다 — 같은 것을 두 이름으로 부르지 않는다.
+const KIND_LABEL = {
+  waiting: 'tray.notifyWaiting',
+  escalate: 'tray.notifyEscalate',
+  context: 'tray.notifyContext',
+  usage: 'tray.notifyUsage',
+  done: 'tray.notifyDone',
+};
+
 // ── 이름 가리기. 세션 이름은 작업 디렉터리·첫 지시에서 나오므로 화면을 남에게 보일 때
 // 가릴 수 있어야 한다. 대체 이름은 스냅샷 순서대로 붙인 번호다 — 같은 스냅샷 안에서는
 // 캔버스와 패널이 같은 이름을 부른다.
@@ -563,12 +577,47 @@ function options(entries, picked) {
     .join('');
 }
 
+// 알림 섹션. 트레이 메뉴에도 같은 항목이 있지만 시각을 고르는 일은 메뉴로 못 하고,
+// 종류가 다섯이라 한자리에 펼쳐 보이는 편이 켜고 끄기 쉽다.
+function notifyBlock() {
+  if (!notifyCfg) return '';
+  const q = notifyCfg.quiet;
+  const label = (k) => (k === 'done' ? t(KIND_LABEL[k], { d: fmtDur(notifyCfg.doneAfterMs) }) : t(KIND_LABEL[k]));
+  return `
+    <section class="block">
+      <h3>${t('cfg.notifySection')}</h3>
+      ${notifyCfg.kinds
+        .filter((k) => KIND_LABEL[k])
+        .map(
+          (k) => `<label class="cfg-check">
+            <input type="checkbox" data-notify="${esc(k)}"${notifyCfg.notify[k] ? ' checked' : ''}>
+            <span>${esc(label(k))}</span>
+          </label>`,
+        )
+        .join('')}
+      <label class="cfg-check">
+        <input type="checkbox" id="cfg-quiet-on"${q.hours ? ' checked' : ''}>
+        <span>${t('cfg.quiet')}</span>
+      </label>
+      <div class="cfg-row">
+        <label for="cfg-quiet-from"><b>${t('cfg.quietRange')}</b></label>
+        <input type="time" id="cfg-quiet-from" value="${esc(q.from)}">
+        <span class="cfg-sep">~</span>
+        <input type="time" id="cfg-quiet-to" value="${esc(q.to)}">
+      </div>
+      <p class="hint">${t('cfg.quietHint')}</p>
+    </section>
+  `;
+}
+
 function drawCfg() {
   const rooms = state.rooms ?? [];
   const picked = Object.keys(cfg.roomThemes).length;
   cfgRooms = roomSig();
 
   cfgBody.innerHTML = `
+    ${notifyBlock()}
+
     <section class="block">
       <h3>${t('cfg.langSection')}</h3>
       <div class="cfg-row">
@@ -625,7 +674,14 @@ async function saveView(patch) {
   if (saved) cfg = normalizeView(saved);
 }
 
-document.getElementById('cfg-open').addEventListener('click', () => {
+// 알림 설정은 트레이 메뉴에서도 바뀐다 — 열 때마다 새로 받아 와야 화면이 실제와 맞는다.
+async function saveNotify(patch) {
+  const next = await window.office?.setNotify?.(patch).catch(() => null);
+  if (next) notifyCfg = next;
+}
+
+document.getElementById('cfg-open').addEventListener('click', async () => {
+  notifyCfg = (await window.office?.getNotify?.().catch(() => null)) ?? notifyCfg;
   drawCfg();
   cfgDialog.showModal();
 });
@@ -648,6 +704,22 @@ cfgBody.addEventListener('change', (e) => {
   }
   if (el.id === 'cfg-names') {
     saveView({ names: el.value });
+    return;
+  }
+  if (el.dataset?.notify) {
+    saveNotify({ notify: { [el.dataset.notify]: el.checked } });
+    return;
+  }
+  if (el.id === 'cfg-quiet-on') {
+    saveNotify({ quiet: { hours: el.checked } });
+    return;
+  }
+  if (el.id === 'cfg-quiet-from' || el.id === 'cfg-quiet-to') {
+    const which = el.id.endsWith('from') ? 'from' : 'to';
+    // 시각 칸을 비운 채로 두면 main이 기본값으로 되돌린다 — 화면도 그 값으로 맞춰 준다
+    saveNotify({ quiet: { [which]: el.value } }).then(() => {
+      if (notifyCfg) el.value = notifyCfg.quiet[which];
+    });
     return;
   }
   const key = el.dataset?.room;
