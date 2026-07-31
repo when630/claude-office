@@ -53,5 +53,9 @@ npm run usage-tap:remove   # 빼기
 네 줄짜리 `try { … } catch { }` 블록을 넣는다. 실패해도 statusline 자체는 그대로 돌고,
 `# >>> claude-office usage tap >>>` 마커로 감싸 두어 여러 번 실행해도 한 번만 심긴다.
 PowerShell 5.1이 한글 주석을 cp949로 읽지 않도록 저장할 때 BOM을 붙인다.
-자동으로 못 찾으면 직접 넣을 수 있는 코드를 알려준다(트레이는 대화상자로, CLI는 표준출력으로).
+
+**자동 설치는 statusline이 PowerShell(.ps1)일 때만 된다.** bash 등 다른 statusline이면 —
+맥은 항상 이 경우다 — 직접 넣을 수 있는 코드를 알려준다(트레이는 대화상자로, CLI는 표준출력으로).
+안내에는 bash용 한 줄(`printf '%s' "$payload" > …/office-usage.json`)도 들어 있어,
+stdin을 읽은 뒤에 그대로 넣으면 똑같이 동작한다.
 tap이 없으면 그 칸에 안내만 뜨고 나머지 기능은 전부 그대로 동작한다.
