@@ -20,11 +20,13 @@ import {
   longestWait,
   sanitizeNotify,
   sanitizeQuiet,
+  sanitizeRoomNotify,
   isQuiet,
   midnightAfter,
   BLINK_AFTER_MS,
   DONE_MIN_BUSY_MS,
   NOTIFY_KINDS,
+  ROOM_LEVELS,
 } from './notify.mjs';
 import { openTerminal, reasonText as terminalReason } from './terminal.mjs';
 import { t, fmtDur, fmtWhen, setLang, resolveLang, LANGS, LANG_NAMES } from '../shared/i18n.mjs';
@@ -72,6 +74,7 @@ const defaults = {
   lang: 'auto',
   notify: sanitizeNotify(), // 종류별 on/off — 어휘와 하위 호환은 main/notify.mjs가 정한다
   quiet: sanitizeQuiet(), // 방해금지 — 조용한 시간대와 임시 무음(until)
+  roomNotify: {}, // 방 이름 → 알림 세기('off' | 'keen'). 보통인 방은 적지 않는다
   history: true,
   trayHintShown: false,
   view: { names: 'show', roomThemes: {} },
@@ -102,6 +105,7 @@ function loadSettings() {
     lang: LANG_PREFS.includes(saved.lang) ? saved.lang : defaults.lang,
     notify: sanitizeNotify(saved.notify),
     quiet: sanitizeQuiet(saved.quiet),
+    roomNotify: sanitizeRoomNotify(saved.roomNotify),
     view: sanitizeView(saved.view),
   };
   applyLang();
@@ -163,6 +167,8 @@ function notifySettings() {
     notify: settings.notify,
     quiet: settings.quiet,
     doneAfterMs: DONE_MIN_BUSY_MS,
+    levels: ROOM_LEVELS,
+    roomNotify: settings.roomNotify,
   };
 }
 
@@ -299,7 +305,7 @@ function notify(title, body, onClick) {
 // 다음 문턱에서 자연히 다시 부른다. 트레이 점·깜빡임은 조용한 동안에도 그대로다.
 function maybeNotify(snapshot) {
   const quiet = isQuiet(settings.quiet);
-  for (const item of decideNotifications(notifyState, snapshot)) {
+  for (const item of decideNotifications(notifyState, snapshot, Date.now(), settings.roomNotify)) {
     if (!notifyOn(item.kind) || quiet) continue;
     // 세션에 딸린 알림은 그 자리를 펼쳐주고, 계정 사용량처럼 주인이 없는 건 창만 띄운다
     notify(item.title, item.body, item.key ? () => selectInWindow(item.key) : showWindow);
@@ -712,6 +718,7 @@ if (!app.requestSingleInstanceLock()) {
     ipcMain.handle('office:getNotify', () => notifySettings());
     ipcMain.handle('office:setNotify', (_e, patch) => {
       if (patch?.notify) settings.notify = sanitizeNotify({ ...settings.notify, ...patch.notify });
+      if (patch?.roomNotify) settings.roomNotify = sanitizeRoomNotify({ ...settings.roomNotify, ...patch.roomNotify });
       if (patch?.quiet) return setQuiet(patch.quiet);
       saveSettings();
       refreshTrayMenu();

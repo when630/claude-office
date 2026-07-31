@@ -80,6 +80,13 @@ export default {
     terminal: 'Terminal',
   },
 
+  // Per-room alert level (the room list in Settings)
+  roomLevel: {
+    off: 'No alerts',
+    normal: 'Normal',
+    keen: 'Keen',
+  },
+
   // ── Default view (nothing selected)
   idle: {
     office: 'Office',
@@ -160,11 +167,12 @@ export default {
     namesNote: 'Name used on desk tags and as the panel heading',
     namesHint:
       'Masking calls them <code>Clawd 1, 2…</code>. Use it when showing your screen to someone — the working directory path still shows in the panel.',
-    roomsSection: 'Room type',
+    roomsSection: 'Rooms — type and alerts',
+    roomNotify: 'Alert level',
     roomsEmpty: 'No rooms are up right now. Once a session attaches you can pick its type here.',
     roomsReset: 'Reset all to auto',
     roomsHint:
-      'Auto assigns by hashing the room name. A type you pick is remembered by working-directory name, so it survives the room going away and coming back.',
+      'Auto assigns by hashing the room name. A type you pick is remembered by working-directory name, so it survives the room going away and coming back. The box on the right is how loudly that room may call you — <b>No alerts</b> keeps its sessions from notifying at all (they still show up in the office), and <b>Keen</b> pulls the repeat nudges in to <code>1 · 3 · 10 · 30 min</code>.',
   },
 
   // ── Attendance
