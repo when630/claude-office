@@ -128,6 +128,67 @@ main {
   height: calc(100% - 42px);
 }
 
+/* ── 미니 모드. 같은 페이지를 작은 창에서 열고 사무실만 남긴다.
+   프레임이 없는 창이라 손잡이(#mini-bar)가 유일한 드래그 영역이다. */
+#mini-bar {
+  display: none;
+}
+body.mini #topbar,
+body.mini #panel,
+body.mini #help-open,
+body.mini #help {
+  display: none;
+}
+body.mini #mini-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 22px;
+  padding: 0 6px 0 9px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-soft);
+  font-size: 11px;
+  color: var(--dim);
+  /* 창을 끄는 자리 — 버튼만 빼고 전부 손잡이다 */
+  -webkit-app-region: drag;
+}
+body.mini main {
+  height: calc(100% - 22px);
+}
+/* 좁은 창에서 스크롤바까지 서면 그만큼 사무실이 줄어든다 — 스크롤은 되되 막대는 감춘다 */
+body.mini #stage {
+  padding: 6px;
+  scrollbar-width: none;
+}
+body.mini #stage::-webkit-scrollbar {
+  display: none;
+}
+#mini-stats .w {
+  color: var(--accent);
+}
+#mini-stats .s {
+  color: #e0a95c;
+}
+#mini-stats .f {
+  color: var(--red);
+}
+#mini-grow {
+  margin-left: auto;
+  padding: 0 5px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: var(--dim);
+  font: inherit;
+  line-height: 18px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+#mini-grow:hover {
+  border-color: var(--line);
+  color: var(--text);
+}
+
 #stage {
   flex: 1;
   overflow: auto;

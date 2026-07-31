@@ -33,6 +33,7 @@ export default {
   topbar: {
     attendance: 'Attendance',
     settings: 'Settings',
+    mini: 'Shrink to a corner',
     in: 'in',
     typing: 'working',
     waiting: 'waiting on you',
@@ -75,6 +76,11 @@ export default {
     hide: 'No name tags',
     alias: 'Clawd {n}',
     aliasBare: 'Clawd',
+  },
+
+  // Mini-window handle
+  mini: {
+    grow: 'Back to full size',
   },
 
   kind: {
@@ -226,6 +232,7 @@ export default {
     failed: '{n} failed',
     update: 'Install update and restart (v{v})',
     open: 'Open the office',
+    mini: 'Mini window (always on top)',
     waitingList: 'Waiting on you',
     waitingNone: 'Nothing waiting on you',
     notify: 'Notifications',

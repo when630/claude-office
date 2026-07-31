@@ -30,6 +30,7 @@ export default {
   topbar: {
     attendance: '출근부',
     settings: '설정',
+    mini: '작게 띄우기',
     in: '출근',
     typing: '작업 중',
     waiting: '입력 대기',
@@ -72,6 +73,11 @@ export default {
     hide: '이름표 없음',
     alias: '클로드 {n}',
     aliasBare: '클로드',
+  },
+
+  // 미니 모드 손잡이
+  mini: {
+    grow: '원래 크기로',
   },
 
   kind: {
@@ -222,6 +228,7 @@ export default {
     failed: '{n} 실패',
     update: '업데이트 설치하고 재시작 (v{v})',
     open: '사무실 열기',
+    mini: '작게 띄우기 (항상 위)',
     waitingList: '기다리는 세션',
     waitingNone: '기다리는 세션이 없습니다',
     notify: '알림',

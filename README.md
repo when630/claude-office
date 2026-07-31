@@ -123,6 +123,11 @@ Automatic installation is blocked for unsigned macOS builds, so there a new vers
 
 - Closing the window does not quit — it drops to the tray (menu bar on macOS). To really quit:
   **tray icon > Quit**
+- **Shrink to a corner** — the `▭` button in the top bar (or the tray menu) drops the office
+  into a small frameless window that stays **always on top**. Just the office and a one-line
+  count. Space is tight, so it keeps three rooms and puts the ones **waiting on you or going in
+  circles** first. Click a desk and it grows back with that desk selected. Size, position and
+  mode are remembered, so it comes back the way you left it
 - **Waiting on you** in the tray menu lists whatever is waiting, longest first — click one and
   **its terminal opens right there.** No need to open the window and hunt for the desk
 - Two **global shortcuts** (rebind them in Settings) — `Ctrl+Alt+O` shows and hides the window,
