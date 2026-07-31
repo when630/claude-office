@@ -10,6 +10,7 @@ main/notify.mjs     무엇을 알릴지 — 대기 재알림·컨텍스트·사�
                     Electron을 모르고 `now`를 인자로 받는다(그래서 테스트가 된다)
 main/usage-tap.mjs  statusline에 사용량 tap 심기/빼기 (트레이·CLI 공용 로직)
 main/terminal.mjs   세션의 터미널 열기 (Windows Terminal · Terminal.app) — id만 받아 명령을 조립한다
+main/history.mjs    근태 기록 — 상태 전이만 jsonl로 남기고 물어보면 집계한다 (출근부)
 main/updater.mjs    GitHub Releases 자동 업데이트 — 받아두고 트레이 재시작 또는 종료 시 설치
                     (서명 없는 맥은 설치가 거부되므로 검사만 하고 알림으로 안내)
 main/preload.cjs    contextBridge (샌드박스라 CJS여야 한다)
@@ -43,6 +44,9 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   문턱을 건드렸으면 `npm test`로 확인한다 (시각을 인자로 받으므로 30분을 기다릴 필요가 없다)
 - `main/terminal.mjs` — 터미널을 띄우는 방법(`openWindows`·`openMac`), 셸에 넘길 id의 허용 문자(`ID_OK`).
   다른 터미널 앱을 쓰려면 여기에 분기를 넣는다
+- `main/history.mjs` — 무엇을 남길지(`diffEvents`), 시간을 어떻게 셀지(`summarize`·`BUCKET`),
+  보존 기간(`RETAIN_MS`), 대기 목록에 올릴 최소 길이(`WAIT_WORTH_MS`).
+  시각을 인자로 받으므로 하루를 기다리지 않고 `test/history.test.mjs`가 확인한다
 - `main/index.mjs` — `POLL_MS`, `BLINK_MS`(깜빡임 주기), `signature`(스냅샷 중복 전송 판정에서 뺄 필드)
 
 ## 디버그 입구

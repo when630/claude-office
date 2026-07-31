@@ -16,6 +16,17 @@ import {
   BLINK_AFTER_MS,
 } from './notify.mjs';
 import { openTerminal, REASONS as TERMINAL_REASONS } from './terminal.mjs';
+import {
+  diffEvents,
+  bootEvent,
+  appendEvents,
+  readEvents,
+  pruneFile,
+  clearFile,
+  summarize,
+  dayStart,
+  RETAIN_MS,
+} from './history.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -39,10 +50,11 @@ let updateReady = null; // 받아 둔 새 버전 — 트레이 메뉴에 재시�
 
 // ── 설정 (userData/settings.json)
 //
-// notify·trayHintShown은 main만 쓰고, view는 렌더러가 쓴다(설정 창 → office:setView).
+// notify·trayHintShown·history는 main만 쓰고, view는 렌더러가 쓴다(설정 창 → office:setView).
 // 방 종류를 방 key(작업 디렉터리 이름)로 기억하므로 앱을 다시 켜도 고른 방이 그대로 남는다.
 const defaults = {
   notify: sanitizeNotify(), // 종류별 on/off — 어휘와 하위 호환은 main/notify.mjs가 정한다
+  history: true,
   trayHintShown: false,
   view: { names: 'show', roomThemes: {} },
 };
@@ -51,6 +63,11 @@ let settings = { ...defaults, view: { ...defaults.view } };
 
 function settingsPath() {
   return path.join(app.getPath('userData'), 'settings.json');
+}
+
+// 근태 기록. 설정과 같은 자리에 두어 통째로 지우기 쉽게 한다.
+function historyPath() {
+  return path.join(app.getPath('userData'), 'history.jsonl');
 }
 
 function loadSettings() {
@@ -298,6 +315,29 @@ function toggleTap(want) {
     });
 }
 
+// 기록은 되돌릴 수 없으니 한 번 묻는다
+function confirmClearHistory() {
+  dialog
+    .showMessageBox({
+      type: 'warning',
+      title: '근태 기록 지우기',
+      message: '지금까지 쌓인 근태 기록을 지울까요?',
+      detail: `${historyPath()}\n\n출근부의 오늘·최근 7일 집계가 빈 상태로 돌아갑니다. 되돌릴 수 없습니다.`,
+      buttons: ['취소', '지우기'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    })
+    .then(({ response }) => {
+      if (response !== 1) return;
+      const ok = clearFile(historyPath());
+      notify('근태 기록', ok ? '기록을 지웠습니다.' : '기록을 지우지 못했습니다.');
+    })
+    .catch(() => {
+      /* 대화상자를 못 띄우는 상황이면 아무것도 지우지 않는다 */
+    });
+}
+
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
     ...(updateReady
@@ -343,6 +383,16 @@ function buildTrayMenu() {
       checked: tapStatus().installed,
       click: (item) => toggleTap(item.checked),
     },
+    {
+      label: '근태 기록 (출근부)',
+      type: 'checkbox',
+      checked: settings.history,
+      click: (item) => {
+        settings.history = item.checked;
+        saveSettings();
+      },
+    },
+    { label: '근태 기록 지우기…', click: confirmClearHistory },
     {
       label: '로그인 시 자동 시작',
       type: 'checkbox',
@@ -394,6 +444,8 @@ async function tick() {
     return;
   }
   const json = signature(snapshot);
+  // 전이만 남긴다 — lastSnapshot을 갈아 끼우기 전에 비교해야 한다
+  if (settings.history) appendEvents(historyPath(), diffEvents(lastSnapshot, snapshot));
   lastSnapshot = snapshot;
   updateTray(snapshot);
   maybeNotify(snapshot);
@@ -411,6 +463,11 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(async () => {
     app.setAppUserModelId(app.isPackaged ? APP_ID : process.execPath);
     loadSettings();
+
+    // 오래된 기록을 덜어내고 "여기서 앱이 켜졌다"를 남긴다 — 앱이 꺼져 있던 동안을 근태로
+    // 세지 않기 위한 표시다(main/history.mjs의 재생 규칙).
+    pruneFile(historyPath());
+    if (settings.history) appendEvents(historyPath(), [bootEvent()]);
 
     ipcMain.handle('office:getState', () => lastSnapshot);
     ipcMain.handle('office:meta', () => ({
@@ -431,6 +488,19 @@ if (!app.requestSingleInstanceLock()) {
         sessionId: target?.sessionId,
       });
       return { ...res, message: res.ok ? null : (TERMINAL_REASONS[res.reason] ?? '터미널을 열지 못했습니다.') };
+    });
+
+    // 출근부. 오늘과 최근 7일을 한 번에 넘긴다 — 창을 열 때 한 번만 읽으면 되고,
+    // 파일이 커도 보존 기간(14일)만큼이라 한 번에 읽어 집계해도 부담이 없다.
+    ipcMain.handle('office:history', () => {
+      const events = readEvents(historyPath());
+      const now = Date.now();
+      return {
+        on: settings.history,
+        retainDays: Math.round(RETAIN_MS / 86_400_000),
+        today: summarize(events, { from: dayStart(now), to: now }),
+        week: summarize(events, { from: dayStart(now, 6), to: now }),
+      };
     });
 
     // 설정 창(렌더러)이 쓰는 표시 설정. 저장된 값을 되돌려주므로 렌더러는 반영만 하면 된다.

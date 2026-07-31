@@ -17,6 +17,7 @@
       <div id="stats"></div>
       <div class="right">
         <span id="clock"></span>
+        <button id="att-open" type="button" title="출근부">출근부</button>
         <button id="cfg-open" type="button" title="설정">설정</button>
       </div>
     </header>
@@ -34,6 +35,15 @@
         <button id="cfg-close" type="button" title="닫기">닫기</button>
       </header>
       <div id="cfg-body"></div>
+    </dialog>
+
+    <!-- 출근부. 열 때마다 main에서 집계를 받아 온다(스냅샷과 달리 밀려 오지 않는다). -->
+    <dialog id="att">
+      <header>
+        <h2>출근부</h2>
+        <button id="att-close" type="button" title="닫기">닫기</button>
+      </header>
+      <div id="att-body"></div>
     </dialog>
 
     <script type="module" src="./app.mjs"></script>
