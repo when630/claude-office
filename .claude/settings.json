@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run icons)",
+      "Bash(node --check *)",
+      "Bash(npx electron-builder --win --dir)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)"
+    ],
+    "ask": ["Bash(git push *)"],
+    "deny": [
+      "Read(./.env*)",
+      "Read(./**/*.pem)",
+      "Bash(rm -rf *)",
+      "Bash(*electron-builder*--publish*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/check-syntax.mjs\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
