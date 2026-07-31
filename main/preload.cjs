@@ -17,4 +17,7 @@ contextBridge.exposeInMainWorld('office', {
   // 설정 창의 표시 설정 — 저장된 뒤의 값을 되돌려준다
   getView: () => ipcRenderer.invoke('office:getView'),
   setView: (patch) => ipcRenderer.invoke('office:setView', patch),
+  // 언어. 트레이 메뉴에서도 바꿀 수 있으므로 밀어주는 쪽(onLang)도 있어야 한다.
+  setLang: (pref) => ipcRenderer.invoke('office:setLang', pref),
+  onLang: (cb) => ipcRenderer.on('office:lang', (_e, payload) => cb(payload)),
 });

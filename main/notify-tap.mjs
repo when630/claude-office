@@ -10,26 +10,28 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { CLAUDE_DIR, NOTIFY_DIR } from './paths.mjs';
+import { t, has } from '../shared/i18n.mjs';
 
 const SETTINGS = path.join(CLAUDE_DIR, 'settings.json');
 
 // 세션이 끝난 뒤 남은 파일을 언제까지 믿을지. 이보다 오래된 것은 읽지 않고 지운다.
 const NOTE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
-export const REASONS = {
-  'no-node': 'node를 찾지 못했습니다 — 훅이 실행되지 않으므로 심지 않았습니다.',
-  'bad-settings': `${SETTINGS}을 읽지 못했습니다(형식이 깨졌을 수 있습니다). 손대지 않았습니다.`,
-  'write-failed': '설정을 저장하지 못했습니다.',
-  'not-installed': '심어둔 것이 없습니다.',
-};
+// 실패 사유를 지금 언어의 문구로 (사용량 tap과 같은 규칙 — 사유 키는 결과에 그대로 남는다)
+export function reasonText(reason) {
+  const key = `ntap.reason.${reason}`;
+  return has(key) ? t(key, { settings: SETTINGS }) : t('ntap.failed');
+}
 
 // 훅이 돌릴 스크립트. 세션마다 파일 하나를 덮어쓰므로 파일이 자라지 않는다.
 // 조용히 실패해야 한다 — 여기서 죽으면 세션 쪽 알림이 막힌다.
+//
+// 주석은 앱 언어와 무관하게 영어다 — 사용량 tap의 심는 코드와 같은 이유다.
 function scriptSource() {
   // .mjs로 저장하므로 ESM이다 — require는 여기서 정의되지 않는다(그렇게 썼다가 훅이 통째로
   // 죽는 것을 실측에서 잡았다).
-  return `// Claude Office가 심은 Notification 훅. 지워도 앱의 "무엇을 기다리는지"만 조용해집니다.
-// 세션이 무엇을 기다리는지 세션별 파일 하나에 덮어씁니다.
+  return `// Notification hook installed by Claude Office. Deleting it only silences
+// "what it is waiting for" in the app. Overwrites one file per session.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -172,11 +174,11 @@ export function removeNotifyTap(scriptPath) {
 // 손으로 넣을 수 있게 — settings.json을 앱이 못 고치는 경우(형식이 깨졌거나 권한이 없을 때)
 export function manualGuide(scriptPath) {
   return [
-    `${SETTINGS} 의 hooks에 아래를 넣으면 같은 일을 합니다:`,
+    t('ntap.guide.intro', { settings: SETTINGS }),
     '',
     JSON.stringify({ hooks: { Notification: [{ hooks: [{ type: 'command', command: commandFor(scriptPath) }] }] } }, null, 2),
     '',
-    `스크립트는 ${scriptPath} 에 있습니다(연동을 한 번 켜면 앱이 만들어 둡니다).`,
+    t('ntap.guide.script', { script: scriptPath }),
   ].join('\n');
 }
 

@@ -658,9 +658,8 @@ b.lv-na {
 .copy:hover {
   border-color: #39414f;
 }
-.copy.done span::after {
-  content: '됨';
-}
+/* 눌렀다는 표시는 색만 여기서 낸다 — 글자는 app.mjs가 갈아 끼운다.
+   CSS의 content로 "됨"을 덧붙이던 방식은 한국어에서만 말이 된다(Copy + 됨). */
 .copy.done span {
   color: var(--green);
 }

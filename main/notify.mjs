@@ -6,6 +6,10 @@
 //
 // 알림 종류를 껐더라도 상태는 전진시킨다 — 걸러내는 일은 부르는 쪽(설정)에 맡긴다.
 // 여기서 걸러 버리면 꺼둔 동안 넘긴 문턱이 켜는 순간 한꺼번에 터진다.
+//
+// 문구는 shared/i18n.mjs에서 온다. 언어는 모듈이 들고 있으므로 판정 함수의 인자가 늘지 않는다 —
+// 테스트에서 언어를 바꿔 보려면 setLang()을 먼저 부르면 된다.
+import { t, fmtDur, fmtTokens } from '../shared/i18n.mjs';
 
 // 대기를 한 번 알리고 끝내면 그 토스트를 놓친 순간(회의 중·전체화면·다른 가상 데스크톱)
 // 앱이 영원히 조용해진다 — 30분 방치된 세션과 방금 뜬 프롬프트가 똑같이 취급된다.
@@ -16,7 +20,7 @@ export const BLINK_AFTER_MS = WAIT_STEPS_MS[0];
 export const CONTEXT_STEPS = [85, 95];
 export const USAGE_STEPS = [80, 95];
 
-const USAGE_LABEL = { session: '세션 사용량 (5시간)', week: '주간 사용량 (7일)' };
+const USAGE_LABEL = { session: 'notify.usageSession', week: 'notify.usageWeek' };
 
 export const NOTIFY_KINDS = ['waiting', 'escalate', 'context', 'usage'];
 
@@ -41,21 +45,6 @@ export function createNotifyState() {
     // 첫 스냅샷을 지났는지. 앱을 막 켠 순간엔 이미 벌어져 있던 일까지 쏟아내지 않는다.
     primed: false,
   };
-}
-
-// 알림 문구용 — "12분", "1시간 5분"
-export function fmtDur(ms) {
-  const m = Math.max(0, Math.round(ms / 60000));
-  if (m < 60) return `${m}분`;
-  const h = Math.floor(m / 60);
-  return m % 60 ? `${h}시간 ${m % 60}분` : `${h}시간`;
-}
-
-export function fmtTokens(n) {
-  if (!n) return '—';
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 ? 2 : 0)}M`;
-  if (n >= 1000) return `${Math.round(n / 1000)}K`;
-  return String(n);
 }
 
 // 값이 넘어선 문턱의 개수. 오름차순 배열을 전제한다.
@@ -84,7 +73,7 @@ export function longestWait(snapshot, now = Date.now()) {
 
 // 터미널 세션은 무엇을 묻는지 알 수 없다(선택지는 답하기 전엔 대화 파일에 안 남는다)
 function needsText(w) {
-  return w.needs || (w.kind === 'bg' ? '입력이 필요합니다' : '터미널에 선택지나 확인이 떠 있습니다');
+  return w.needs || t(w.kind === 'bg' ? 'notify.needsBg' : 'notify.needsTerminal');
 }
 
 function decideWaiting(state, snapshot, now, first, out) {
@@ -109,7 +98,7 @@ function decideWaiting(state, snapshot, now, first, out) {
     // 처음 보는 놈, 또는 답한 뒤 다시 물어본 놈(그때 statusAt이 갱신된다)
     if (!prev || prev.at !== w.statusAt) {
       state.waiting.set(key, { at: w.statusAt, step });
-      out.push({ kind: 'waiting', key, title: `${w.name} 이(가) 기다립니다`, body: needsText(w) });
+      out.push({ kind: 'waiting', key, title: t('notify.waitingTitle', { name: w.name }), body: needsText(w) });
       continue;
     }
 
@@ -118,7 +107,7 @@ function decideWaiting(state, snapshot, now, first, out) {
     out.push({
       kind: 'escalate',
       key,
-      title: `${w.name} 이(가) 아직 기다립니다 — ${fmtDur(waited)}째`,
+      title: t('notify.escalateTitle', { name: w.name, d: fmtDur(waited) }),
       body: needsText(w),
     });
   }
@@ -140,8 +129,11 @@ function decideContext(state, snapshot, first, out) {
     out.push({
       kind: 'context',
       key: w.key,
-      title: `${w.name} 컨텍스트 ${pct}%`,
-      body: `${fmtTokens(w.context.tokens)} / ${fmtTokens(w.context.limit)} — 곧 자동 압축이 돌 수 있습니다.`,
+      title: t('notify.contextTitle', { name: w.name, pct }),
+      body: t('notify.contextBody', {
+        used: fmtTokens(w.context.tokens),
+        limit: fmtTokens(w.context.limit),
+      }),
     });
   }
   for (const key of [...state.context.keys()]) if (!live.has(key)) state.context.delete(key);
@@ -163,9 +155,13 @@ function decideUsage(state, usage, now, first, out) {
     state.usage[kind] = step;
     if (first || step <= prev) continue;
     const resetsAt = usage[kind].resetsAt;
-    const resets = resetsAt ? ` · ${fmtDur(resetsAt - now)} 뒤 초기화` : '';
+    const resets = resetsAt ? t('notify.usageResets', { d: fmtDur(resetsAt - now) }) : '';
     // key가 없으면 부르는 쪽이 창만 띄운다 — 특정 세션의 일이 아니다
-    out.push({ kind: 'usage', title: `${USAGE_LABEL[kind]} ${pct}%`, body: `남은 여유가 얼마 없습니다${resets}.` });
+    out.push({
+      kind: 'usage',
+      title: t('notify.usageTitle', { label: t(USAGE_LABEL[kind]), pct }),
+      body: t('notify.usageBody', { resets }),
+    });
   }
 }
 

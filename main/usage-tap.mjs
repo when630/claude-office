@@ -14,6 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { CLAUDE_DIR, USAGE_FILE } from './paths.mjs';
+import { t, has } from '../shared/i18n.mjs';
 
 export const BEGIN = '# >>> claude-office usage tap >>>';
 export const END = '# <<< claude-office usage tap <<<';
@@ -23,15 +24,12 @@ export const END = '# <<< claude-office usage tap <<<';
 export const PRE_BEGIN = '# >>> claude-office stdin encoding >>>';
 export const PRE_END = '# <<< claude-office stdin encoding <<<';
 
-// 실패 사유. 트레이는 이걸로 안내 문구를 고르고, CLI는 그대로 찍는다.
-export const REASONS = {
-  'no-statusline': '~/.claude/settings.json에 statusLine 설정이 없습니다.',
-  'not-powershell': 'statusLine이 가리키는 PowerShell 스크립트(.ps1)를 찾지 못했습니다.',
-  'no-stdin-line': 'statusline 스크립트에서 stdin을 읽는 줄($x = [Console]::In.ReadToEnd())을 찾지 못했습니다.',
-  'not-installed': '심어진 tap이 없습니다.',
-  'already-installed': '이미 심어져 있습니다.',
-  'write-failed': 'statusline 스크립트를 고쳐 쓰지 못했습니다.',
-};
+// 실패 사유를 지금 언어의 문구로. 트레이는 이걸로 안내를 고르고, CLI는 그대로 찍는다.
+// 사유 키(reason)는 돌려주는 결과에 그대로 남는다 — 부르는 쪽이 키로 분기할 수 있어야 한다.
+export function reasonText(reason) {
+  const key = `tap.reason.${reason}`;
+  return has(key) ? t(key) : t('tap.failed');
+}
 
 // stdin을 읽기 **전에** 인코딩을 UTF-8로 맞춘다.
 //
@@ -41,10 +39,14 @@ export const REASONS = {
 // 뒤에서 UTF-8로 다시 써도 복구되지 않는다. JSON이 부서져 앱은 사용량을 아예 못 읽는다.
 //
 // 이 줄은 statusline 자신의 한글 출력도 같이 고쳐 주므로 손해가 없다.
+//
+// 심는 코드의 주석은 앱 언어와 무관하게 영어다 — 남의 스크립트에 남는 글이고, 앱 언어를
+// 바꾼다고 이미 심어둔 파일을 다시 쓰지는 않으므로 언어를 따라가게 하면 파일마다 언어가
+// 섞인다. 탐지는 BEGIN/PRE_BEGIN 표식으로 하므로 주석 문구는 탐지와 무관하다.
 export function preSnippet() {
   return [
     PRE_BEGIN,
-    `# stdin(JSON)을 UTF-8로 읽게 맞춘다. 이게 없으면 한글이 든 payload가 cp949로 깨진다.`,
+    `# Read stdin (JSON) as UTF-8. Without this, payloads with non-ASCII text break as cp949.`,
     `try { [Console]::InputEncoding = New-Object System.Text.UTF8Encoding $false } catch { }`,
     PRE_END,
   ].join('\r\n');
@@ -53,8 +55,8 @@ export function preSnippet() {
 export function snippet(varName) {
   return [
     BEGIN,
-    `# Claude Office가 세션·주간 사용률을 읽어가는 자리. payload를 그대로 남긴다.`,
-    `# 지워도 statusline 동작에는 영향이 없다 (앱에서 사용량 표시만 사라진다).`,
+    `# Where Claude Office reads your session and weekly usage from. Keeps the payload as-is.`,
+    `# Safe to delete — your statusline keeps working (only the app's usage display goes away).`,
     `try {`,
     `    $__officeDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $env:USERPROFILE '.claude' }`,
     `    [IO.File]::WriteAllText((Join-Path $__officeDir 'office-usage.json'), $${varName}, (New-Object System.Text.UTF8Encoding $false))`,
@@ -209,17 +211,17 @@ export function removeTap() {
 // 자동으로 못 붙였을 때 띄우는 안내. 트레이 대화상자와 CLI가 같은 문구를 쓴다.
 export function manualGuide() {
   return [
-    'statusline이 stdin으로 받은 원본 JSON을 그대로 아래 경로에 쓰면 됩니다.',
+    t('tap.guide.intro'),
     '',
-    `  대상 파일: ${USAGE_FILE}`,
+    t('tap.guide.target', { file: USAGE_FILE }),
     '',
-    'PowerShell — stdin을 읽는 줄 **앞**에 (한글이 든 payload가 cp949로 깨지는 것을 막는다):',
+    t('tap.guide.pre'),
     preSnippet().replace(/\r\n/g, '\n'),
     '',
-    'PowerShell — 읽은 **뒤**에 ($raw에 stdin이 들어 있다고 할 때):',
+    t('tap.guide.post'),
     snippet('raw').replace(/\r\n/g, '\n'),
     '',
-    'bash ($payload에 stdin이 들어 있다고 할 때):',
+    t('tap.guide.bash'),
     `  printf '%s' "$payload" > "\${CLAUDE_CONFIG_DIR:-$HOME/.claude}/office-usage.json"`,
   ].join('\n');
 }

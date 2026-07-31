@@ -10,6 +10,7 @@
 // 판정과 집계는 순수 함수로 두고 파일 I/O만 아래에 모았다 — 시간에 달린 로직이라 테스트가 필요하다.
 import fs from 'node:fs';
 import path from 'node:path';
+import { t } from '../shared/i18n.mjs';
 
 // 기록을 얼마나 들고 있을지. 앱 시작할 때 이보다 오래된 줄을 덜어낸다.
 export const RETAIN_MS = 14 * 24 * 60 * 60 * 1000;
@@ -83,7 +84,9 @@ export function summarize(events, { from, to }) {
   let maxCtx = null;
 
   const roomOf = (name) => {
-    const key = name || '(알 수 없음)';
+    // 이름이 빠진 줄을 모으는 자리. 집계할 때 붙이므로 기록 자체는 언어를 타지 않는다 —
+    // 지난 기록을 지금 언어로 읽게 하려면 파일에 문구를 남기지 않아야 한다.
+    const key = name || t('att.unknownRoom');
     if (!rooms.has(key)) rooms.set(key, { room: key, keys: new Set(), busyMs: 0, waitMs: 0, idleMs: 0 });
     return rooms.get(key);
   };
