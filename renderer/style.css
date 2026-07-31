@@ -934,6 +934,34 @@ input[type='checkbox'] {
   color: #5d6779;
 }
 
+/* 단축키 칸 — 누르면 조합을 받는다. select와 같은 폭이라 줄이 흔들리지 않는다 */
+.cfg-key {
+  flex: none;
+  width: 132px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #171b23;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cfg-key:hover {
+  border-color: #39414f;
+}
+.cfg-key.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.cfg-key.bad {
+  border-color: var(--red);
+  color: #f18a72;
+}
+.cfg-row label small.warn {
+  color: #f18a72;
+}
+
 .cfg-reset {
   margin-top: 12px;
   padding: 5px 10px;

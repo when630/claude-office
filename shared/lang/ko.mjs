@@ -154,6 +154,14 @@ export default {
   cfg: {
     title: '설정',
     notifySection: '알림',
+    hotkeySection: '단축키',
+    hotkeyToggle: '창 열고 닫기',
+    hotkeyJump: '가장 오래 기다린 세션 열기',
+    hotkeyNone: '없음',
+    hotkeyPress: '조합을 누르세요…',
+    hotkeyTaken: '다른 앱이 쓰고 있습니다',
+    hotkeyHint:
+      '칸을 누르고 원하는 조합을 그대로 누르면 됩니다. <b>Backspace</b>로 비우면 그 단축키를 쓰지 않습니다. 수식키(Ctrl · Alt · Shift) 없는 조합은 받지 않습니다 — 전역이라 타이핑을 통째로 먹습니다. 이미 다른 앱이 잡은 조합은 빨갛게 표시됩니다.',
     quiet: '조용한 시간대',
     quietRange: '시간',
     quietHint:
@@ -214,6 +222,8 @@ export default {
     failed: '{n} 실패',
     update: '업데이트 설치하고 재시작 (v{v})',
     open: '사무실 열기',
+    waitingList: '기다리는 세션',
+    waitingNone: '기다리는 세션이 없습니다',
     notify: '알림',
     notifyWaiting: '입력 대기',
     notifyEscalate: '대기가 길어지면 다시 (5 · 15 · 30 · 60분)',
@@ -256,6 +266,8 @@ export default {
     doneBody: '{d} 걸렸습니다',
     stuckTitle: '{name} 이(가) 헤매는 것 같습니다',
     stuckBody: '도구가 연달아 실패하거나 한동안 진전이 없습니다',
+    hotkeyFailTitle: '단축키를 잡지 못했습니다',
+    hotkeyFailBody: '{keys} — 이미 다른 앱이 쓰고 있습니다. 설정에서 다른 조합으로 바꿔 주세요.',
     updateReadyTitle: 'Claude Office {v} 준비됨',
     updateReadyBody: '트레이 메뉴에서 재시작하면 적용됩니다. 그냥 두면 다음 종료 때 설치됩니다.',
     updateManualTitle: 'Claude Office {v} 나왔습니다',

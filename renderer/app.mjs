@@ -579,6 +579,69 @@ function options(entries, picked) {
     .join('');
 }
 
+// ── 전역 단축키
+//
+// 조합을 손으로 타이핑하게 하면 Accelerator 문법을 사람이 외워야 한다. 그래서 칸을 누르고
+// **원하는 조합을 실제로 누르는** 방식으로 받는다. 여기서 만드는 문자열은 main이 다시 검사한다.
+let hotkeyCfg = null;
+let capturing = null; // 지금 조합을 받고 있는 자리 (toggle | jump)
+
+const HOTKEY_LABEL = { toggle: 'cfg.hotkeyToggle', jump: 'cfg.hotkeyJump' };
+
+// 눌린 키를 Electron Accelerator로. 수식키만 눌린 동안에는 아직 조합이 아니다.
+function accelOf(e) {
+  const parts = [];
+  if (e.ctrlKey || e.metaKey) parts.push('CommandOrControl');
+  if (e.altKey) parts.push('Alt');
+  if (e.shiftKey) parts.push('Shift');
+  if (!parts.length) return null; // 수식키 없는 한 글자를 전역으로 잡으면 타이핑을 통째로 먹는다
+
+  const k = e.key;
+  if (!k || /^(Control|Meta|Alt|Shift|OS)$/.test(k)) return null;
+  // 표시용 이름으로 눌러 편다 — Alt를 끼면 e.key가 기호로 오므로 code에서 글자를 뽑는다
+  const fromCode = /^(Key|Digit)([A-Z0-9])$/.exec(e.code);
+  const key = fromCode ? fromCode[2] : k.length === 1 ? k.toUpperCase() : k;
+  if (!/^[A-Za-z0-9]{1,12}$/.test(key)) return null;
+  parts.push(key);
+  return parts.join('+');
+}
+
+// 저장은 Accelerator 문법 그대로 두고 보여줄 때만 눌러 편다 — `CommandOrControl+Alt+O`는
+// 칸을 다 잡아먹고, 사람이 실제로 누르는 키의 이름도 아니다.
+function accelLabel(accel) {
+  return accel.replace('CommandOrControl', /Mac/i.test(navigator.userAgent) ? 'Cmd' : 'Ctrl');
+}
+
+function hotkeyBlock() {
+  if (!hotkeyCfg) return '';
+  const row = (action) => {
+    const accel = hotkeyCfg.hotkeys[action] ?? '';
+    const bad = accel && hotkeyCfg.failed?.includes(accel);
+    const text = capturing === action ? t('cfg.hotkeyPress') : accel ? accelLabel(accel) : t('cfg.hotkeyNone');
+    return `<div class="cfg-row">
+      <label><b>${t(HOTKEY_LABEL[action])}</b>${bad ? `<small class="warn">${t('cfg.hotkeyTaken')}</small>` : ''}</label>
+      <button type="button" class="cfg-key${capturing === action ? ' on' : ''}${bad ? ' bad' : ''}"
+        data-hotkey="${esc(action)}">${esc(text)}</button>
+    </div>`;
+  };
+  return `
+    <section class="block">
+      <h3>${t('cfg.hotkeySection')}</h3>
+      ${HOTKEY_ACTIONS.map(row).join('')}
+      <p class="hint">${t('cfg.hotkeyHint')}</p>
+    </section>
+  `;
+}
+
+const HOTKEY_ACTIONS = ['toggle', 'jump'];
+
+async function saveHotkeys(patch) {
+  const next = await window.office?.setHotkeys?.(patch).catch(() => null);
+  if (next) hotkeyCfg = next;
+  capturing = null;
+  drawCfg();
+}
+
 // 알림 섹션. 트레이 메뉴에도 같은 항목이 있지만 시각을 고르는 일은 메뉴로 못 하고,
 // 종류가 다섯이라 한자리에 펼쳐 보이는 편이 켜고 끄기 쉽다.
 function notifyBlock() {
@@ -619,6 +682,8 @@ function drawCfg() {
 
   cfgBody.innerHTML = `
     ${notifyBlock()}
+
+    ${hotkeyBlock()}
 
     <section class="block">
       <h3>${t('cfg.langSection')}</h3>
@@ -692,10 +757,31 @@ async function saveNotify(patch) {
 
 document.getElementById('cfg-open').addEventListener('click', async () => {
   notifyCfg = (await window.office?.getNotify?.().catch(() => null)) ?? notifyCfg;
+  hotkeyCfg = (await window.office?.getHotkeys?.().catch(() => null)) ?? hotkeyCfg;
+  capturing = null;
   drawCfg();
   cfgDialog.showModal();
 });
 document.getElementById('cfg-close').addEventListener('click', () => cfgDialog.close());
+
+// 조합을 받는 동안은 창의 다른 단축키(닫기 등)보다 먼저 가로챈다.
+cfgDialog.addEventListener('keydown', (e) => {
+  if (!capturing) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (e.key === 'Escape') {
+    capturing = null;
+    drawCfg();
+    return;
+  }
+  // 비우는 것이 곧 끄는 것이다
+  if (e.key === 'Backspace' || e.key === 'Delete') {
+    saveHotkeys({ [capturing]: '' });
+    return;
+  }
+  const accel = accelOf(e);
+  if (accel) saveHotkeys({ [capturing]: accel });
+});
 
 cfgBody.addEventListener('change', (e) => {
   const el = e.target;
@@ -749,7 +835,17 @@ cfgBody.addEventListener('change', (e) => {
 });
 
 cfgBody.addEventListener('click', (e) => {
-  if (e.target.classList?.contains('cfg-reset')) saveView({ roomThemes: {} }).then(drawCfg);
+  if (e.target.classList?.contains('cfg-reset')) {
+    saveView({ roomThemes: {} }).then(drawCfg);
+    return;
+  }
+  const action = e.target.dataset?.hotkey;
+  if (action) {
+    capturing = capturing === action ? null : action;
+    drawCfg();
+    // 다시 그리면 눌렀던 버튼이 사라진다 — 새로 그려진 같은 자리에 초점을 돌려준다
+    cfgBody.querySelector(`[data-hotkey="${action}"]`)?.focus();
+  }
 });
 
 // ── 출근부

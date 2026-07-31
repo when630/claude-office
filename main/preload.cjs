@@ -17,6 +17,9 @@ contextBridge.exposeInMainWorld('office', {
   // 설정 창의 알림 설정 — 종류별 on/off와 방해금지 (트레이 메뉴와 같은 값)
   getNotify: () => ipcRenderer.invoke('office:getNotify'),
   setNotify: (patch) => ipcRenderer.invoke('office:setNotify', patch),
+  // 전역 단축키 — 저장된 조합과 못 잡은 조합을 함께 돌려준다
+  getHotkeys: () => ipcRenderer.invoke('office:getHotkeys'),
+  setHotkeys: (patch) => ipcRenderer.invoke('office:setHotkeys', patch),
   // 설정 창의 표시 설정 — 저장된 뒤의 값을 되돌려준다
   getView: () => ipcRenderer.invoke('office:getView'),
   setView: (patch) => ipcRenderer.invoke('office:setView', patch),

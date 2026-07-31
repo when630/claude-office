@@ -157,6 +157,14 @@ export default {
   cfg: {
     title: 'Settings',
     notifySection: 'Notifications',
+    hotkeySection: 'Shortcuts',
+    hotkeyToggle: 'Show or hide the window',
+    hotkeyJump: 'Open the longest wait',
+    hotkeyNone: 'None',
+    hotkeyPress: 'Press a combination…',
+    hotkeyTaken: 'Another app has it',
+    hotkeyHint:
+      'Click a box and press the combination you want. <b>Backspace</b> clears it, which turns that shortcut off. Combinations without a modifier (Ctrl · Alt · Shift) are refused — these are global and would swallow your typing. A combination another app already holds is marked in red.',
     quiet: 'Quiet hours',
     quietRange: 'Hours',
     quietHint:
@@ -218,6 +226,8 @@ export default {
     failed: '{n} failed',
     update: 'Install update and restart (v{v})',
     open: 'Open the office',
+    waitingList: 'Waiting on you',
+    waitingNone: 'Nothing waiting on you',
     notify: 'Notifications',
     notifyWaiting: 'Waiting on you',
     notifyEscalate: 'Nudge again while waiting (5 · 15 · 30 · 60 min)',
@@ -260,6 +270,8 @@ export default {
     doneBody: 'took {d}',
     stuckTitle: '{name} looks stuck',
     stuckBody: 'Tools failing one after another, or no progress for a while',
+    hotkeyFailTitle: 'Could not register a shortcut',
+    hotkeyFailBody: '{keys} — another app already holds it. Pick a different combination in Settings.',
     updateReadyTitle: 'Claude Office {v} is ready',
     updateReadyBody: 'Restart from the tray menu to apply it, or leave it and it installs when you quit.',
     updateManualTitle: 'Claude Office {v} is out',
