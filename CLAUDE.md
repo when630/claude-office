@@ -35,3 +35,7 @@ npx electron-builder --win --dir     # 설치본 없이 패키징 회귀 확인
 `git tag vX.Y.Z && git push origin vX.Y.Z` → CI가 Windows·macOS를 빌드해 draft 릴리스
 하나에 모은다 → 릴리스 노트 쓰고 Publish. 로컬에서 `--publish`를 돌리지 않는다 —
 같은 태그에 릴리스가 갈라졌던 전례가 있어 `.claude/settings.json`의 deny로 막아 두었다.
+
+**Publish 전에 자산이 한 draft에 다 있는지 센다.** `latest.yml`(Windows)과 `latest-mac.yml`(맥)이
+둘 다 있어야 자동 업데이트가 두 플랫폼에서 돈다. 갈라져 있으면 그대로 Publish하지 말고 원인을
+찾는다 — 0.4.0에서 두 잡이 각자 draft를 만들어 그 둘이 갈라졌던 적이 있다(#46).

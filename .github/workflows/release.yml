@@ -1,7 +1,15 @@
-# v* 태그를 푸시하면 Windows·macOS 설치본을 빌드해 GitHub Releases 초안(draft)에 올린다.
-# 두 잡이 같은 태그의 초안 하나를 공유하므로, 끝난 뒤 릴리스 노트를 쓰고 Publish만 하면 된다.
+# v* 태그를 푸시하면 Windows·macOS 설치본을 빌드해 GitHub Releases 초안(draft) **하나**에 올린다.
 #
 #   git tag v0.4.0 && git push origin v0.4.0
+#
+# 굽는 일과 올리는 일을 갈라 놓았다. 예전에는 두 잡이 각각 `--publish always`를 돌렸는데,
+# 둘 다 "이 태그의 draft가 없다"고 판단하는 순간이 겹치면 **각자 draft를 하나씩 만든다**(#46).
+# 실제로 0.4.0에서 그렇게 갈라졌고, 하필 갈라진 것이 `latest.yml`과 `latest-mac.yml`이었다 —
+# 그 둘이 한 릴리스에 있어야 두 플랫폼의 자동 업데이트가 돈다.
+#
+# 그래서 각 잡은 굽기만 하고(`--publish never`) 결과를 artifact로 올린다. 둘 다 끝난 뒤
+# 마지막 잡 하나가 그것을 받아 draft를 **한 번에** 만든다. 릴리스 노트를 쓰고 Publish하는 것은
+# 지금처럼 사람이 한다.
 #
 # 코드 서명은 아직 없다 — 맥 잡의 CSC_IDENTITY_AUTO_DISCOVERY=false가 키체인 탐색을 꺼서
 # 서명 없이 빌드를 통과시킨다. 서명을 넣을 때 CSC_LINK 등 시크릿과 함께 이 줄을 지운다.
@@ -32,7 +40,36 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx electron-builder ${{ matrix.args }} --publish always
+      - run: npx electron-builder ${{ matrix.args }} --publish never
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
+      # dist/ 아래에는 win-unpacked 같은 중간 산출물도 있다 — 릴리스에 올릴 것만 고른다.
+      # latest*.yml은 자동 업데이트가 읽는 파일이라 빠지면 안 된다.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.zip
+            dist/*.blockmap
+            dist/latest*.yml
+          if-no-files-found: error
+          retention-days: 3
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      # 무엇이 올라가는지 로그에 남긴다 — 갈라졌던 전례가 있어 눈으로 세는 자리가 필요하다
+      - run: ls -l dist
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" --draft --title "Claude Office ${TAG#v}" --notes "" dist/*
