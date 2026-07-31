@@ -14,7 +14,14 @@ import {
   reasonText as notifyTapReason,
 } from './notify-tap.mjs';
 import { initUpdater, installNow } from './updater.mjs';
-import { createNotifyState, decideNotifications, longestWait, sanitizeNotify, BLINK_AFTER_MS } from './notify.mjs';
+import {
+  createNotifyState,
+  decideNotifications,
+  longestWait,
+  sanitizeNotify,
+  BLINK_AFTER_MS,
+  DONE_MIN_BUSY_MS,
+} from './notify.mjs';
 import { openTerminal, reasonText as terminalReason } from './terminal.mjs';
 import { t, fmtDur, setLang, resolveLang, LANGS, LANG_NAMES } from '../shared/i18n.mjs';
 import {
@@ -482,6 +489,13 @@ function buildTrayMenu() {
           type: 'checkbox',
           checked: notifyOn('usage'),
           click: (item) => setNotify('usage', item.checked),
+        },
+        {
+          // 문턱을 라벨에 적어 둔다 — 짧은 문답에는 안 뜬다는 걸 켜기 전에 알 수 있어야 한다
+          label: t('tray.notifyDone', { d: fmtDur(DONE_MIN_BUSY_MS) }),
+          type: 'checkbox',
+          checked: notifyOn('done'),
+          click: (item) => setNotify('done', item.checked),
         },
       ],
     },
