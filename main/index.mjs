@@ -394,6 +394,21 @@ function toggleNotifyTap(want) {
     });
 }
 
+// 예전 버전이 심어둔 사용량 tap에는 stdin 인코딩 머리말이 없다 — 세션 이름에 한글이 있으면
+// statusline이 payload를 cp949로 읽어 JSON이 부서지고 사용량이 조용히 멈춘다(#17).
+// 심어져 있으면 앱을 켤 때 머리말만 조용히 보탠다(.bak은 남는다).
+function upgradeUsageTap() {
+  const st = tapStatus();
+  if (!st.installed || st.hasEncoding) return;
+  const res = installTap();
+  if (res.ok && res.upgraded) {
+    notify(
+      '사용량 연동을 고쳤습니다',
+      '한글이 든 payload가 깨지지 않게 statusline의 stdin 인코딩을 맞췄습니다.',
+    );
+  }
+}
+
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
     ...(updateReady
@@ -572,6 +587,8 @@ if (!app.requestSingleInstanceLock()) {
       saveSettings();
       return settings.view;
     });
+
+    upgradeUsageTap();
 
     createTray();
     // 맥은 로그인 시작에 인자를 못 넘긴다 — 로그인으로 뜬 실행인지(wasOpenedAtLogin)로 대신한다

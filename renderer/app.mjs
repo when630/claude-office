@@ -297,9 +297,17 @@ function idlePanel() {
         note: '',
         id: 'u-week-left',
       })}
-      <p class="hint${u.stale ? ' warn' : ''}">사용량 갱신 ${fmtAge(Date.now() - u.at)} 전${
-        u.stale ? ' · statusline이 안 돌고 있는 듯합니다' : ''
-      }</p>`
+      ${
+        // 파일이 깨져 있으면 화면의 숫자는 마지막으로 성공한 값이다 — 그걸 숨기지 않는다
+        u.broken
+          ? `<p class="hint warn"><code>office-usage.json</code>을 읽지 못하고 있습니다 —
+              위 숫자는 마지막으로 읽힌 값입니다. 세션 이름에 한글이 있으면 statusline이
+              stdin을 cp949로 읽어 payload가 깨집니다.
+              <b>트레이 아이콘 &gt; 사용량 연동</b>을 껐다 켜면 인코딩을 맞춰 다시 심습니다.</p>`
+          : `<p class="hint${u.stale ? ' warn' : ''}">사용량 갱신 ${fmtAge(Date.now() - u.at)} 전${
+              u.stale ? ' · statusline이 안 돌고 있는 듯합니다' : ''
+            }</p>`
+      }`
     : `<p class="dim">세션·주간 사용률은 Claude Code가 <b>statusline</b>에만 넘겨주는 값입니다.
         statusline이 받은 payload를 <code>~/.claude/office-usage.json</code>으로 떨어뜨려 두면
         여기에 표시됩니다.</p>
