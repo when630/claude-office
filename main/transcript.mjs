@@ -256,6 +256,23 @@ function scanAides(lines) {
   return [...live, ...sync.reverse()].slice(0, MAX_AIDES);
 }
 
+// 도구가 연달아 실패하고 있는가. 같은 에러를 반복해 되받는 세션은 겉으로는 열심히 일하는
+// 것과 구별되지 않는다 — 그 신호를 여기서 뽑는다.
+//
+// 줄 단위로 본다. 병렬 호출이면 한 줄에 결과가 여럿 들어오는데, 그 안에 하나라도 성공이
+// 있으면 뭔가는 되고 있다는 뜻이라 연속을 끊는다. JSON 파싱 없이 훑는다 — tool_result 줄이
+// 가장 크고, 여기서 필요한 건 참·거짓 하나뿐이다.
+export function scanErrorRun(lines) {
+  let run = 0;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    if (!line || line.length > MAX_LINE || !line.includes('"tool_use_id"')) continue;
+    if (!line.includes('"is_error":true')) break; // 성공한 결과 — 연속이 끊겼다
+    run++;
+  }
+  return run;
+}
+
 // 뒤에서 앞으로 훑으며 각 항목의 "가장 최근 것"을 하나씩 줍는다.
 function parseTail(text) {
   const out = {
@@ -269,6 +286,7 @@ function parseTail(text) {
     model: null,
     aides: [],
     turns: [],
+    errorRun: 0,
   };
   const lines = text.split('\n');
   const seenPr = new Set();
@@ -276,6 +294,7 @@ function parseTail(text) {
   // 비서는 따로 훑는다. 아래 루프는 필요한 걸 다 주우면 도중에 멈추는데,
   // 에이전트를 띄운 줄은 몇 분 전 것이라 그 전에 잘려 나가기 때문이다.
   out.aides = scanAides(lines);
+  out.errorRun = scanErrorRun(lines);
 
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i];
@@ -419,6 +438,9 @@ export async function readTranscript(cwd, sessionId) {
         ? { tokens: used, limit, pct: Math.min(100, Math.round((used / limit) * 1000) / 10) }
         : null,
     outputTokens: parsed.usage?.output ?? 0,
+    // 연달아 실패한 도구 호출 수와 대화 파일이 마지막으로 자란 시각 — 헤매는 세션을
+    // 알아보는 두 신호다(main/collect.mjs의 isStuck)
+    errorRun: parsed.errorRun,
     at: st.mtimeMs,
   };
 

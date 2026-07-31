@@ -3,7 +3,7 @@ import { app, BrowserWindow, Tray, Menu, Notification, nativeImage, ipcMain, she
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collect } from './collect.mjs';
+import { collect, STUCK_ERRORS, STUCK_QUIET_MS } from './collect.mjs';
 import { CLAUDE_DIR, USAGE_FILE } from './paths.mjs';
 import { installTap, removeTap, tapStatus, manualGuide, reasonText as tapReason } from './usage-tap.mjs';
 import {
@@ -315,7 +315,9 @@ function maybeNotify(snapshot) {
 // ── 트레이
 function trayIconFor(stats) {
   if (stats?.waiting > 0) return 'tray-wait';
-  if (stats?.failed > 0) return 'tray-fail';
+  // 헤매는 자리도 붉은 점을 쓴다 — 실패와 같은 뜻("뭔가 잘못됐다")이고, 아이콘을 한 벌 더
+  // 굽는 값어치가 있을 만큼 다른 상태는 아니다
+  if (stats?.failed > 0 || stats?.stuck > 0) return 'tray-fail';
   return 'tray';
 }
 
@@ -362,6 +364,7 @@ function updateTray(snapshot) {
         : t('tray.waiting', { n: stats.waiting }),
     );
   }
+  if (stats.stuck) parts.push(t('tray.stuck', { n: stats.stuck }));
   if (stats.failed) parts.push(t('tray.failed', { n: stats.failed }));
   const who = app.isPackaged ? 'Claude Office' : 'Claude Office (dev)';
   tray.setToolTip(`${who} — ${parts.join(' · ')}`);
@@ -559,6 +562,12 @@ function buildTrayMenu() {
           type: 'checkbox',
           checked: notifyOn('done'),
           click: (item) => setNotify('done', item.checked),
+        },
+        {
+          label: t('tray.notifyStuck', { d: fmtDur(STUCK_QUIET_MS), n: STUCK_ERRORS }),
+          type: 'checkbox',
+          checked: notifyOn('stuck'),
+          click: (item) => setNotify('stuck', item.checked),
         },
         { type: 'separator' },
         {

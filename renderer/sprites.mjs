@@ -95,6 +95,8 @@ export const SPR = {
   gNote: glyph(PX.G_NOTE, '#6a7fd2'),
   gDots: glyph(PX.G_DOTS, '#4a5262'),
   gSpark: glyph(PX.G_SPARK, '#d8a33a'),
+  // 헤매는 중 — 어두운 gQuestion과 같은 모양이지만 눈에 걸려야 하므로 색이 다르다
+  gStuck: glyph(PX.G_QUESTION, '#d8a33a'),
 };
 
 export function drawSprite(ctx, spr, x, y) {

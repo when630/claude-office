@@ -79,6 +79,10 @@ body {
   color: var(--accent);
   font-weight: 700;
 }
+#stats .s {
+  color: #e0a95c;
+  font-weight: 700;
+}
 #stats .f {
   color: var(--red);
   font-weight: 700;
@@ -300,6 +304,10 @@ b.lv-na {
 .mood.waiting {
   background: #3d3315;
   color: var(--accent);
+}
+.mood.stuck {
+  background: #3d2c15;
+  color: #e0a95c;
 }
 .mood.failed {
   background: #3d1d18;
