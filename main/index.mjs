@@ -7,21 +7,32 @@ import { collect } from './collect.mjs';
 import { CLAUDE_DIR, USAGE_FILE } from './paths.mjs';
 import { installTap, removeTap, tapStatus, manualGuide, REASONS } from './usage-tap.mjs';
 import { initUpdater, installNow } from './updater.mjs';
+import {
+  createNotifyState,
+  decideNotifications,
+  longestWait,
+  fmtDur,
+  sanitizeNotify,
+  BLINK_AFTER_MS,
+} from './notify.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const POLL_MS = 1500;
 const APP_ID = 'com.when630.claude-office';
+const BLINK_MS = 700;
 
 let win = null;
 let tray = null;
 let timer = null;
 let lastSnapshot = null;
 let lastJson = '';
-let notifiedWaiting = new Set();
-let firstTick = true;
+// 무엇을 이미 알렸는지 — 판정은 main/notify.mjs가 하고 여기서는 상태만 들고 있는다
+let notifyState = createNotifyState();
 let quitting = false;
 let trayState = null;
+let blinkPhase = false; // 깜빡임의 꺼진 위상 — 이때는 평상 아이콘을 쓴다
+let blinkTimer = null;
 let lastBounds = null; // 창을 다시 열 때 있던 자리로 돌려놓는다
 let updateReady = null; // 받아 둔 새 버전 — 트레이 메뉴에 재시작 항목이 생긴다
 
@@ -29,7 +40,11 @@ let updateReady = null; // 받아 둔 새 버전 — 트레이 메뉴에 재시�
 //
 // notify·trayHintShown은 main만 쓰고, view는 렌더러가 쓴다(설정 창 → office:setView).
 // 방 종류를 방 key(작업 디렉터리 이름)로 기억하므로 앱을 다시 켜도 고른 방이 그대로 남는다.
-const defaults = { notify: true, trayHintShown: false, view: { names: 'show', roomThemes: {} } };
+const defaults = {
+  notify: sanitizeNotify(), // 종류별 on/off — 어휘와 하위 호환은 main/notify.mjs가 정한다
+  trayHintShown: false,
+  view: { names: 'show', roomThemes: {} },
+};
 const NAME_MODES = ['show', 'mask', 'hide'];
 let settings = { ...defaults, view: { ...defaults.view } };
 
@@ -44,7 +59,16 @@ function loadSettings() {
   } catch {
     saved = {};
   }
-  settings = { ...defaults, ...saved, view: sanitizeView(saved.view) };
+  settings = { ...defaults, ...saved, notify: sanitizeNotify(saved.notify), view: sanitizeView(saved.view) };
+}
+
+function notifyOn(kind) {
+  return settings.notify?.[kind] === true;
+}
+
+function setNotify(kind, value) {
+  settings.notify = { ...settings.notify, [kind]: value };
+  saveSettings();
 }
 
 // 렌더러가 보낸 값도, 손으로 고친 settings.json도 같은 문을 지난다 — 모르는 키·엉뚱한 타입은
@@ -172,50 +196,62 @@ function notify(title, body, onClick) {
   n.show();
 }
 
-function maybeNotifyWaiting(snapshot) {
-  const waiting = new Map();
-  for (const room of snapshot.rooms) {
-    for (const w of room.workers) if (w.mood === 'waiting') waiting.set(w.key, w);
+// 판정은 main/notify.mjs가 한다 — 여기서는 종류별 on/off로 걸러 띄우기만 한다.
+// 꺼둔 종류도 판정은 돌아야 한다(notify.mjs 머리말) — 그래야 켜는 순간 밀린 알림이 안 터진다.
+function maybeNotify(snapshot) {
+  for (const item of decideNotifications(notifyState, snapshot)) {
+    if (!notifyOn(item.kind)) continue;
+    // 세션에 딸린 알림은 그 자리를 펼쳐주고, 계정 사용량처럼 주인이 없는 건 창만 띄운다
+    notify(item.title, item.body, item.key ? () => selectInWindow(item.key) : showWindow);
   }
-
-  // 앱을 막 켠 순간엔 이미 대기 중이던 것들까지 쏟아내지 않는다
-  if (firstTick) {
-    notifiedWaiting = new Set(waiting.keys());
-    firstTick = false;
-    return;
-  }
-
-  if (settings.notify) {
-    for (const [key, w] of waiting) {
-      if (notifiedWaiting.has(key)) continue;
-      // 터미널 세션은 무엇을 묻는지 알 수 없다(선택지는 답하기 전엔 대화 파일에 안 남는다)
-      notify(
-        `${w.name} 이(가) 기다립니다`,
-        w.needs || (w.kind === 'bg' ? '입력이 필요합니다' : '터미널에 선택지나 확인이 떠 있습니다'),
-        () => selectInWindow(key),
-      );
-    }
-  }
-  notifiedWaiting = new Set(waiting.keys());
 }
 
 // ── 트레이
 function trayIconFor(stats) {
-  if (stats.waiting > 0) return 'tray-wait';
-  if (stats.failed > 0) return 'tray-fail';
+  if (stats?.waiting > 0) return 'tray-wait';
+  if (stats?.failed > 0) return 'tray-fail';
   return 'tray';
 }
 
-function updateTray(stats) {
+// 아이콘을 정하는 곳은 여기 하나다 — 깜빡임 타이머와 폴링이 서로 덮어쓰지 않게.
+function paintTrayIcon() {
   if (!tray) return;
-  const next = trayIconFor(stats);
-  if (next !== trayState) {
-    tray.setImage(trayImage(next));
-    trayState = next;
+  // 꺼진 위상에서는 평상 아이콘 — 노란 점이 붙었다 떨어지는 것처럼 보인다
+  const next = blinkPhase ? 'tray' : trayIconFor(lastSnapshot?.stats);
+  if (next === trayState) return;
+  tray.setImage(trayImage(next));
+  trayState = next;
+}
+
+// 방치된 대기는 아이콘을 깜빡여 눈에 걸리게 한다. 실패는 깜빡이지 않는다 — 실패는 이미
+// 끝난 일이고, 깜빡임은 "지금 나를 부르고 있다"는 뜻으로 아껴 쓴다.
+function updateBlink(snapshot) {
+  const want = snapshot.stats?.waiting > 0 && longestWait(snapshot) >= BLINK_AFTER_MS;
+  if (want && !blinkTimer) {
+    blinkTimer = setInterval(() => {
+      blinkPhase = !blinkPhase;
+      paintTrayIcon();
+    }, BLINK_MS);
+  } else if (!want && blinkTimer) {
+    clearInterval(blinkTimer);
+    blinkTimer = null;
+    blinkPhase = false;
+    paintTrayIcon();
   }
-  const parts = [`${stats.total}명 출근`];
+}
+
+function updateTray(snapshot) {
+  if (!tray) return;
+  const stats = snapshot.stats ?? {};
+  paintTrayIcon();
+  updateBlink(snapshot);
+  const parts = [`${stats.total ?? 0}명 출근`];
   if (stats.typing) parts.push(`${stats.typing} 작업 중`);
-  if (stats.waiting) parts.push(`${stats.waiting} 입력 대기`);
+  // 몇 분째 방치됐는지가 트레이에서 바로 보여야 한다 — 창을 열지 않고 판단하는 자리다
+  if (stats.waiting) {
+    const worst = longestWait(snapshot);
+    parts.push(worst >= 60_000 ? `${stats.waiting} 입력 대기 (최장 ${fmtDur(worst)})` : `${stats.waiting} 입력 대기`);
+  }
   if (stats.failed) parts.push(`${stats.failed} 실패`);
   const who = app.isPackaged ? 'Claude Office' : 'Claude Office (dev)';
   tray.setToolTip(`${who} — ${parts.join(' · ')}`);
@@ -272,13 +308,33 @@ function buildTrayMenu() {
     { label: '사무실 열기', click: showWindow },
     { type: 'separator' },
     {
-      label: '입력 대기 알림',
-      type: 'checkbox',
-      checked: settings.notify,
-      click: (item) => {
-        settings.notify = item.checked;
-        saveSettings();
-      },
+      label: '알림',
+      submenu: [
+        {
+          label: '입력 대기',
+          type: 'checkbox',
+          checked: notifyOn('waiting'),
+          click: (item) => setNotify('waiting', item.checked),
+        },
+        {
+          label: '대기가 길어지면 다시 (5 · 15 · 30 · 60분)',
+          type: 'checkbox',
+          checked: notifyOn('escalate'),
+          click: (item) => setNotify('escalate', item.checked),
+        },
+        {
+          label: '컨텍스트 임박 (85 · 95%)',
+          type: 'checkbox',
+          checked: notifyOn('context'),
+          click: (item) => setNotify('context', item.checked),
+        },
+        {
+          label: '계정 사용량 임박 (80 · 95%)',
+          type: 'checkbox',
+          checked: notifyOn('usage'),
+          click: (item) => setNotify('usage', item.checked),
+        },
+      ],
     },
     {
       label: '사용량 연동 (statusline)',
@@ -338,8 +394,8 @@ async function tick() {
   }
   const json = signature(snapshot);
   lastSnapshot = snapshot;
-  updateTray(snapshot.stats);
-  maybeNotifyWaiting(snapshot);
+  updateTray(snapshot);
+  maybeNotify(snapshot);
   if (json === lastJson) return;
   lastJson = json;
   if (win && !win.isDestroyed()) win.webContents.send('office:state', snapshot);
@@ -409,5 +465,6 @@ if (!app.requestSingleInstanceLock()) {
   app.on('before-quit', () => {
     quitting = true;
     if (timer) clearInterval(timer);
+    if (blinkTimer) clearInterval(blinkTimer);
   });
 }
