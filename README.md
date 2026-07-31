@@ -35,6 +35,10 @@
 프롬프트 앞에서 그냥 쉬는 세션(`idle`)과는 구분하므로, 끝난 세션마다 알림이 울리지는 않는다.
 판정 원리는 [캐릭터가 하는 짓](docs/characters.md#선택지가-뜨면-산책하지-않는다) 참고.
 
+터미널 세션은 **무엇을** 묻는지까지는 알 수 없다 — 선택지가 떠 있는 동안 대화 파일에 아무것도
+안 쓰이기 때문이다. 트레이 메뉴에서 [Notification 훅](docs/notify-hook.md)을 켜 두면
+`Bash 실행 권한이 필요합니다`처럼 **실제 문구**가 패널과 알림에 들어온다.
+
 ## 오른쪽 패널
 
 <img src="docs/images/panel.png" width="345" alt="세션 패널 — 컨텍스트 게이지·서브에이전트·타임라인·재접속 명령" align="right" />
@@ -117,6 +121,7 @@ Electron 43 · 런타임 의존성은 자동 업데이트(electron-updater) 하�
   컨텍스트는 자동 압축이 돌아 세션의 기억이 잘리기 전에 알려주는 쪽이고,
   사용량은 statusline 연동이 붙어 있을 때만 나온다
 - **로그인 시 자동 시작**(창 없이 트레이에만 올라온다), **사용량 연동(statusline)**,
+  **[무엇을 기다리는지 알아내기](docs/notify-hook.md)**(Notification 훅),
   **근태 기록**([출근부](docs/attendance.md))도 트레이 메뉴에 있다 —
   쌓인 근태 기록을 지우는 항목도 여기 있다
 - 설정은 `%APPDATA%\claude-office\settings.json`
@@ -131,6 +136,7 @@ Electron 43 · 런타임 의존성은 자동 업데이트(electron-updater) 하�
 | [사무실 종류](docs/rooms.md) | 8종 방과 비품 · 회의실만 배치가 다른 이유 |
 | [캐릭터가 하는 짓](docs/characters.md) | 16×12 픽셀 규칙 · 전환 애니메이션 · 입력 대기 판정 · 말풍선 · 비서 |
 | [오른쪽 패널](docs/panel.md) | 패널 구성 · 픽셀 폰트 · 사용량 tap의 원리 |
+| [무엇을 기다리는지](docs/notify-hook.md) | Notification 훅을 심어 권한 확인·선택지 문구를 받아오는 법 |
 | [출근부](docs/attendance.md) | 무엇을 남기나 · 시간을 어떻게 세나 · 끄기와 지우기 |
 | [설정](docs/settings.md) | 이름 가리기 · 방 종류 고르기 |
 | [구조](docs/architecture.md) | 파일 지도 · 손댈 만한 곳 · 디버그 입구 |

@@ -9,6 +9,7 @@ import path from 'node:path';
 import { CLAUDE_DIR } from './paths.mjs';
 import { readTranscript } from './transcript.mjs';
 import { readUsage } from './usage.mjs';
+import { readNotes, noteNeeds } from './notify-tap.mjs';
 
 export { CLAUDE_DIR };
 
@@ -96,6 +97,12 @@ async function collectJobs() {
     jobs.set(e.name, { id: e.name, dir, state, timeline });
   }
   return jobs;
+}
+
+// 실제 대화가 쌓이는 세션 id. 백그라운드 잡은 자기 sessionId가 아니라 resumeSessionId 쪽에
+// 대화 파일이 생긴다 — 트랜스크립트도, Notification 훅의 session_id도 이 값으로 맞춰야 한다.
+function sessionIdOf(s, job) {
+  return job?.state?.resumeSessionId || s.sessionId;
 }
 
 async function collectSessions() {
@@ -227,11 +234,13 @@ export async function collect() {
   const scripts = await Promise.all(
     alive.map((s) => {
       const job = s.jobId ? jobs.get(s.jobId) : null;
-      // 백그라운드 잡은 실제 대화가 resumeSessionId 쪽 파일에 쌓인다
-      const sid = job?.state?.resumeSessionId || s.sessionId;
-      return readTranscript(job?.state?.cwd || s.cwd, sid).catch(() => null);
+      return readTranscript(job?.state?.cwd || s.cwd, sessionIdOf(s, job)).catch(() => null);
     }),
   );
+
+  // Notification 훅을 심어 뒀다면 지금 무엇을 묻고 있는지가 들어온다(main/notify-tap.mjs).
+  // 안 심었으면 빈 Map이고 아래는 예전처럼 돈다.
+  const notes = readNotes(now);
 
   alive.forEach((s, i) => {
     const job = s.jobId ? jobs.get(s.jobId) : null;
@@ -254,7 +263,9 @@ export async function collect() {
       // 잡은 state.json의 detail이 가장 최신. 터미널 세션은 그런 파일이 없으니
       // 자리를 비운 사용자에게 남긴 요약(away_summary) → 마지막으로 한 말 순으로 대신한다.
       detail: trimText(st.detail || tr?.summary || tr?.lastMessage || ''),
-      needs: trimText(st.needs || '', 160) || null,
+      // 백그라운드 잡은 state.json에 needs를 남기지만 터미널 세션은 그런 파일이 없다.
+      // Notification 훅을 심어 두면 권한 확인·선택지 문구가 그때 그대로 들어온다.
+      needs: trimText(st.needs || noteNeeds(notes.get(sessionIdOf(s, job)), s.statusUpdatedAt), 160) || null,
       suggestedReply: trimText(st.suggestedReply || '', 160) || null,
       // 잡은 state.json에 누적 토큰을 남긴다. 터미널 세션은 그게 없어 트랜스크립트에서
       // 계산한 컨텍스트 토큰으로 대신한다 — 같은 척도라 잡 쪽 숫자와도 얼추 맞는다.
