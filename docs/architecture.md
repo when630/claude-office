@@ -80,7 +80,10 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   시각을 인자로 받으므로 하루를 기다리지 않고 `test/history.test.mjs`가 확인한다
 - `main/notify-tap.mjs` — 훅이 돌릴 스크립트(`scriptSource` — `.mjs`라 ESM이다),
   받은 문구를 쓸지 정하는 규칙(`noteNeeds`·`NOTE_SLACK_MS`), 남은 파일을 버릴 기준(`NOTE_MAX_AGE_MS`)
-- `main/index.mjs` — `POLL_MS`, `BLINK_MS`(깜빡임 주기), `signature`(스냅샷 중복 전송 판정에서 뺄 필드)
+- `main/index.mjs` — `POLL_MS`, `BLINK_MS`(깜빡임 주기), `signature`(스냅샷 중복 전송 판정에서 뺄 필드),
+  전역 단축키(`HOTKEY_ACTIONS`·`ACCEL_OK`·`applyHotkeys` — 등록 실패는 반환값으로만 오므로
+  `hotkeyFailed`에 담아 설정 창까지 올린다), 트레이의 대기 목록(`waitingMenu`·`waitMenuSig` —
+  분이 바뀔 때만 메뉴를 다시 짠다)
 
 ## 디버그 입구
 

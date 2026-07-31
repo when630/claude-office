@@ -1,5 +1,17 @@
 // Claude Office — 트레이에 상주하며 로컬 Claude Code 세션을 픽셀 사무실로 보여준다.
-import { app, BrowserWindow, Tray, Menu, Notification, nativeImage, ipcMain, shell, clipboard, dialog } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  Tray,
+  Menu,
+  Notification,
+  nativeImage,
+  ipcMain,
+  shell,
+  clipboard,
+  dialog,
+  globalShortcut,
+} from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -75,6 +87,8 @@ const defaults = {
   notify: sanitizeNotify(), // 종류별 on/off — 어휘와 하위 호환은 main/notify.mjs가 정한다
   quiet: sanitizeQuiet(), // 방해금지 — 조용한 시간대와 임시 무음(until)
   roomNotify: {}, // 방 이름 → 알림 세기('off' | 'keen'). 보통인 방은 적지 않는다
+  // 전역 단축키. 빈 문자열이면 그 자리는 안 잡는다 — 끄는 방법이 곧 비우는 것이다.
+  hotkeys: { toggle: 'CommandOrControl+Alt+O', jump: 'CommandOrControl+Alt+W' },
   history: true,
   trayHintShown: false,
   view: { names: 'show', roomThemes: {} },
@@ -106,6 +120,7 @@ function loadSettings() {
     notify: sanitizeNotify(saved.notify),
     quiet: sanitizeQuiet(saved.quiet),
     roomNotify: sanitizeRoomNotify(saved.roomNotify),
+    hotkeys: sanitizeHotkeys(saved.hotkeys),
     view: sanitizeView(saved.view),
   };
   applyLang();
@@ -170,6 +185,72 @@ function notifySettings() {
     levels: ROOM_LEVELS,
     roomNotify: settings.roomNotify,
   };
+}
+
+// ── 전역 단축키
+//
+// 창을 열지 않고도 처리하려는 것이다. 지금은 토스트를 놓치면 창을 열고 → 책상을 찾고 →
+// 클릭하고 → 터미널에서 열기까지 네 걸음인데, terminal.mjs는 id만 있으면 되는 자리다.
+const HOTKEY_ACTIONS = ['toggle', 'jump'];
+// Accelerator 문법(수식키+키) 중 우리가 받아들이는 모양. 손으로 고친 settings.json이
+// 앱을 못 뜨게 하지 않도록 좁게 받는다 — register()는 이상한 문자열에 예외를 던진다.
+const ACCEL_OK = /^(?:(?:CommandOrControl|Command|Control|Ctrl|Alt|Option|Shift|Super)\+){1,3}[A-Za-z0-9]{1,12}$/;
+
+function sanitizeHotkeys(v) {
+  const out = { ...defaults.hotkeys };
+  if (v && typeof v === 'object') {
+    for (const k of HOTKEY_ACTIONS) {
+      if (typeof v[k] !== 'string') continue;
+      // 빈 문자열은 "이 자리는 안 쓴다"는 뜻이라 그대로 받는다
+      out[k] = v[k] === '' || ACCEL_OK.test(v[k]) ? v[k] : out[k];
+    }
+  }
+  return out;
+}
+
+// 잡아 둔 단축키를 다 놓고 지금 설정대로 다시 잡는다. 실패한 것은 그대로 돌려준다 —
+// globalShortcut.register()는 이미 남이 쓰는 조합이면 조용히 false를 낼 뿐이라,
+// 알려주지 않으면 사용자는 눌러 보고 아무 일도 안 일어나는 것만 겪는다.
+let hotkeyFailed = [];
+
+function applyHotkeys({ announce = false } = {}) {
+  globalShortcut.unregisterAll();
+  const run = { toggle: toggleWindow, jump: jumpToLongestWait };
+  const failed = [];
+  for (const action of HOTKEY_ACTIONS) {
+    const accel = settings.hotkeys[action];
+    if (!accel) continue;
+    let ok = false;
+    try {
+      ok = globalShortcut.register(accel, run[action]);
+    } catch {
+      ok = false; // Accelerator로 못 읽는 문자열
+    }
+    if (!ok) failed.push(accel);
+  }
+  hotkeyFailed = failed;
+  if (announce && failed.length) {
+    notify(t('notify.hotkeyFailTitle'), t('notify.hotkeyFailBody', { keys: failed.join(' · ') }));
+  }
+  return failed;
+}
+
+// 창 토글. 보이고 초점까지 있으면 내리고, 아니면 올려서 초점을 준다 —
+// 다른 창에 가려 있을 때 눌렀는데 사라지면 그건 고장으로 읽힌다.
+function toggleWindow() {
+  if (win && !win.isDestroyed() && win.isVisible() && win.isFocused()) win.hide();
+  else showWindow();
+}
+
+// 가장 오래 기다린 세션의 터미널로. 기다리는 게 없으면 창만 띄운다 — 아무 일도 안 일어나면
+// 단축키가 안 먹은 것인지 기다리는 게 없는 것인지 알 수 없다.
+function jumpToLongestWait() {
+  const [first] = waitingWorkers();
+  if (!first) {
+    showWindow();
+    return;
+  }
+  openTerminalFor(first);
 }
 
 // 렌더러가 보낸 값도, 손으로 고친 settings.json도 같은 문을 지난다 — 모르는 키·엉뚱한 타입은
@@ -502,6 +583,38 @@ function langMenu() {
   }));
 }
 
+// 지금 기다리고 있는 자리들 — 오래 기다린 순서.
+function waitingWorkers() {
+  const out = [];
+  for (const room of lastSnapshot?.rooms ?? []) {
+    for (const w of room.workers ?? []) if (w.mood === 'waiting') out.push(w);
+  }
+  return out.sort((a, b) => (a.statusAt ?? Infinity) - (b.statusAt ?? Infinity));
+}
+
+// 트레이 메뉴에 적을 이름. 이름을 가리기로 해 뒀으면 세션 이름 대신 방 이름을 쓴다 —
+// 화면을 공유하는 동안엔 트레이 메뉴도 같이 보인다(방 이름은 원래 가리지 않는 값이다).
+function trayNameOf(w) {
+  return (settings.view.names === 'show' ? w.name : w.room) || w.room || '—';
+}
+
+async function openTerminalFor(w) {
+  const res = await openTerminal({ cwd: w.cwd, jobId: w.jobId, sessionId: w.sessionId });
+  // 성공은 터미널 창이 뜨는 것으로 충분하다. 실패만 알린다 — 왜 아무 일도 없었는지 알아야 한다
+  if (!res.ok) notify(t('terminal.failed'), terminalReason(res.reason));
+}
+
+// 트레이에서 바로 기다리는 세션으로. 창을 열고 책상을 찾는 걸음을 없애는 자리다.
+function waitingMenu() {
+  const list = waitingWorkers().slice(0, 8);
+  if (!list.length) return [{ label: t('tray.waitingNone'), enabled: false }];
+  const now = Date.now();
+  return list.map((w) => ({
+    label: `${trayNameOf(w)} · ${fmtDur(w.statusAt ? now - w.statusAt : 0)}`,
+    click: () => openTerminalFor(w),
+  }));
+}
+
 // "지금부터 조용히". 남은 시간이 아니라 **끝나는 시각**을 적는다 — 메뉴는 열 때마다 다시
 // 짜이지 않으므로 "30분 남음"은 곧 거짓이 되지만 "14:35까지"는 언제 봐도 맞다.
 function quietMenu() {
@@ -528,6 +641,7 @@ function buildTrayMenu() {
       ? [{ label: t('tray.update', { v: updateReady }), click: installNow }, { type: 'separator' }]
       : []),
     { label: t('tray.open'), click: showWindow },
+    { label: t('tray.waitingList'), submenu: waitingMenu() },
     { type: 'separator' },
     {
       label: t('tray.notify'),
@@ -645,6 +759,16 @@ function signature(snapshot) {
   return JSON.stringify(snapshot, (k, v) => (k === 'ts' ? undefined : v));
 }
 
+let lastWaitSig = '';
+
+function waitMenuSig() {
+  const now = Date.now();
+  return waitingWorkers()
+    .slice(0, 8)
+    .map((w) => `${w.key}:${Math.floor((now - (w.statusAt ?? now)) / 60_000)}`)
+    .join('|');
+}
+
 async function tick() {
   let snapshot;
   try {
@@ -653,6 +777,14 @@ async function tick() {
     console.error('[collect]', err.message);
     return;
   }
+  // 트레이의 대기 목록은 이름과 분이 적힌 채로 굳어 있다 — 목록이나 분이 바뀔 때만 다시 짠다.
+  // 대기가 있는 동안에도 1분에 한 번꼴이라, 스냅샷마다 메뉴를 새로 만드는 것과 값이 다르다.
+  const waitSig = waitMenuSig();
+  if (waitSig !== lastWaitSig) {
+    lastWaitSig = waitSig;
+    refreshTrayMenu();
+  }
+
   // 시간대에 들고 나거나 임시 무음이 끝나면 트레이 메뉴의 표시가 실제와 어긋난다.
   // 만료된 until은 여기서 정리해 둔다 — 다음에 메뉴를 열었을 때 지난 시각이 남아 있지 않게.
   const quiet = isQuiet(settings.quiet);
@@ -734,6 +866,15 @@ if (!app.requestSingleInstanceLock()) {
       return notifySettings();
     });
 
+    // 전역 단축키. 등록 실패는 반환값으로만 알 수 있어(register가 false를 낼 뿐이다)
+    // 실패한 조합을 함께 넘긴다 — 설정 창이 그 자리를 표시한다.
+    ipcMain.handle('office:getHotkeys', () => ({ hotkeys: settings.hotkeys, failed: hotkeyFailed }));
+    ipcMain.handle('office:setHotkeys', (_e, patch) => {
+      settings.hotkeys = sanitizeHotkeys({ ...settings.hotkeys, ...(patch ?? {}) });
+      saveSettings();
+      return { hotkeys: settings.hotkeys, failed: applyHotkeys() };
+    });
+
     // 설정 창(렌더러)이 쓰는 표시 설정. 저장된 값을 되돌려주므로 렌더러는 반영만 하면 된다.
     ipcMain.handle('office:getView', () => settings.view);
     ipcMain.handle('office:setView', (_e, patch) => {
@@ -752,6 +893,8 @@ if (!app.requestSingleInstanceLock()) {
 
     quietNow = isQuiet(settings.quiet);
     createTray();
+    // 못 잡은 조합은 알려 준다. 눌러 보고 아무 일도 안 일어나는 것으로 알게 하지 않는다.
+    applyHotkeys({ announce: true });
     // 맥은 로그인 시작에 인자를 못 넘긴다 — 로그인으로 뜬 실행인지(wasOpenedAtLogin)로 대신한다
     const hidden = process.argv.includes('--hidden') || app.getLoginItemSettings().wasOpenedAtLogin === true;
     createWindow(!hidden);
@@ -785,5 +928,6 @@ if (!app.requestSingleInstanceLock()) {
     quitting = true;
     if (timer) clearInterval(timer);
     if (blinkTimer) clearInterval(blinkTimer);
+    globalShortcut.unregisterAll();
   });
 }

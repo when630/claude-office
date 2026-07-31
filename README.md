@@ -123,6 +123,11 @@ Automatic installation is blocked for unsigned macOS builds, so there a new vers
 
 - Closing the window does not quit — it drops to the tray (menu bar on macOS). To really quit:
   **tray icon > Quit**
+- **Waiting on you** in the tray menu lists whatever is waiting, longest first — click one and
+  **its terminal opens right there.** No need to open the window and hunt for the desk
+- Two **global shortcuts** (rebind them in Settings) — `Ctrl+Alt+O` shows and hides the window,
+  `Ctrl+Alt+W` opens the terminal of the longest wait. If another app already holds the
+  combination you get told, rather than a shortcut that quietly does nothing
 - The tray icon carries the state — Clawd normally, a yellow dot when something is waiting on
   you, a red dot when something failed. Hover for `5 in office · 3 working · 1 waiting on you
   (longest 12m)`
