@@ -1,6 +1,7 @@
 # 설정
 
-상단바 오른쪽 **설정** 버튼. 고른 값은 `%APPDATA%\claude-office\settings.json`의 `view`에 남아
+상단바 오른쪽 **설정** 버튼. 고른 값은 `%APPDATA%\claude-office\settings.json`
+(맥은 `~/Library/Application Support/claude-office/settings.json`)의 `view`에 남아
 앱을 다시 켜도 그대로다.
 
 ## 클로드 이름
