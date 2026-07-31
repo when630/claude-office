@@ -18,6 +18,8 @@ main/preload.cjs    contextBridge (샌드박스라 CJS여야 한다)
 renderer/           픽셀 렌더러 (app · render · sprites · themes · talk · style)
 renderer/fonts/     사무실 영역 픽셀 폰트 (Mona S 12px, OFL 1.1)
 shared/pixels.mjs   픽셀 데이터 — 렌더러와 아이콘 생성기가 공유
+shared/i18n.mjs     화면에 나가는 문구 — t()·언어 정하기, 기간·시각 셈법(언어별로 분기하는 것만)
+shared/lang/*.mjs   언어별 사전 (순수 데이터 — UI 문구 · 방 이름 · 캐릭터 대사)
 tools/make-icons.mjs        캐릭터 픽셀 → PNG (의존성 없이 직접 인코딩) — 맥 메뉴바용 16px 변형도 굽는다
 tools/install-usage-tap.mjs 위 로직의 CLI 껍데기 (npm run usage-tap)
 test/               `npm test` (node --test, 의존성 없음) — 알림 문턱 판정 · attach 명령 조립
@@ -31,8 +33,10 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   `props`·`wall`이 비품을 정한다
   (둘 다 `renderer/sprites.mjs`의 `SPR` 키 — 회의실 벽의 `screen`만 예외로 `drawScreen()`이 직접 그린다). 자리 모양을 새로 만들려면 `render.mjs`의
   `drawSurface`·`drawGear`·`clawdSeated`에 분기를 추가한다
-- `renderer/talk.mjs` — 혼잣말(`LINES`), 시간대 대사(`TIME_LINES`), 잡담(`DUOS`), 비서 보고(`AIDE_LINES`),
-  주기(`CYCLE`·`SHOW`). 문장을 고를 때 `kind`를 실어 보내면 말풍선 색이 그에 따라 갈린다
+- `shared/lang/en.mjs`·`ko.mjs` — 문장은 전부 여기 있다(UI 문구 · 방 이름 · 캐릭터 대사).
+  두 파일의 키 모양이 같아야 하고, `en`이 없는 키의 대체값이다
+- `renderer/talk.mjs` — **언제 무엇을 고르는지**만 정한다(문장은 사전에 있다). 시간대 구간(`TIME_SLOTS`),
+  주기(`CYCLE`·`SHOW`·`AIDE_CYCLE`). 문장을 고를 때 `kind`를 실어 보내면 말풍선 색이 그에 따라 갈린다
 - `renderer/render.mjs` — 방 크기(`SLOT_W`·`SLOT_H`·`FLOOR_BASE`), 자리 배치(`DY_DESK` 주석에 y좌표 정리 · 그리는 곳은 `drawSurface`·`drawGear`·`clawdSeated`),
   돌아다니는 범위·속도(`bandBounds`·`SEG_MS`), 모이는 주기(`HANG_EVERY`), 잡담 거리(`CHAT_NEAR_X`),
   말풍선 색(`BUBBLE_STYLE`), 방 색상 `HUES`
@@ -55,6 +59,7 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
 ## 디버그 입구
 
 DevTools 콘솔에서 `__office.push(state)` / `__office.select(key)`로 임의 상태를 밀어넣어
-입력 대기·실패처럼 평소 안 나오는 화면을 확인할 수 있다. `__office.view({ names, roomThemes })`는
-설정을 **저장하지 않고** 바꿔 보는 입구다 — 헤드리스로 화면을 굽어 확인할 때 쓴다.
+입력 대기·실패처럼 평소 안 나오는 화면을 확인할 수 있다. `__office.view({ names, roomThemes })`와
+`__office.lang('en')`은 설정을 **저장하지 않고** 바꿔 보는 입구다 — 헤드리스로 화면을 굽어
+확인할 때 쓴다(`lang`은 main을 거치지 않으므로 `'auto'`는 뜻이 없다).
 (이 README·docs의 캡처도 그렇게 구운 것이다.)

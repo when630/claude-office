@@ -1208,18 +1208,26 @@ function fitText(ctx, text, maxW) {
   return out;
 }
 
+// 끊을 자리는 공백을 먼저 본다 — 영어는 단어 중간에서 끊으면 읽히지 않는다
+// ("this func / tion"). 공백이 없는 덩어리(경로·id·한 어절이 한 줄보다 긴 경우)는
+// 어쩔 수 없이 글자에서 끊는다. 마지막 줄을 '…'로 잘라내는 규칙은 그대로다.
 function wrapText(ctx, text, maxW, maxLines) {
   const out = [];
   let cur = '';
   for (const ch of text) {
+    // 줄 첫머리의 공백은 버린다 — 끊긴 자리의 공백이 다음 줄을 밀어낸다
+    if (!cur && /\s/.test(ch)) continue;
     if (cur && ctx.measureText(cur + ch).width > maxW) {
       if (out.length + 1 >= maxLines) {
         while (cur && ctx.measureText(cur + '…').width > maxW) cur = cur.slice(0, -1);
         out.push(cur + '…');
         return out;
       }
-      out.push(cur);
-      cur = '';
+      const at = cur.lastIndexOf(' ');
+      // 줄 맨 앞을 잘라내면 빈 줄이 생기므로 공백이 첫 글자인 경우는 글자에서 끊는다
+      const carry = at > 0 ? cur.slice(at + 1) : '';
+      out.push(at > 0 ? cur.slice(0, at) : cur);
+      cur = carry;
     }
     cur += ch;
   }

@@ -7,15 +7,17 @@
 // 문자열을 그대로 셸에 넘기면 그게 곧 임의 명령 실행 통로가 된다.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import { t, has } from '../shared/i18n.mjs';
 
 // 셸에 들어가는 값이라 좁게 받는다. 세션 id는 UUID, 잡 id는 짧은 hex다.
 const ID_OK = /^[A-Za-z0-9._-]{1,128}$/;
 
-export const REASONS = {
-  'no-id': '이 세션은 붙을 id가 없습니다.',
-  unsupported: '이 플랫폼에서는 터미널을 열지 못합니다.',
-  failed: '터미널을 띄우지 못했습니다. 명령을 복사해 직접 실행해 주세요.',
-};
+// 실패 사유를 지금 언어로. 돌려주는 결과에는 사유 키(reason)를 그대로 남기고 문구만 여기서
+// 만든다 — 부르는 쪽이 키로 분기할 수 있어야 한다.
+export function reasonText(reason) {
+  const key = `terminal.reason.${reason}`;
+  return has(key) ? t(key) : t('terminal.failed');
+}
 
 export function attachCommand({ jobId, sessionId } = {}) {
   if (jobId && ID_OK.test(jobId)) return `claude attach ${jobId}`;

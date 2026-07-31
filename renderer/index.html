@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="ko">
+<!-- lang은 app.mjs가 설정에 맞춰 갈아 끼운다 (기본값은 폰트·줄바꿈이 무난한 en) -->
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -17,8 +18,8 @@
       <div id="stats"></div>
       <div class="right">
         <span id="clock"></span>
-        <button id="att-open" type="button" title="출근부">출근부</button>
-        <button id="cfg-open" type="button" title="설정">설정</button>
+        <button id="att-open" type="button" data-i18n="topbar.attendance" data-i18n-title="topbar.attendance"></button>
+        <button id="cfg-open" type="button" data-i18n="topbar.settings" data-i18n-title="topbar.settings"></button>
       </div>
     </header>
 
@@ -28,23 +29,23 @@
     </main>
 
     <!-- 한 번 읽으면 되는 안내는 기본 화면에서 빼고 여기 접어둔다.
-         내용이 고정이라 app.mjs가 만들지 않고 그대로 둔다. -->
-    <button id="help-open" type="button" title="말풍선 읽는 법" aria-expanded="false" aria-controls="help">?</button>
+         뼈대는 고정이고 문구만 app.mjs가 채운다(data-i18n) — 언어를 바꾸면 다시 채워진다. -->
+    <button id="help-open" type="button" data-i18n-title="help.button" aria-expanded="false" aria-controls="help">?</button>
     <div id="help" hidden>
-      <h3>말풍선 읽는 법</h3>
+      <h3 data-i18n="help.title"></h3>
       <ul class="legend">
-        <li><span class="chip real"></span>세션에서 읽어온 말 — 지금 상황·최근 지시·서브에이전트 보고</li>
-        <li><span class="chip idle"></span>혼잣말·잡담 — 분위기용으로 써 둔 문장</li>
+        <li><span class="chip real"></span><span data-i18n="help.real"></span></li>
+        <li><span class="chip idle"></span><span data-i18n="help.idle"></span></li>
       </ul>
-      <p>자리를 클릭하면 그 세션이 뭘 하고 있는지 볼 수 있습니다.</p>
+      <p data-i18n="help.hint"></p>
     </div>
 
     <!-- 설정. <dialog>를 쓰면 배경 차단과 Esc 닫기가 공짜로 따라온다.
          내용은 app.mjs가 열 때마다 지금 떠 있는 방으로 다시 짠다. -->
     <dialog id="cfg">
       <header>
-        <h2>설정</h2>
-        <button id="cfg-close" type="button" title="닫기">닫기</button>
+        <h2 data-i18n="cfg.title"></h2>
+        <button id="cfg-close" type="button" data-i18n="common.close" data-i18n-title="common.close"></button>
       </header>
       <div id="cfg-body"></div>
     </dialog>
@@ -52,8 +53,8 @@
     <!-- 출근부. 열 때마다 main에서 집계를 받아 온다(스냅샷과 달리 밀려 오지 않는다). -->
     <dialog id="att">
       <header>
-        <h2>출근부</h2>
-        <button id="att-close" type="button" title="닫기">닫기</button>
+        <h2 data-i18n="att.title"></h2>
+        <button id="att-close" type="button" data-i18n="common.close" data-i18n-title="common.close"></button>
       </header>
       <div id="att-body"></div>
     </dialog>

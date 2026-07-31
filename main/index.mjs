@@ -5,24 +5,18 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collect } from './collect.mjs';
 import { CLAUDE_DIR, USAGE_FILE } from './paths.mjs';
-import { installTap, removeTap, tapStatus, manualGuide, REASONS } from './usage-tap.mjs';
+import { installTap, removeTap, tapStatus, manualGuide, reasonText as tapReason } from './usage-tap.mjs';
 import {
   installNotifyTap,
   removeNotifyTap,
   notifyTapStatus,
   manualGuide as notifyManualGuide,
-  REASONS as NOTIFY_REASONS,
+  reasonText as notifyTapReason,
 } from './notify-tap.mjs';
 import { initUpdater, installNow } from './updater.mjs';
-import {
-  createNotifyState,
-  decideNotifications,
-  longestWait,
-  fmtDur,
-  sanitizeNotify,
-  BLINK_AFTER_MS,
-} from './notify.mjs';
-import { openTerminal, REASONS as TERMINAL_REASONS } from './terminal.mjs';
+import { createNotifyState, decideNotifications, longestWait, sanitizeNotify, BLINK_AFTER_MS } from './notify.mjs';
+import { openTerminal, reasonText as terminalReason } from './terminal.mjs';
+import { t, fmtDur, setLang, resolveLang, LANGS, LANG_NAMES } from '../shared/i18n.mjs';
 import {
   diffEvents,
   bootEvent,
@@ -59,13 +53,18 @@ let updateReady = null; // 받아 둔 새 버전 — 트레이 메뉴에 재시�
 //
 // notify·trayHintShown·history는 main만 쓰고, view는 렌더러가 쓴다(설정 창 → office:setView).
 // 방 종류를 방 key(작업 디렉터리 이름)로 기억하므로 앱을 다시 켜도 고른 방이 그대로 남는다.
+//
+// lang은 양쪽이 쓴다 — 트레이·알림은 main이, 화면은 렌더러가 그리기 때문이다. 저장값은
+// 'auto' | 'en' | 'ko'이고 실제로 쓸 언어는 OS 로케일과 함께 정한다(shared/i18n.mjs).
 const defaults = {
+  lang: 'auto',
   notify: sanitizeNotify(), // 종류별 on/off — 어휘와 하위 호환은 main/notify.mjs가 정한다
   history: true,
   trayHintShown: false,
   view: { names: 'show', roomThemes: {} },
 };
 const NAME_MODES = ['show', 'mask', 'hide'];
+const LANG_PREFS = ['auto', ...LANGS];
 let settings = { ...defaults, view: { ...defaults.view } };
 
 function settingsPath() {
@@ -84,7 +83,39 @@ function loadSettings() {
   } catch {
     saved = {};
   }
-  settings = { ...defaults, ...saved, notify: sanitizeNotify(saved.notify), view: sanitizeView(saved.view) };
+  settings = {
+    ...defaults,
+    ...saved,
+    lang: LANG_PREFS.includes(saved.lang) ? saved.lang : defaults.lang,
+    notify: sanitizeNotify(saved.notify),
+    view: sanitizeView(saved.view),
+  };
+  applyLang();
+}
+
+// ── 언어. 설정값과 OS 로케일에서 실제로 쓸 언어를 정해 이 프로세스에 세운다.
+// 렌더러는 제 프로세스에서 따로 세운다(office:meta로 받아 간다).
+function applyLang() {
+  return setLang(resolveLang(settings.lang, app.getLocale()));
+}
+
+// 언어를 바꾸면 이미 그려 둔 것들을 다시 짠다 — 재시작을 요구할 이유가 없다.
+// 트레이 메뉴는 라벨이 박힌 채로 만들어져 있어 통째로 다시 만들어야 하고,
+// 툴팁은 다음 폴링을 기다리지 않고 지금 스냅샷으로 다시 쓴다.
+function setLangPref(pref) {
+  if (!LANG_PREFS.includes(pref) || pref === settings.lang) return;
+  settings.lang = pref;
+  saveSettings();
+  applyLang();
+  if (tray) {
+    tray.setContextMenu(buildTrayMenu());
+    if (lastSnapshot) updateTray(lastSnapshot);
+  }
+  if (win && !win.isDestroyed()) win.webContents.send('office:lang', langPayload());
+}
+
+function langPayload() {
+  return { lang: applyLang(), pref: settings.lang };
 }
 
 function notifyOn(kind) {
@@ -187,7 +218,7 @@ function createWindow(show = true) {
     if (!settings.trayHintShown) {
       settings.trayHintShown = true;
       saveSettings();
-      notify('트레이에서 계속 지켜봅니다', '입력 대기가 생기면 알려줍니다. 종료하려면 트레이 아이콘 > 종료.');
+      notify(t('notify.trayHintTitle'), t('notify.trayHintBody'));
     }
   });
 }
@@ -270,14 +301,18 @@ function updateTray(snapshot) {
   const stats = snapshot.stats ?? {};
   paintTrayIcon();
   updateBlink(snapshot);
-  const parts = [`${stats.total ?? 0}명 출근`];
-  if (stats.typing) parts.push(`${stats.typing} 작업 중`);
+  const parts = [t('tray.total', { n: stats.total ?? 0 })];
+  if (stats.typing) parts.push(t('tray.typing', { n: stats.typing }));
   // 몇 분째 방치됐는지가 트레이에서 바로 보여야 한다 — 창을 열지 않고 판단하는 자리다
   if (stats.waiting) {
     const worst = longestWait(snapshot);
-    parts.push(worst >= 60_000 ? `${stats.waiting} 입력 대기 (최장 ${fmtDur(worst)})` : `${stats.waiting} 입력 대기`);
+    parts.push(
+      worst >= 60_000
+        ? t('tray.waitingLong', { n: stats.waiting, d: fmtDur(worst) })
+        : t('tray.waiting', { n: stats.waiting }),
+    );
   }
-  if (stats.failed) parts.push(`${stats.failed} 실패`);
+  if (stats.failed) parts.push(t('tray.failed', { n: stats.failed }));
   const who = app.isPackaged ? 'Claude Office' : 'Claude Office (dev)';
   tray.setToolTip(`${who} — ${parts.join(' · ')}`);
 }
@@ -292,11 +327,11 @@ function toggleTap(want) {
 
   if (res.ok) {
     if (res.already) {
-      notify('사용량 연동', want ? '이미 연동돼 있습니다.' : '연동된 것이 없습니다.');
+      notify(t('tap.title'), t(want ? 'tap.already' : 'tap.nothing'));
     } else if (want) {
-      notify('사용량 연동을 켰습니다', 'Claude Code 세션에서 statusline이 한 번 그려지면 사용량이 뜹니다.');
+      notify(t('tap.onTitle'), t('tap.onBody'));
     } else {
-      notify('사용량 연동을 껐습니다', 'statusline에서 심어둔 줄을 뺐습니다. 앱의 사용량 표시만 사라집니다.');
+      notify(t('tap.offTitle'), t('tap.offBody'));
     }
     return;
   }
@@ -306,10 +341,12 @@ function toggleTap(want) {
   dialog
     .showMessageBox({
       type: 'warning',
-      title: '사용량 연동',
-      message: REASONS[res.reason] ?? '사용량 연동에 실패했습니다.',
-      detail: [res.command && `statusLine 명령: ${res.command}`, res.error, '', guide].filter(Boolean).join('\n'),
-      buttons: ['확인', '안내 복사'],
+      title: t('tap.title'),
+      message: tapReason(res.reason),
+      detail: [res.command && t('tap.command', { cmd: res.command }), res.error, '', guide]
+        .filter(Boolean)
+        .join('\n'),
+      buttons: [t('common.ok'), t('common.copyGuide')],
       defaultId: 0,
       cancelId: 0,
       noLink: true,
@@ -327,10 +364,10 @@ function confirmClearHistory() {
   dialog
     .showMessageBox({
       type: 'warning',
-      title: '근태 기록 지우기',
-      message: '지금까지 쌓인 근태 기록을 지울까요?',
-      detail: `${historyPath()}\n\n출근부의 오늘·최근 7일 집계가 빈 상태로 돌아갑니다. 되돌릴 수 없습니다.`,
-      buttons: ['취소', '지우기'],
+      title: t('hist.clearTitle'),
+      message: t('hist.clearMessage'),
+      detail: t('hist.clearDetail', { path: historyPath() }),
+      buttons: [t('common.cancel'), t('hist.clearButton')],
       defaultId: 0,
       cancelId: 0,
       noLink: true,
@@ -338,7 +375,7 @@ function confirmClearHistory() {
     .then(({ response }) => {
       if (response !== 1) return;
       const ok = clearFile(historyPath());
-      notify('근태 기록', ok ? '기록을 지웠습니다.' : '기록을 지우지 못했습니다.');
+      notify(t('hist.title'), t(ok ? 'hist.cleared' : 'hist.clearFailed'));
     })
     .catch(() => {
       /* 대화상자를 못 띄우는 상황이면 아무것도 지우지 않는다 */
@@ -361,15 +398,12 @@ function toggleNotifyTap(want) {
 
   if (res.ok) {
     if (res.already) {
-      notify('무엇을 기다리는지', want ? '이미 연동돼 있습니다.' : '연동된 것이 없습니다.');
+      notify(t('ntap.title'), t(want ? 'ntap.already' : 'ntap.nothing'));
     } else if (want) {
       // 훅은 세션을 띄울 때 읽힌다 — 이미 돌고 있는 세션에는 적용되지 않는다
-      notify(
-        '무엇을 기다리는지 알려줍니다',
-        '지금 돌고 있는 세션에는 적용되지 않습니다 — 새로 띄운 세션부터 권한 확인·선택지 문구가 그대로 보입니다.',
-      );
+      notify(t('ntap.onTitle'), t('ntap.onBody'));
     } else {
-      notify('연동을 껐습니다', 'settings.json에서 훅을 뺐습니다. 대기 자체는 그대로 알려줍니다.');
+      notify(t('ntap.offTitle'), t('ntap.offBody'));
     }
     return;
   }
@@ -378,10 +412,10 @@ function toggleNotifyTap(want) {
   dialog
     .showMessageBox({
       type: 'warning',
-      title: '무엇을 기다리는지 알아내기',
-      message: NOTIFY_REASONS[res.reason] ?? '연동에 실패했습니다.',
+      title: t('ntap.setupTitle'),
+      message: notifyTapReason(res.reason),
       detail: guide,
-      buttons: ['확인', '안내 복사'],
+      buttons: [t('common.ok'), t('common.copyGuide')],
       defaultId: 0,
       cancelId: 0,
       noLink: true,
@@ -401,67 +435,71 @@ function upgradeUsageTap() {
   const st = tapStatus();
   if (!st.installed || st.hasEncoding) return;
   const res = installTap();
-  if (res.ok && res.upgraded) {
-    notify(
-      '사용량 연동을 고쳤습니다',
-      '한글이 든 payload가 깨지지 않게 statusline의 stdin 인코딩을 맞췄습니다.',
-    );
-  }
+  if (res.ok && res.upgraded) notify(t('tap.fixedTitle'), t('tap.fixedBody'));
+}
+
+// 언어 항목. 언어 이름은 그 언어로 적는다(LANG_NAMES) — 읽을 수 없는 언어로 적힌 항목은
+// 고를 수가 없다. '자동'만 지금 언어로 적는다.
+function langMenu() {
+  return [['auto', t('common.langAuto')], ...LANGS.map((l) => [l, LANG_NAMES[l]])].map(([pref, label]) => ({
+    label,
+    type: 'radio',
+    checked: settings.lang === pref,
+    click: () => setLangPref(pref),
+  }));
 }
 
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
     ...(updateReady
-      ? [
-          { label: `업데이트 설치하고 재시작 (v${updateReady})`, click: installNow },
-          { type: 'separator' },
-        ]
+      ? [{ label: t('tray.update', { v: updateReady }), click: installNow }, { type: 'separator' }]
       : []),
-    { label: '사무실 열기', click: showWindow },
+    { label: t('tray.open'), click: showWindow },
     { type: 'separator' },
     {
-      label: '알림',
+      label: t('tray.notify'),
       submenu: [
         {
-          label: '입력 대기',
+          label: t('tray.notifyWaiting'),
           type: 'checkbox',
           checked: notifyOn('waiting'),
           click: (item) => setNotify('waiting', item.checked),
         },
         {
-          label: '대기가 길어지면 다시 (5 · 15 · 30 · 60분)',
+          label: t('tray.notifyEscalate'),
           type: 'checkbox',
           checked: notifyOn('escalate'),
           click: (item) => setNotify('escalate', item.checked),
         },
         {
-          label: '컨텍스트 임박 (85 · 95%)',
+          label: t('tray.notifyContext'),
           type: 'checkbox',
           checked: notifyOn('context'),
           click: (item) => setNotify('context', item.checked),
         },
         {
-          label: '계정 사용량 임박 (80 · 95%)',
+          label: t('tray.notifyUsage'),
           type: 'checkbox',
           checked: notifyOn('usage'),
           click: (item) => setNotify('usage', item.checked),
         },
       ],
     },
+    { label: t('tray.language'), submenu: langMenu() },
     {
-      label: '사용량 연동 (statusline)',
+      label: t('tray.usageTap'),
       type: 'checkbox',
       checked: tapStatus().installed,
       click: (item) => toggleTap(item.checked),
     },
     {
-      label: '무엇을 기다리는지 알아내기 (Notification 훅)',
+      label: t('tray.notifyTap'),
       type: 'checkbox',
       checked: notifyTapStatus(notifyScriptPath()).installed,
       click: (item) => toggleNotifyTap(item.checked),
     },
     {
-      label: '근태 기록 (출근부)',
+      label: t('tray.history'),
       type: 'checkbox',
       checked: settings.history,
       click: (item) => {
@@ -469,9 +507,9 @@ function buildTrayMenu() {
         saveSettings();
       },
     },
-    { label: '근태 기록 지우기…', click: confirmClearHistory },
+    { label: t('tray.historyClear'), click: confirmClearHistory },
     {
-      label: '로그인 시 자동 시작',
+      label: t('tray.autostart'),
       type: 'checkbox',
       checked: app.getLoginItemSettings().openAtLogin,
       click: (item) => {
@@ -483,7 +521,7 @@ function buildTrayMenu() {
     },
     { type: 'separator' },
     {
-      label: '종료',
+      label: t('tray.quit'),
       click: () => {
         quitting = true;
         app.quit();
@@ -551,6 +589,8 @@ if (!app.requestSingleInstanceLock()) {
       claudeDir: CLAUDE_DIR,
       usageFile: USAGE_FILE,
       version: app.getVersion(),
+      // 렌더러는 제 프로세스에서 언어를 세워야 한다 — 여기로 실어 보낸다
+      ...langPayload(),
     }));
     ipcMain.on('office:open-external', (_e, url) => openExternal(url));
     ipcMain.on('office:copy', (_e, text) => clipboard.writeText(String(text ?? '')));
@@ -563,7 +603,7 @@ if (!app.requestSingleInstanceLock()) {
         jobId: target?.jobId,
         sessionId: target?.sessionId,
       });
-      return { ...res, message: res.ok ? null : (TERMINAL_REASONS[res.reason] ?? '터미널을 열지 못했습니다.') };
+      return { ...res, message: res.ok ? null : terminalReason(res.reason) };
     });
 
     // 출근부. 오늘과 최근 7일을 한 번에 넘긴다 — 창을 열 때 한 번만 읽으면 되고,
@@ -587,6 +627,12 @@ if (!app.requestSingleInstanceLock()) {
       return settings.view;
     });
 
+    // 설정 창의 언어 전환. 트레이 메뉴에서 바꾼 것과 같은 문을 지난다.
+    ipcMain.handle('office:setLang', (_e, pref) => {
+      setLangPref(pref);
+      return langPayload();
+    });
+
     upgradeUsageTap();
 
     createTray();
@@ -600,13 +646,10 @@ if (!app.requestSingleInstanceLock()) {
       onReady: (version) => {
         updateReady = version;
         if (tray) tray.setContextMenu(buildTrayMenu());
-        notify(
-          `Claude Office ${version} 준비됨`,
-          '트레이 메뉴에서 재시작하면 적용됩니다. 그냥 두면 다음 종료 때 설치됩니다.',
-        );
+        notify(t('notify.updateReadyTitle', { v: version }), t('notify.updateReadyBody'));
       },
       onManual: (version) => {
-        notify(`Claude Office ${version} 나왔습니다`, '눌러서 Releases에서 새 버전을 받아주세요.', () =>
+        notify(t('notify.updateManualTitle', { v: version }), t('notify.updateManualBody'), () =>
           openExternal('https://github.com/when630/claude-office/releases/latest'),
         );
       },

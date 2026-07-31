@@ -1,0 +1,555 @@
+// English dictionary. Pure data — shared/i18n.mjs owns the arithmetic (durations, clocks).
+//
+// This is also the fallback: a key missing from another language falls back here, so every
+// key that exists anywhere must exist here.
+//
+// The character is a crab, so "arms" in the Korean lines are claws here — the puns are
+// rewritten rather than translated. Keep the lines short; they go in a 12px pixel bubble
+// that wraps at two lines.
+export default {
+  // ── Duration suffixes. i18n.mjs slices the pieces and stitches them together.
+  unit: {
+    sec: '{n}s',
+    min: '{n}m',
+    hour: '{n}h',
+    day: '{n}d',
+    justNow: 'just now',
+    ago: '{d} ago',
+    justNowAgo: 'just now',
+  },
+
+  common: {
+    close: 'Close',
+    ok: 'OK',
+    cancel: 'Cancel',
+    copyGuide: 'Copy guide',
+    on: 'on',
+    off: 'off',
+    auto: 'Auto',
+    langAuto: 'Auto (system)',
+  },
+
+  // ── Top bar
+  topbar: {
+    attendance: 'Attendance',
+    settings: 'Settings',
+    in: 'in',
+    typing: 'working',
+    waiting: 'waiting on you',
+    failed: 'failed',
+    longest: 'longest {d}',
+    tokens: '{n} tok',
+  },
+
+  // ── The question mark in the bottom right
+  help: {
+    button: 'How to read the bubbles',
+    title: 'How to read the bubbles',
+    real: 'Read from the session — current activity, latest instruction, subagent report',
+    idle: 'Muttering and small talk — flavour lines we wrote',
+    hint: 'Click a desk to see what that session is doing.',
+  },
+
+  mood: {
+    typing: 'working',
+    waiting: 'waiting on you',
+    idle: 'idle',
+    done: 'done',
+    failed: 'failed',
+    stopped: 'stopped',
+  },
+
+  mode: {
+    normal: 'Default',
+    plan: 'Plan',
+    acceptEdits: 'Auto-accept edits',
+    bypassPermissions: 'Bypass permissions',
+    auto: 'Auto',
+  },
+
+  names: {
+    show: 'Real names',
+    mask: 'Masked (Clawd 1…)',
+    hide: 'No name tags',
+    alias: 'Clawd {n}',
+    aliasBare: 'Clawd',
+  },
+
+  kind: {
+    bg: 'Background',
+    terminal: 'Terminal',
+  },
+
+  // ── Default view (nothing selected)
+  idle: {
+    office: 'Office',
+    in: 'In office',
+    inValue: '{n}',
+    typing: 'Working',
+    waiting: 'Waiting on you',
+    ctxMax: 'Peak context',
+    aides: 'Subagents',
+    spare: 'Spare slots',
+    spareHint:
+      '{n} spare slots are <b>empty background processes</b> the daemon keeps warm. They have never taken a prompt, so they get no desk in the office.',
+    account: 'Account usage',
+    recent: 'Clocked out',
+    reading: 'Reading from',
+    notElectron: 'Run this as an Electron app. <code>npm start</code>',
+  },
+
+  usage: {
+    session: 'Session (5h)',
+    week: 'Week (7d)',
+    resets: 'resets {when}',
+    left: '{d} left',
+    resetDone: 'reset',
+    age: 'Usage updated {ago}',
+    staleSuffix: ' · the statusline may not be running',
+    broken:
+      '<code>office-usage.json</code> is not readable right now — the numbers above are the last ones that came through. If a session name contains non-ASCII text, the statusline reads stdin as cp949 and the payload breaks. Toggle <b>tray icon &gt; Usage feed</b> off and on to reinstall it with the right encoding.',
+    none:
+      'Session and weekly usage are numbers Claude Code hands to the <b>statusline</b> and nowhere else. Have your statusline drop the payload it receives into <code>~/.claude/office-usage.json</code> and it shows up here.',
+    noneHint: 'Turn on <b>tray icon &gt; Usage feed</b> and the app wires it up for you.',
+  },
+
+  // ── A desk is selected
+  panel: {
+    context: 'Context',
+    kind: 'Kind',
+    uptime: 'Up',
+    model: 'Model',
+    effort: 'Effort',
+    fast: 'Fast',
+    tokens: 'Tokens',
+    pid: 'PID',
+    mode: 'Mode',
+    updated: 'Updated',
+    aides: 'Subagents attached: {n}',
+    needTitle: 'Waiting on you',
+    waited: 'Waiting for {d}',
+    needFallback: 'A prompt or confirmation is up in the terminal. Answer it there and it carries on.',
+    suggested: 'Suggested reply: {reply}',
+    detail: 'Right now',
+    lastPrompt: 'Latest instruction',
+    intent: 'First instruction',
+    empty: 'Nothing recorded yet. This fills in once it takes its first instruction.',
+    links: 'Linked MRs',
+    timeline: 'Timeline',
+    open: 'Open in terminal',
+    opened: 'Opened',
+    copy: 'Copy',
+    copied: 'Copied',
+    copiedCmd: 'Copied the command to the clipboard.',
+  },
+
+  // ── Settings dialog
+  cfg: {
+    title: 'Settings',
+    langSection: 'Language',
+    lang: 'Language',
+    langNote: 'Language for app text and character lines',
+    langHint: 'Applies right away — the tray menu and notifications switch too.',
+    namesSection: 'Clawd names',
+    names: 'Name tags',
+    namesNote: 'Name used on desk tags and as the panel heading',
+    namesHint:
+      'Masking calls them <code>Clawd 1, 2…</code>. Use it when showing your screen to someone — the working directory path still shows in the panel.',
+    roomsSection: 'Room type',
+    roomsEmpty: 'No rooms are up right now. Once a session attaches you can pick its type here.',
+    roomsReset: 'Reset all to auto',
+    roomsHint:
+      'Auto assigns by hashing the room name. A type you pick is remembered by working-directory name, so it survives the room going away and coming back.',
+  },
+
+  // ── Attendance
+  att: {
+    title: 'Attendance',
+    today: 'Today',
+    week: 'Last 7 days',
+    range: '{from} – {to} · as of {time}',
+    sessions: 'Sessions',
+    sessionsValue: '{n}',
+    busy: 'Working',
+    waitMine: 'Waiting on me',
+    ctxMax: 'Peak context',
+    byRoom: 'By room',
+    room: 'Room',
+    thSessions: 'Sessions',
+    thBusy: 'Working',
+    thWait: 'Waiting',
+    thIdle: 'Idle',
+    waits: 'Longest waits',
+    empty: 'Nothing recorded in this range.',
+    loading: 'Loading…',
+    loadFailed: 'Could not read the attendance log.',
+    onHint:
+      'Only {days} days are kept; older entries are dropped when the app starts. Room names (working directories) are kept — session names and instructions are not. Turn it off or clear it from <b>tray icon &gt; Attendance log</b>.',
+    offHint:
+      'The attendance log is off — nothing is being recorded. Turn it on from <b>tray icon &gt; Attendance log</b>.',
+    offlineHint:
+      'Time while the app was closed is not counted. It could not be observed, so counting it would be a lie.',
+    unknownRoom: '(unknown)',
+  },
+
+  // ── Tray
+  tray: {
+    total: '{n} in office',
+    typing: '{n} working',
+    waiting: '{n} waiting on you',
+    waitingLong: '{n} waiting on you (longest {d})',
+    failed: '{n} failed',
+    update: 'Install update and restart (v{v})',
+    open: 'Open the office',
+    notify: 'Notifications',
+    notifyWaiting: 'Waiting on you',
+    notifyEscalate: 'Nudge again while waiting (5 · 15 · 30 · 60 min)',
+    notifyContext: 'Context running out (85 · 95%)',
+    notifyUsage: 'Account usage running out (80 · 95%)',
+    usageTap: 'Usage feed (statusline)',
+    notifyTap: 'Find out what it is waiting for (Notification hook)',
+    history: 'Attendance log',
+    historyClear: 'Clear attendance log…',
+    autostart: 'Start at login',
+    language: 'Language',
+    quit: 'Quit',
+  },
+
+  // ── OS notifications
+  notify: {
+    trayHintTitle: 'Still watching from the tray',
+    trayHintBody: 'You will get a nudge when a session needs you. To quit for real: tray icon > Quit.',
+    waitingTitle: '{name} is waiting',
+    escalateTitle: '{name} is still waiting — {d} now',
+    needsBg: 'Needs your input',
+    needsTerminal: 'A prompt or confirmation is up in the terminal',
+    contextTitle: '{name} context {pct}%',
+    contextBody: '{used} / {limit} — auto-compaction may kick in soon.',
+    usageSession: 'Session usage (5h)',
+    usageWeek: 'Weekly usage (7d)',
+    usageTitle: '{label} {pct}%',
+    usageBody: 'Not much headroom left{resets}.',
+    usageResets: ' · resets in {d}',
+    updateReadyTitle: 'Claude Office {v} is ready',
+    updateReadyBody: 'Restart from the tray menu to apply it, or leave it and it installs when you quit.',
+    updateManualTitle: 'Claude Office {v} is out',
+    updateManualBody: 'Click to grab the new build from Releases.',
+  },
+
+  // ── Usage feed (statusline tap)
+  tap: {
+    title: 'Usage feed',
+    already: 'Already wired up.',
+    nothing: 'Nothing was wired up.',
+    onTitle: 'Usage feed is on',
+    onBody: 'The numbers show up once a Claude Code session paints its statusline.',
+    offTitle: 'Usage feed is off',
+    offBody: 'Removed the line we added to your statusline. Only the usage display in the app goes away.',
+    failed: 'Could not set up the usage feed.',
+    command: 'statusLine command: {cmd}',
+    fixedTitle: 'Fixed the usage feed',
+    fixedBody: "Set the statusline's stdin encoding so payloads with non-ASCII text stop breaking.",
+    reason: {
+      'no-statusline': 'There is no statusLine setting in ~/.claude/settings.json.',
+      'not-powershell': 'Could not find the PowerShell script (.ps1) that statusLine points at.',
+      'no-stdin-line':
+        'Could not find the line that reads stdin ($x = [Console]::In.ReadToEnd()) in the statusline script.',
+      'not-installed': 'No tap is installed.',
+      'already-installed': 'Already installed.',
+      'write-failed': 'Could not write the statusline script.',
+    },
+    guide: {
+      intro: 'Have your statusline write the raw JSON it gets on stdin to the path below.',
+      target: '  Target file: {file}',
+      pre: 'PowerShell — **before** the line that reads stdin (keeps non-ASCII payloads from breaking as cp949):',
+      post: 'PowerShell — **after** it reads (assuming stdin landed in $raw):',
+      bash: 'bash (assuming stdin landed in $payload):',
+    },
+  },
+
+  // ── Find out what it is waiting for (Notification hook)
+  ntap: {
+    title: 'What it is waiting for',
+    setupTitle: 'Find out what it is waiting for',
+    already: 'Already wired up.',
+    nothing: 'Nothing was wired up.',
+    onTitle: 'It will now tell you what it is waiting for',
+    onBody:
+      'Sessions already running are unaffected — permission prompts and choices come through verbatim for sessions you start from now on.',
+    offTitle: 'Hook removed',
+    offBody: 'Took the hook out of settings.json. You still get told when something is waiting.',
+    failed: 'Could not install the hook.',
+    reason: {
+      'no-node': 'Could not find node — the hook would never run, so nothing was installed.',
+      'bad-settings': 'Could not read {settings} (it may be malformed). Left it alone.',
+      'write-failed': 'Could not save the settings.',
+      'not-installed': 'Nothing is installed.',
+    },
+    guide: {
+      intro: 'Putting this under hooks in {settings} does the same thing:',
+      script: 'The script lives at {script} (the app writes it once you turn the hook on).',
+    },
+  },
+
+  // ── Attendance log
+  hist: {
+    title: 'Attendance log',
+    cleared: 'Log cleared.',
+    clearFailed: 'Could not clear the log.',
+    clearTitle: 'Clear attendance log',
+    clearMessage: 'Clear the attendance log collected so far?',
+    clearDetail: '{path}\n\nToday and Last 7 days go back to empty. This cannot be undone.',
+    clearButton: 'Clear',
+  },
+
+  // ── npm run usage-tap (tools/install-usage-tap.mjs). Dev entry point; not in the packaged app.
+  cli: {
+    nothingInstalled: 'No tap is installed: {file}',
+    alreadyInstalled: 'Already installed: {file}',
+    installed: 'Installed: {file}',
+    removed: 'Removed: {file}',
+    backup: 'Backup: {file}',
+    varName: '  ${name} is what gets written to the usage file.',
+    bomKept: '  BOM: was already there',
+    bomAdded: '  BOM: was missing, added it',
+    next: 'Usage shows up in the app once a Claude Code session paints its statusline.',
+  },
+
+  // ── Opening a terminal
+  terminal: {
+    failed: 'Could not open a terminal.',
+    reason: {
+      'no-id': 'This session has no id to attach to.',
+      unsupported: 'Opening a terminal is not supported on this platform.',
+      failed: 'Could not launch a terminal. Copy the command and run it yourself.',
+    },
+  },
+
+  // ── Room types. renderer/themes.mjs owns the structure (props, floor); names and lines here.
+  rooms: {
+    dev: {
+      label: 'Dev room',
+      lines: ['I like the sound of a build running', 'That fan next to me is loud', 'Heat is rolling off the rack'],
+    },
+    design: {
+      label: 'Design room',
+      lines: ['This gap is two pixels off', 'One fewer colour and it would be perfect', 'The warm light in here is nice'],
+    },
+    lounge: {
+      label: 'Lounge',
+      lines: ['Coffee smell reaches all the way here', 'I want to lie on that sofa', 'The vending machine has no change', 'One round on the arcade…'],
+    },
+    meeting: {
+      label: 'Meeting room',
+      lines: ['Did this meeting need to happen', 'The screen will not turn on', 'Can I wipe the whiteboard'],
+    },
+    lab: {
+      label: 'Lab',
+      lines: ['This experiment will not reproduce', 'The fish in the tank is watching me', 'That flask is the wrong colour'],
+    },
+    archive: {
+      label: 'Archive',
+      lines: ['This document is three years old', 'Another box showed up', 'Look at all this dust'],
+    },
+    server: {
+      label: 'Server room',
+      lines: ['It is loud in here', 'One of the fans died', 'Why is it so cold'],
+    },
+    ops: {
+      label: 'Ops room',
+      lines: ['The printer jammed again', 'Three alerts came in', 'Dashboard still all green'],
+    },
+  },
+
+  // ── Muttering, small talk, aide reports (picked by renderer/talk.mjs)
+  talk: {
+    waiting: 'Waiting for {d}…',
+
+    lines: {
+      typing: [
+        'Hmm… why is this function so long',
+        'Let me run the tests first',
+        'The types do not line up here',
+        'One more line and I think it is done',
+        'Did I not already fix this bit?',
+        'Short claws make for typos',
+        'What do I write in the commit message',
+        'Logs, let me see the logs…',
+        'Who named this variable',
+        'The indentation is mixed in here',
+        'This condition is negated twice',
+        'I never cleared the cache',
+        'What was I thinking yesterday',
+        'The comment is older than the code',
+        'This one file is 1200 lines',
+        'It works, do not touch it',
+        'Ah, a missing await right here',
+        'Regex always comes back for me later',
+        'It reproduces but I cannot see why',
+        'More logging, then',
+        'This library has no docs',
+        'Tabs or spaces, that is the question',
+        'Refactoring is a job for future me',
+        'Half an hour lost to one bracket',
+        'Three minute build, time for coffee',
+        'Do I need a null check here too',
+        'Am I even editing the right file',
+        'Just renaming it made it readable',
+      ],
+      idle: [
+        'Quiet in here…',
+        'Maybe a coffee',
+        'When does the next job arrive',
+        'Time for a stretch',
+        'My claws are stiff',
+        'That plant needs watering',
+        'This is a break, not slacking',
+        'Having nothing to do makes me nervous',
+        'Should I tidy the desk',
+        'Maybe I will look out the window',
+        'Nobody is calling me',
+        'Waiting is work too',
+        'I could read some docs',
+        'The water cooler is nice and cold',
+        'Sounds busy next door',
+        'My step count is low today',
+        'My claws could use a trim',
+        'Good time to skim the issues',
+        'Quiet is the best signal there is',
+        'Somebody buy me a coffee',
+        'This chair squeaks',
+        'What is for lunch',
+      ],
+      waiting: [
+        'Excuse me, could you look at this',
+        'Waiting on an answer…',
+        'Hello? Anyone there?',
+        'Is it fine to go ahead like this',
+        'Confirm it and I am off',
+        'Just need permission, once',
+        'Which of the two should I pick',
+        'I am stuck right here',
+        'Standing here with claws up',
+        'Have you stepped away…',
+        'One word from you is all it takes',
+        'Waiting is work, but still',
+        'It is just that this cannot be undone',
+        'May I use my own judgement',
+        'Can I delete this file',
+        'Please check the terminal',
+      ],
+      done: [
+        'Done! All finished',
+        'Got one done today',
+        'Time to clock out?',
+        'Committed as well',
+        'Tests all green',
+        'Wrapped it up cleanly',
+        'I think that went rather well',
+        'Next job, please',
+        'MR is up',
+        'Notes written, signing off',
+        'Rolling up the claws paid off',
+        'Passed on the first try',
+      ],
+      failed: [
+        'Ah… that is broken',
+        'What went wrong there',
+        'Back to the logs',
+        'I do not think this one is on me',
+        'I hope it is an environment thing',
+        'From the top again…',
+        'My claw slipped',
+        'It definitely worked locally',
+        'I see the cause, not the fix…',
+        'One more run at it',
+        'This error message is unkind',
+        'Let me at least write it down',
+      ],
+      stopped: [
+        '…',
+        'Paused',
+        'Somebody switched me off',
+        'This far and no further',
+        'Power went out',
+        'We continue next time',
+        'Stopped. Reason unknown',
+      ],
+    },
+
+    // Time-of-day asides — talk.mjs owns the hour ranges
+    time: {
+      lateNight: ['Cold claws at this hour', 'I should be asleep', 'Do not trust me at this hour', 'Nobody is looking'],
+      earlyMorning: ['The morning air is good', 'In already', 'Early one today', 'Sun is coming up'],
+      morning: ['Mornings run best', 'This is the focused hour', 'Second coffee'],
+      lunch: ['Sleepy after lunch', 'The code looks unfamiliar after a meal', 'Post-lunch walk'],
+      afternoon: ['Afternoons are long', 'Drowsy, but the deadline still comes', 'Maybe one more coffee'],
+      evening: ['Overtime tonight, then', 'I saw the sun go down', 'Do not bring up going home'],
+      night: ['What am I still doing here', 'Code written at night is frightening', 'Tomorrow-me can have it'],
+    },
+
+    // When two of them meet — [the one who speaks first, the one who answers]
+    duos: [
+      ['Build finished?', 'Still running'],
+      ['Did you fix that?', 'Not me'],
+      ['Coffee?', 'My claws shake as it is'],
+      ['Can I merge this branch?', 'Give me a minute'],
+      ['What time are you leaving?', 'Is that a thing we do'],
+      ['Why are the tests broken?', 'Green on my side'],
+      ['I touched that file too', 'Ah, a conflict'],
+      ['What did you have for lunch?', 'Nothing at all'],
+      ['Review this for me', 'I have no free claw'],
+      ['Is next door always this loud?', 'It is the server room, nothing to be done'],
+      ['I am stuck', 'Read the logs first'],
+      ['Have you used that library?', 'No docs, so I gave up'],
+      ['How do you look after your claws?', 'Best not to use them'],
+      ['What was the MR number', 'It was not mine to file'],
+      ['Watch my desk a moment?', 'Where are you going'],
+      ['Who wrote this code?', 'One of us, three years ago'],
+      ['How many alerts today?', 'I stopped counting'],
+      ['Did you water the plant?', 'You said you did it yesterday'],
+      ['Is that issue still open?', 'Nobody will touch it'],
+      ['When do we deploy?', 'Not on a Friday'],
+      ['Can you help with a regex?', 'Nobody can help with that'],
+      ['Why are you standing here?', 'I am waiting'],
+      ['Good work today', 'You too'],
+      ['Did this meeting need to happen', 'Do not ask me'],
+      ['Seen the type error?', 'Ignore it and it goes away'],
+      ['I hear someone new started', 'Where do they sit'],
+      ['The printer jammed again', 'That is just how it is'],
+      ['Did you clear the cache?', 'That never occurred to me'],
+      ['Could you keep it down', 'I have not said a word'],
+      ['Walking out together?', 'Mine is still running'],
+    ],
+
+    // Aide reports. {label} the subagent's instruction, {kind} its type, {n} how many are attached.
+    aide: {
+      // {label}을 문장 앞에 둔다 — 말풍선은 두 줄에서 잘리므로 뒤에 붙인 말은 사라진다
+      labeled: [
+        '{label} — checking that now',
+        '{label} — still running',
+        '{label} is wrapping up',
+        '{label} — I have it covered',
+        '{label} — I will report back',
+        '{label} is about halfway',
+        '{label} — collating it now',
+      ],
+      bare: [
+        'One {kind} is running',
+        'I have the {kind} covered',
+        'I will report the moment it comes back',
+        'No word back yet',
+        'It needs a little longer',
+        'I will write it up for you',
+        'Checking on it now',
+      ],
+      many: ['{n} helpers attached', '{n} running at once', 'Collecting results from {n} of them'],
+    },
+
+    // Walking to and from the desk
+    move: {
+      done: ['All done!', 'That will do for now', 'Finished', 'Time to breathe', 'End of report', 'Off for a coffee'],
+      start: ['Right, here we go', 'Got it', 'On my way', 'Let us have a look', 'Time to work', 'Off we go'],
+    },
+  },
+};

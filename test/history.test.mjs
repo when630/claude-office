@@ -3,6 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { diffEvents, bootEvent, summarize, dayStart } from '../main/history.mjs';
+import { setLang } from '../shared/i18n.mjs';
 
 const T0 = Date.parse('2026-07-31T09:00:00Z');
 const MIN = 60_000;
@@ -159,11 +160,15 @@ test('이벤트 순서가 섞여 들어와도 시간순으로 재생한다', () 
 });
 
 test('방 이름이 없으면 알 수 없음으로 모은다', () => {
-  const s = summ([
+  const events = [
     { at: T0, ev: 'on', key: 'a', room: '', mood: 'typing' },
     { at: T0 + 3 * MIN, ev: 'off', key: 'a', room: '' },
-  ]);
-  assert.equal(s.rooms[0].room, '(알 수 없음)');
+  ];
+  // 문구는 집계할 때 붙는다 — 기록 파일에는 남지 않으므로 지난 기록도 지금 언어로 읽힌다
+  setLang('ko');
+  assert.equal(summ(events).rooms[0].room, '(알 수 없음)');
+  setLang('en');
+  assert.equal(summ(events).rooms[0].room, '(unknown)');
 });
 
 test('dayStart는 로컬 자정 — 아침에 어제가 되면 안 된다', () => {

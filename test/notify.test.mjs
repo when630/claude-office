@@ -1,8 +1,12 @@
 // 알림 문턱 판정 (main/notify.mjs). 실기기로는 30분짜리 대기를 만들어 놓고 기다려야 하는
 // 로직이라 여기서 시각을 손으로 밀어 확인한다.
-import { test } from 'node:test';
+//
+// 문구는 언어에 딸려 있으므로(shared/i18n.mjs) 여기서 언어를 못 박는다 — 그러지 않으면
+// 돌리는 사람의 OS 로케일에 따라 단정이 갈린다.
+import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { createNotifyState, decideNotifications, longestWait, fmtDur, sanitizeNotify } from '../main/notify.mjs';
+import { createNotifyState, decideNotifications, longestWait, sanitizeNotify } from '../main/notify.mjs';
+import { fmtDur, setLang } from '../shared/i18n.mjs';
 
 const T0 = Date.parse('2026-07-31T09:00:00Z');
 const MIN = 60_000;
@@ -36,6 +40,9 @@ function primed() {
 function kinds(out) {
   return out.map((o) => o.kind);
 }
+
+// 문턱 판정을 보는 테스트는 한국어 문구로 확인한다. 언어를 갈아 끼우는 테스트가 아래에 따로 있다.
+beforeEach(() => setLang('ko'));
 
 test('앱을 막 켠 첫 스냅샷은 조용하다 — 이미 벌어져 있던 일을 쏟아내지 않는다', () => {
   const state = createNotifyState();
@@ -163,4 +170,37 @@ test('fmtDur', () => {
   assert.equal(fmtDur(60 * MIN), '1시간');
   assert.equal(fmtDur(95 * MIN), '1시간 35분');
   assert.equal(fmtDur(-5000), '0분');
+
+  setLang('en');
+  assert.equal(fmtDur(0), '0m');
+  assert.equal(fmtDur(5 * MIN), '5m');
+  assert.equal(fmtDur(60 * MIN), '1h');
+  assert.equal(fmtDur(95 * MIN), '1h 35m');
+});
+
+// 판정은 언어를 타지 않고 문구만 갈린다 — 언어를 바꿔도 같은 순간에 같은 종류가 나와야 한다.
+test('언어를 바꾸면 알림 문구가 바뀌고 판정은 그대로다', () => {
+  const args = [snap([waiter('a', T0, { kind: 'bg' })]), T0];
+
+  setLang('ko');
+  const ko = decideNotifications(primed(), ...args);
+  assert.deepEqual(kinds(ko), ['waiting']);
+  assert.match(ko[0].title, /기다립니다/);
+  assert.equal(ko[0].body, '입력이 필요합니다');
+
+  setLang('en');
+  const en = decideNotifications(primed(), ...args);
+  assert.deepEqual(kinds(en), ['waiting']);
+  assert.match(en[0].title, /is waiting/);
+  assert.equal(en[0].body, 'Needs your input');
+});
+
+test('사용량 문구도 언어를 따라간다', () => {
+  const usage = { session: { pct: 81, resetsAt: T0 + 90 * MIN }, week: { pct: 40 } };
+
+  setLang('en');
+  const out = decideNotifications(primed(), snap([], usage), T0);
+  assert.deepEqual(kinds(out), ['usage']);
+  assert.match(out[0].title, /Session usage/);
+  assert.match(out[0].body, /resets in 1h 30m/);
 });
