@@ -17,6 +17,10 @@
       <h1>Claw'd Office</h1>
       <div id="stats"></div>
       <div class="right">
+        <!-- 이름으로 거르기. 방이 서넛일 때는 쓸 일이 없어 눈에 안 띄게 두고,
+             걸러진 방이 생기면 옆의 배지가 그 사실을 알린다. -->
+        <input id="room-filter" type="search" autocomplete="off" spellcheck="false" data-i18n-ph="topbar.filter" />
+        <button id="room-shown" type="button" hidden></button>
         <span id="clock"></span>
         <button id="mini-open" type="button" data-i18n-title="topbar.mini">▭</button>
         <button id="att-open" type="button" data-i18n="topbar.attendance" data-i18n-title="topbar.attendance"></button>
@@ -32,7 +36,8 @@
     </header>
 
     <main>
-      <div id="stage"><canvas id="office"></canvas></div>
+      <!-- 전부 걸러지거나 접히면 빈 화면이 남는데, 그건 고장으로 읽힌다 — 이유를 적어 둔다 -->
+      <div id="stage"><canvas id="office"></canvas><p id="stage-empty" hidden></p></div>
       <aside id="panel"></aside>
     </main>
 

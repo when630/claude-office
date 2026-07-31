@@ -123,6 +123,10 @@ Automatic installation is blocked for unsigned macOS builds, so there a new vers
 
 - Closing the window does not quit — it drops to the tray (menu bar on macOS). To really quit:
   **tray icon > Quit**
+- Once you have a lot of rooms, **filter them by name** in the top-right box. Pin the ones you
+  watch with `☆` in Settings and collapse the rest with `▥` — all three change the view only,
+  so a collapsed room still nudges you. A `3 hidden` badge appears while anything is out of
+  sight, and clicking it clears the lot
 - **Shrink to a corner** — the `▭` button in the top bar (or the tray menu) drops the office
   into a small frameless window that stays **always on top**. Just the office and a one-line
   count. Space is tight, so it keeps three rooms and puts the ones **waiting on you or going in

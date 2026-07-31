@@ -27,6 +27,9 @@ const panel = document.getElementById('panel');
 const statsEl = document.getElementById('stats');
 const clockEl = document.getElementById('clock');
 const miniStatsEl = document.getElementById('mini-stats');
+const filterEl = document.getElementById('room-filter');
+const shownBtn = document.getElementById('room-shown');
+const stageEmpty = document.getElementById('stage-empty');
 const cfgDialog = document.getElementById('cfg');
 const cfgBody = document.getElementById('cfg-body');
 const attDialog = document.getElementById('att');
@@ -42,7 +45,9 @@ const MINI_ROOMS = 3;
 let state = { rooms: [], recent: [], stats: {}, usage: null, ts: 0 };
 let meta = null;
 // 표시 설정 — main의 settings.json(view)에 저장된다. 상태(state)와 달리 스냅샷마다 오지 않는다.
-let cfg = { names: 'show', roomThemes: {} };
+let cfg = { names: 'show', roomThemes: {}, pinned: [], collapsed: [] };
+// 이름으로 거르기. **저장하지 않는다** — 다시 켰을 때 걸러진 채로 뜨면 그건 "방이 안 보인다"가 된다.
+let roomFilter = '';
 let view = { boxes: [], seats: [], width: 100, height: 100 };
 let scale = 3;
 let dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -167,8 +172,20 @@ function roomScore(room) {
   return best;
 }
 
+// 방이 열 개를 넘어가면 사무실이 그냥 벽지가 된다. 이름으로 거르고, 자주 보는 방을 앞에 고정하고,
+// 관심 없는 방은 접는다. 세 가지가 다 **보기만** 건드린다 — 알림도 근태도 그대로 돈다.
 function roomsToDraw() {
-  const rooms = state.rooms ?? [];
+  let rooms = state.rooms ?? [];
+
+  const q = roomFilter.trim().toLowerCase();
+  if (q) rooms = rooms.filter((r) => `${r.key} ${r.cwd ?? ''}`.toLowerCase().includes(q));
+  if (cfg.collapsed.length) rooms = rooms.filter((r) => !cfg.collapsed.includes(r.key));
+  // sort는 안정적이라 고정하지 않은 방들끼리는 원래 순서(인원수 순)가 그대로 남는다
+  if (cfg.pinned.length) {
+    const pin = (r) => (cfg.pinned.includes(r.key) ? 0 : 1);
+    rooms = [...rooms].sort((a, b) => pin(a) - pin(b));
+  }
+
   if (!MINI) return rooms;
   // 미니는 첫 방밖에 안 보이는 크기일 수 있다 — 급한 방을 **맨 앞으로** 올린다.
   // 같은 급끼리는 원래 순서(인원수 순)를 지킨다: 매 스냅샷 자리가 뒤집히면 곁눈질이 안 된다.
@@ -581,6 +598,22 @@ function drawMiniStats() {
     .join(' · ');
 }
 
+// 안 보이는 방이 몇인지, 그리고 거기서 빠져나오는 길. 걸러 놓은 것을 잊고 "방이 사라졌다"고
+// 여기는 일이 없어야 한다.
+function drawRoomBadge() {
+  const total = (state.rooms ?? []).length;
+  const hidden = total - roomsToDraw().length;
+  shownBtn.hidden = hidden <= 0;
+  if (hidden > 0) {
+    shownBtn.textContent = t('topbar.hidden', { n: hidden });
+    shownBtn.title = t('topbar.hiddenTitle');
+  }
+  // 전부 걸러졌으면 빈 캔버스 대신 이유를 적는다
+  const empty = total > 0 && hidden === total;
+  stageEmpty.hidden = !empty;
+  if (empty) stageEmpty.textContent = t('topbar.allHidden');
+}
+
 function drawStats() {
   const s = state.stats ?? {};
   const u = state.usage;
@@ -590,6 +623,7 @@ function drawStats() {
     drawMiniStats();
     return;
   }
+  drawRoomBadge();
   statsEl.innerHTML = [
     `<b>${s.total ?? 0}</b> ${t('topbar.in')}`,
     s.typing ? `<span class="t">${s.typing}</span> ${t('topbar.typing')}` : '',
@@ -620,9 +654,12 @@ function roomSig() {
 
 // main도 같은 값을 걸러내지만(sanitizeView), 렌더러는 IPC 없이도 돌아야 하므로 여기서도 본다.
 function normalizeView(v) {
+  const list = (x) => (Array.isArray(x) ? x.filter((k) => typeof k === 'string' && k) : []);
   return {
     names: NAME_MODES.includes(v?.names) ? v.names : 'show',
     roomThemes: v?.roomThemes && typeof v.roomThemes === 'object' ? { ...v.roomThemes } : {},
+    pinned: list(v?.pinned),
+    collapsed: list(v?.collapsed),
   };
 }
 
@@ -770,7 +807,17 @@ function drawCfg() {
           ? rooms
               .map(
                 (r, i) => `<div class="cfg-row cfg-room">
-                  <label for="cfg-room-${i}"><b>${esc(r.label)}</b><small>${esc(r.cwd ?? '')}</small></label>
+                  <label for="cfg-room-${i}">
+                    <b>${esc(r.label)}</b><small>${esc(r.cwd ?? '')}</small>
+                    <span class="cfg-marks">
+                      <button type="button" class="cfg-mark${cfg.pinned.includes(r.key) ? ' on' : ''}"
+                        data-pin="${esc(r.key)}" title="${t('cfg.roomPin')}">${cfg.pinned.includes(r.key) ? '★' : '☆'}</button>
+                      <button type="button" class="cfg-mark${cfg.collapsed.includes(r.key) ? ' on' : ''}"
+                        data-collapse="${esc(r.key)}" title="${t('cfg.roomCollapse')}">${
+                          cfg.collapsed.includes(r.key) ? '▤' : '▥'
+                        }</button>
+                    </span>
+                  </label>
                   <select id="cfg-room-${i}" data-room="${esc(r.key)}" aria-label="${t('cfg.roomsSection')}">${options(
                     [['', t('common.auto')], ...THEMES.map((theme) => [theme.key, theme.label])],
                     cfg.roomThemes[r.key] ?? '',
@@ -892,6 +939,18 @@ cfgBody.addEventListener('click', (e) => {
     saveView({ roomThemes: {} }).then(drawCfg);
     return;
   }
+  // 고정·접기는 목록에 그대로 남아야 하므로(사라지면 되돌릴 자리가 없다) 표시만 갈아 끼운다
+  const toggle = (list, key) => (list.includes(key) ? list.filter((k) => k !== key) : [...list, key]);
+  const pin = e.target.dataset?.pin;
+  if (pin) {
+    saveView({ pinned: toggle(cfg.pinned, pin) }).then(drawCfg);
+    return;
+  }
+  const collapse = e.target.dataset?.collapse;
+  if (collapse) {
+    saveView({ collapsed: toggle(cfg.collapsed, collapse) }).then(drawCfg);
+    return;
+  }
   const action = e.target.dataset?.hotkey;
   if (action) {
     capturing = capturing === action ? null : action;
@@ -1005,6 +1064,20 @@ async function openAtt() {
   drawAtt();
 }
 
+// ── 방 거르기
+filterEl.addEventListener('input', () => {
+  roomFilter = filterEl.value;
+  refresh();
+});
+
+// 배지를 누르면 걸러 놓은 것과 접어 둔 것을 한꺼번에 푼다 — 빠져나오는 길은 한 번에 닿아야 한다
+shownBtn.addEventListener('click', () => {
+  roomFilter = '';
+  filterEl.value = '';
+  if (cfg.collapsed.length) saveView({ collapsed: [] }).then(drawCfg);
+  else refresh();
+});
+
 // ── 미니 모드 여닫기. 창을 갈아 끼우는 일이라 main이 한다(별도 창이다).
 document.getElementById('mini-open').addEventListener('click', () => window.office?.setMini?.(true));
 document.getElementById('mini-grow').addEventListener('click', () => window.office?.setMini?.(false));
@@ -1056,6 +1129,7 @@ let langPref = 'auto';
 function applyStaticText() {
   for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
   for (const el of document.querySelectorAll('[data-i18n-title]')) el.title = t(el.dataset.i18nTitle);
+  for (const el of document.querySelectorAll('[data-i18n-ph]')) el.placeholder = t(el.dataset.i18nPh);
 }
 
 function applyLang(payload) {
