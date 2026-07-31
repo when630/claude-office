@@ -3,4 +3,7 @@ dist/
 build/
 *.log
 .idea/
-.claude/
+# .claude/는 로컬 세션 파일이 섞이므로 팀 공유분(settings.json·hooks/)만 커밋한다
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
