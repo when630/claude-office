@@ -49,7 +49,9 @@ your answer** —
   but the tray stays where it is
 
 Sessions merely resting at the prompt are told apart from this, so you do not get a notification
-for every session that finishes.
+for every session that finishes. **If you do want a nudge when work finishes**, turn it on under
+tray menu > Notifications — it only fires for jobs that took over three minutes, so short
+exchanges stay quiet.
 
 For sessions you run in a terminal, the app cannot tell **what** is being asked — nothing is
 written to the session's transcript while the choices are on screen. Turn on the
@@ -124,9 +126,11 @@ Automatic installation is blocked for unsigned macOS builds, so there a new vers
   you, a red dot when something failed. Hover for `5 in office · 3 working · 1 waiting on you
   (longest 12m)`
 - **Notifications** in the tray menu turns each kind on and off — waiting on you · repeat nudges ·
-  **context running out** (85 · 95%) · **account usage running out** (80 · 95%). The context one
-  is there to warn you before auto-compaction trims the session's memory; the usage one only
-  appears when the statusline tap is in place
+  **context running out** (85 · 95%) · **account usage running out** (80 · 95%) · **work
+  finished**. The context one is there to warn you before auto-compaction trims the session's
+  memory; the usage one only appears when the statusline tap is in place. Work finished is off by
+  default and only fires for jobs over **three minutes** — it carries how long it took and where
+  the session left off
 - **Language** (Auto · English · 한국어), **Start at login** (comes up in the tray only, no
   window), **Usage feed (statusline)**,
   **[Find out what it is waiting for](docs/notify-hook.md)** (Notification hook) and the
