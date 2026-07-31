@@ -874,6 +874,11 @@ b.lv-na {
   border-color: #39414f;
 }
 
+/* 방 행은 종류와 알림 세기 두 칸이 나란히 선다 — 이름이 설 자리를 남기려면 좁아야 한다 */
+.cfg-room select {
+  width: 108px;
+}
+
 /* 알림 종류 — 켜고 끄는 것뿐이라 한 줄에 체크박스와 이름만 둔다 */
 .cfg-check {
   display: flex;

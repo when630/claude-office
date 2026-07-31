@@ -24,6 +24,30 @@ export const USAGE_STEPS = [80, 95];
 // 자리를 뜰 만한 길이였을 때만 부른다.
 export const DONE_MIN_BUSY_MS = 3 * 60_000;
 
+// 방별 알림 세기. 회사 repo는 1분만 기다려도 부르고 싶고, 잠깐 띄운 실험용 폴더는 아예
+// 안 불러도 된다 — 종류로만 끄고 켜서는 그 구분이 안 된다.
+//
+// 세 단계로 못 박는다. 단계를 늘리면 문턱 표가 곧 아무도 못 읽는 것이 된다.
+export const ROOM_LEVELS = ['off', 'normal', 'keen'];
+const KEEN_STEPS_MS = [1, 3, 10, 30].map((m) => m * 60_000);
+
+export function levelOf(rooms, room) {
+  const v = rooms?.[room];
+  return ROOM_LEVELS.includes(v) ? v : 'normal';
+}
+
+// 저장할 것은 기본값에서 벗어난 방뿐이다 — 'normal'까지 적어 두면 방을 한 번 열어 본 것만으로
+// 설정 파일이 불어난다(방 종류의 '자동'과 같은 규칙).
+export function sanitizeRoomNotify(v) {
+  const out = {};
+  if (v && typeof v === 'object') {
+    for (const [key, level] of Object.entries(v)) {
+      if (key && ROOM_LEVELS.includes(level) && level !== 'normal') out[key] = level;
+    }
+  }
+  return out;
+}
+
 const USAGE_LABEL = { session: 'notify.usageSession', week: 'notify.usageWeek' };
 
 export const NOTIFY_KINDS = ['waiting', 'escalate', 'context', 'usage', 'done'];
@@ -140,7 +164,7 @@ function needsText(w) {
   return w.needs || t(w.kind === 'bg' ? 'notify.needsBg' : 'notify.needsTerminal');
 }
 
-function decideWaiting(state, snapshot, now, first, out) {
+function decideWaiting(state, snapshot, now, first, out, rooms) {
   const waiting = new Map();
   for (const w of everyWorker(snapshot)) if (w.mood === 'waiting') waiting.set(w.key, w);
 
@@ -149,7 +173,10 @@ function decideWaiting(state, snapshot, now, first, out) {
 
   for (const [key, w] of waiting) {
     const waited = waitedOf(w, now);
-    const step = stepOf(WAIT_STEPS_MS, waited);
+    // 민감한 방은 재알림을 앞당긴다. 세기를 바꾸면 넘긴 문턱 수의 뜻도 달라져 그 순간 한 번
+    // 튈 수 있는데, 자주 만지는 값이 아니고 방향도 "더 부른다" 쪽이라 그대로 둔다.
+    const steps = levelOf(rooms, w.room) === 'keen' ? KEEN_STEPS_MS : WAIT_STEPS_MS;
+    const step = stepOf(steps, waited);
     const prev = state.waiting.get(key);
 
     // 켠 순간에 이미 대기 중이던 것도 방치 시간은 이어서 세야 하므로 넘긴 문턱을 채워 넣는다 —
@@ -162,7 +189,13 @@ function decideWaiting(state, snapshot, now, first, out) {
     // 처음 보는 놈, 또는 답한 뒤 다시 물어본 놈(그때 statusAt이 갱신된다)
     if (!prev || prev.at !== w.statusAt) {
       state.waiting.set(key, { at: w.statusAt, step });
-      out.push({ kind: 'waiting', key, title: t('notify.waitingTitle', { name: w.name }), body: needsText(w) });
+      out.push({
+        kind: 'waiting',
+        key,
+        room: w.room,
+        title: t('notify.waitingTitle', { name: w.name }),
+        body: needsText(w),
+      });
       continue;
     }
 
@@ -171,6 +204,7 @@ function decideWaiting(state, snapshot, now, first, out) {
     out.push({
       kind: 'escalate',
       key,
+      room: w.room,
       title: t('notify.escalateTitle', { name: w.name, d: fmtDur(waited) }),
       body: needsText(w),
     });
@@ -208,6 +242,7 @@ function decideDone(state, snapshot, now, first, out) {
     out.push({
       kind: 'done',
       key: w.key,
+      room: w.room,
       title: t(title, { name: w.name }),
       // 얼마나 걸렸는지가 먼저다. 마지막 상황을 알면 뒤에 붙여 무슨 일이었는지도 보여준다
       body: [t('notify.doneBody', { d: fmtDur(busy) }), w.detail].filter(Boolean).join(' · '),
@@ -232,6 +267,7 @@ function decideContext(state, snapshot, first, out) {
     out.push({
       kind: 'context',
       key: w.key,
+      room: w.room,
       title: t('notify.contextTitle', { name: w.name, pct }),
       body: t('notify.contextBody', {
         used: fmtTokens(w.context.tokens),
@@ -268,14 +304,19 @@ function decideUsage(state, usage, now, first, out) {
   }
 }
 
-// 이번 스냅샷에서 띄워야 할 알림 목록. [{ kind, key?, title, body }]
-export function decideNotifications(state, snapshot, now = Date.now()) {
+// 이번 스냅샷에서 띄워야 할 알림 목록. [{ kind, key?, room?, title, body }]
+//
+// `rooms`는 방별 알림 세기(방 이름 → 'off' | 'keen')다. 알림을 끈 방의 것은 **판정을 다 돌린
+// 뒤** 마지막에 덜어낸다 — 중간에 빼면 문턱 상태가 어긋나서, 다시 켜는 순간 그 동안 넘긴
+// 문턱이 한꺼번에 터진다(종류별 on/off와 같은 규칙).
+export function decideNotifications(state, snapshot, now = Date.now(), rooms = null) {
   const out = [];
   const first = !state.primed;
   state.primed = true;
-  decideWaiting(state, snapshot, now, first, out);
+  decideWaiting(state, snapshot, now, first, out, rooms);
   decideDone(state, snapshot, now, first, out);
   decideContext(state, snapshot, first, out);
   decideUsage(state, snapshot?.usage, now, first, out);
-  return out;
+  // 계정 사용량처럼 방이 없는 알림은 그대로 지나간다 — 어느 방의 일도 아니다
+  return out.filter((o) => o.room == null || levelOf(rooms, o.room) !== 'off');
 }

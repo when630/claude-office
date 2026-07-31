@@ -68,7 +68,8 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   컨텍스트·사용량 문턱(`CONTEXT_STEPS`·`USAGE_STEPS`), 완료를 부를 최소 작업 시간(`DONE_MIN_BUSY_MS`),
   알림 종류(`NOTIFY_KINDS`·`NOTIFY_DEFAULTS` — 트레이 메뉴와 짝이다),
   방해금지(`QUIET_DEFAULTS`·`inQuietHours` — 자정을 넘는 구간을 다룬다. 참는 것은 토스트뿐이고
-  트레이·상단바는 `index.mjs`가 그대로 그린다).
+  트레이·상단바는 `index.mjs`가 그대로 그린다),
+  방별 세기(`ROOM_LEVELS`·`KEEN_STEPS_MS` — 끈 방은 판정을 다 돌린 뒤 마지막에 걸러낸다).
   문턱을 건드렸으면 `npm test`로 확인한다 (시각을 인자로 받으므로 30분을 기다릴 필요가 없다)
 - `main/terminal.mjs` — 터미널을 띄우는 방법(`openWindows`·`openMac`), 셸에 넘길 id의 허용 문자(`ID_OK`).
   다른 터미널 앱을 쓰려면 여기에 분기를 넣는다

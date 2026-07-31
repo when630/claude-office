@@ -649,12 +649,20 @@ function drawCfg() {
         rooms.length
           ? rooms
               .map(
-                (r, i) => `<div class="cfg-row">
+                (r, i) => `<div class="cfg-row cfg-room">
                   <label for="cfg-room-${i}"><b>${esc(r.label)}</b><small>${esc(r.cwd ?? '')}</small></label>
-                  <select id="cfg-room-${i}" data-room="${esc(r.key)}">${options(
+                  <select id="cfg-room-${i}" data-room="${esc(r.key)}" aria-label="${t('cfg.roomsSection')}">${options(
                     [['', t('common.auto')], ...THEMES.map((theme) => [theme.key, theme.label])],
                     cfg.roomThemes[r.key] ?? '',
                   )}</select>
+                  ${
+                    notifyCfg
+                      ? `<select data-room-notify="${esc(r.key)}" aria-label="${t('cfg.roomNotify')}">${options(
+                          notifyCfg.levels.map((l) => [l, t(`roomLevel.${l}`)]),
+                          notifyCfg.roomNotify[r.key] ?? 'normal',
+                        )}</select>`
+                      : ''
+                  }
                 </div>`,
               )
               .join('')
@@ -720,6 +728,11 @@ cfgBody.addEventListener('change', (e) => {
     saveNotify({ quiet: { [which]: el.value } }).then(() => {
       if (notifyCfg) el.value = notifyCfg.quiet[which];
     });
+    return;
+  }
+  const room = el.dataset?.roomNotify;
+  if (room) {
+    saveNotify({ roomNotify: { [room]: el.value } });
     return;
   }
   const key = el.dataset?.room;

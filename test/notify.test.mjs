@@ -11,6 +11,7 @@ import {
   longestWait,
   sanitizeNotify,
   sanitizeQuiet,
+  sanitizeRoomNotify,
   isQuiet,
   inQuietHours,
   minutesOf,
@@ -26,17 +27,17 @@ function snap(workers, usage = null) {
 }
 
 function waiter(key, statusAt, extra = {}) {
-  return { key, name: key, mood: 'waiting', kind: 'interactive', statusAt, needs: null, context: null, ...extra };
+  return { key, name: key, mood: 'waiting', kind: 'interactive', statusAt, needs: null, context: null, room: 'room', ...extra };
 }
 
 // 일하는 자리. statusAt은 busy가 된 시각이고, 같은 status로 머무는 동안 갱신되지 않는다.
 function busy(key, statusAt, extra = {}) {
-  return { key, name: key, mood: 'typing', kind: 'interactive', statusAt, detail: '', context: null, ...extra };
+  return { key, name: key, mood: 'typing', kind: 'interactive', statusAt, detail: '', context: null, room: 'room', ...extra };
 }
 
 // 일을 마치고 돌아온 자리. 터미널 세션은 잡 파일이 없어 끝나면 그냥 idle이 된다.
 function ended(key, mood, statusAt, extra = {}) {
-  return { key, name: key, mood, kind: 'interactive', statusAt, detail: '', context: null, ...extra };
+  return { key, name: key, mood, kind: 'interactive', statusAt, detail: '', context: null, room: 'room', ...extra };
 }
 
 function ctxWorker(key, pct) {
@@ -241,6 +242,44 @@ test('예전 설정에서 알림을 껐던 사람은 껐던 상태로 남는다'
     usage: true,
     done: true,
   });
+});
+
+// ── 방별 알림 세기
+
+test('알림을 끈 방은 부르지 않는다 — 다만 문턱은 그대로 전진한다', () => {
+  const state = primed();
+  const off = { room: 'off' };
+  assert.deepEqual(kinds(decideNotifications(state, snap([waiter('a', T0)]), T0, off)), []);
+  assert.deepEqual(kinds(decideNotifications(state, snap([waiter('a', T0)]), T0 + 5 * MIN, off)), []);
+
+  // 다시 켜도 껐던 동안의 5·15분이 몰려 뜨지 않는다 — 다음 문턱 하나만 지난다
+  assert.deepEqual(kinds(decideNotifications(state, snap([waiter('a', T0)]), T0 + 16 * MIN)), ['escalate']);
+  assert.deepEqual(kinds(decideNotifications(state, snap([waiter('a', T0)]), T0 + 20 * MIN)), []);
+});
+
+test('민감한 방은 재알림을 앞당긴다', () => {
+  const state = primed();
+  const keen = { room: 'keen' };
+  assert.deepEqual(kinds(decideNotifications(state, snap([waiter('a', T0)]), T0, keen)), ['waiting']);
+  // 보통이라면 5분까지 조용하다
+  assert.deepEqual(kinds(decideNotifications(state, snap([waiter('a', T0)]), T0 + MIN, keen)), ['escalate']);
+  assert.deepEqual(kinds(decideNotifications(state, snap([waiter('a', T0)]), T0 + 2 * MIN, keen)), []);
+  assert.deepEqual(kinds(decideNotifications(state, snap([waiter('a', T0)]), T0 + 3 * MIN, keen)), ['escalate']);
+});
+
+test('계정 사용량은 방이 없으므로 방 설정에 걸리지 않는다', () => {
+  const state = primed();
+  const out = decideNotifications(state, snap([], { session: { pct: 81 }, week: { pct: 40 } }), T0, { room: 'off' });
+  assert.deepEqual(kinds(out), ['usage']);
+});
+
+test('방별 세기 — 아는 값만, 보통은 저장하지 않는다', () => {
+  assert.deepEqual(sanitizeRoomNotify({ a: 'off', b: 'normal', c: 'keen', d: 'loud', '': 'off' }), {
+    a: 'off',
+    c: 'keen',
+  });
+  assert.deepEqual(sanitizeRoomNotify(null), {});
+  assert.deepEqual(sanitizeRoomNotify('nope'), {});
 });
 
 // ── 방해금지

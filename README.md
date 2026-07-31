@@ -131,6 +131,8 @@ Automatic installation is blocked for unsigned macOS builds, so there a new vers
   memory; the usage one only appears when the statusline tap is in place. Work finished is off by
   default and only fires for jobs over **three minutes** — it carries how long it took and where
   the session left off
+- Each room gets its own **alert level** in Settings — `No alerts` for a scratch folder you never
+  want to hear from, `Keen` for one you cannot miss (repeat nudges move in to 1 · 3 · 10 · 30 min)
 - Set **quiet hours** in Settings (`22:00 ~ 09:00` and other ranges crossing midnight are fine)
   and no toast comes through while they last. To go quiet for a short while right now, use tray
   menu > Notifications > **Silence from now** (30 min · 1 hour · rest of today). While quiet, the
