@@ -297,12 +297,6 @@ function idlePanel() {
         note: '',
         id: 'u-week-left',
       })}
-      <dl class="facts">
-        <div><dt>모델</dt><dd>${esc(u.model ?? '—')}</dd></div>
-        <div><dt>컨텍스트</dt><dd>${fmtLimit(u.contextWindow)}</dd></div>
-        <div><dt>추론 강도</dt><dd>${esc(u.effort ?? '—')}</dd></div>
-        <div><dt>Fast</dt><dd>${u.fastMode ? '켜짐' : '꺼짐'}</dd></div>
-      </dl>
       <p class="hint${u.stale ? ' warn' : ''}">사용량 갱신 ${fmtAge(Date.now() - u.at)} 전${
         u.stale ? ' · statusline이 안 돌고 있는 듯합니다' : ''
       }</p>`
@@ -340,31 +334,34 @@ function idlePanel() {
       ${usageBlock}
     </section>
 
-    ${
-      meta
-        ? `<p class="hint">Claude Office ${esc(meta.version)} · Electron ${esc(meta.electron)}<br /><code>${esc(
-            meta.claudeDir,
-          )}</code></p>`
-        : ''
-    }
-
     ${recentBlock()}
 
-    <section class="block">
-      <h3>말풍선 읽는 법</h3>
-      <ul class="legend">
-        <li><span class="chip real"></span>세션에서 읽어온 말 — 지금 상황·최근 지시·서브에이전트 보고</li>
-        <li><span class="chip idle"></span>혼잣말·잡담 — 분위기용으로 써 둔 문장</li>
-      </ul>
-    </section>
-
-    <p class="hint">자리를 클릭하면 그 세션이 뭘 하고 있는지 볼 수 있습니다.</p>
+    ${
+      // 경로만 덩그러니 두면 그게 무엇인지 알 수 없다 — 앱이 읽고 있는 자리라고 적어 준다
+      meta
+        ? `<section class="block">
+            <h3>읽고 있는 곳</h3>
+            <p><code>${esc(meta.claudeDir)}</code></p>
+            <p class="hint">Claude Office ${esc(meta.version)} · Electron ${esc(meta.electron)}</p>
+          </section>`
+        : ''
+    }
   `;
+}
+
+// 모델·추론 강도·Fast는 계정 값이 아니라 **statusline을 그린 그 세션**의 값이다
+// (office-usage.json은 그 세션의 payload다). 그래서 sessionId가 맞는 자리에만 적는다 —
+// 다른 세션에 적으면 그게 곧 오해가 된다.
+function usageOfSession(w) {
+  const u = state.usage;
+  if (!u?.sessionId || !w.sessionId || u.sessionId !== w.sessionId) return null;
+  return u;
 }
 
 function workerPanel(w) {
   const cmd = attachCmd(w);
   const c = w.context;
+  const u = usageOfSession(w);
   return `
     <header class="who">
       <span class="mood ${esc(w.mood)}">${MOOD_LABEL[w.mood] ?? w.mood}</span>
@@ -387,6 +384,18 @@ function workerPanel(w) {
     <dl class="facts">
       <div><dt>종류</dt><dd>${w.kind === 'bg' ? '백그라운드' : '터미널'}</dd></div>
       <div><dt>가동</dt><dd>${fmtAge(w.startedAt ? Date.now() - w.startedAt : null)}</dd></div>
+      ${
+        // 대화 파일에서 읽은 모델이 우선이다. 그게 없어도(첫 턴 전이면 없다) 같은 세션의
+        // statusline payload가 있으면 그걸 쓴다 — 어느 쪽이든 이 세션의 값이다.
+        w.model || u?.model ? `<div class="wide"><dt>모델</dt><dd>${esc(w.model || u.model)}</dd></div>` : ''
+      }
+      ${
+        c?.limit || u?.contextWindow
+          ? `<div><dt>컨텍스트</dt><dd>${fmtLimit(c?.limit || u.contextWindow)}</dd></div>`
+          : ''
+      }
+      ${u ? `<div><dt>추론 강도</dt><dd>${esc(u.effort ?? '—')}</dd></div>` : ''}
+      ${u ? `<div><dt>Fast</dt><dd>${u.fastMode ? '켜짐' : '꺼짐'}</dd></div>` : ''}
       <div><dt>토큰</dt><dd>${fmtTokens(w.tokens)}</dd></div>
       <div><dt>PID</dt><dd>${w.pid}</dd></div>
       ${w.mode ? `<div><dt>모드</dt><dd>${esc(MODE_LABEL[w.mode] ?? w.mode)}</dd></div>` : ''}
@@ -783,6 +792,31 @@ attBody.addEventListener('click', (e) => {
   if (!range || range === attRange) return;
   attRange = range;
   drawAtt();
+});
+
+// ── 도움말 (우측 하단 물음표)
+//
+// 말풍선 범례는 한 번 읽으면 되는 안내라 기본 화면 자리를 차지할 이유가 없다.
+// 내용은 index.html에 고정으로 두고 여기서 여닫기만 한다.
+const helpBtn = document.getElementById('help-open');
+const helpBox = document.getElementById('help');
+
+function setHelp(open) {
+  helpBox.hidden = !open;
+  helpBtn.setAttribute('aria-expanded', String(open));
+  helpBtn.classList.toggle('on', open);
+}
+
+helpBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  setHelp(helpBox.hidden);
+});
+// 바깥을 누르거나 Esc로 닫는다 — 캡션처럼 잠깐 보는 것이라 계속 떠 있을 이유가 없다
+document.addEventListener('click', (e) => {
+  if (!helpBox.hidden && !helpBox.contains(e.target)) setHelp(false);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !helpBox.hidden) setHelp(false);
 });
 
 // ── main 프로세스에서 오는 스냅샷
