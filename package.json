@@ -2,8 +2,10 @@
   "name": "claude-office",
   "version": "0.3.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "로컬 Claude Code 세션들을 픽셀 사무실로 보여주는 트레이 상주 앱",
+  "author": "when630 <70129021+when630@users.noreply.github.com>",
   "main": "main/index.mjs",
   "scripts": {
     "start": "electron .",
