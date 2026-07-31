@@ -308,11 +308,20 @@ b.lv-na {
   gap: 8px;
 }
 .facts dt {
+  flex: none;
+  /* 값이 길면 라벨이 눌려 "모/델"로 쪼개진다 — 라벨은 접지 않고 값을 흘린다 */
+  white-space: nowrap;
   color: #5d6779;
 }
 .facts dd {
   margin: 0;
+  text-align: right;
+  word-break: break-word;
   font-variant-numeric: tabular-nums;
+}
+/* 모델명처럼 긴 값은 한 줄을 통째로 쓴다 */
+.facts .wide {
+  grid-column: 1 / -1;
 }
 
 .block {
@@ -357,6 +366,58 @@ b.lv-na {
 }
 .block.need .waited:empty {
   display: none;
+}
+
+/* ── 도움말. 우측 하단 물음표를 누르면 캡션처럼 떠오른다.
+   패널이 스크롤돼도 자리가 고정이어야 하므로 fixed로 띄운다. */
+#help-open {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 20;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #1b2029;
+  color: var(--dim);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+#help-open:hover,
+#help-open.on {
+  border-color: #39414f;
+  background: #232936;
+  color: var(--text);
+}
+
+#help {
+  position: fixed;
+  right: 14px;
+  bottom: 46px;
+  z-index: 20;
+  width: min(310px, calc(100vw - 28px));
+  padding: 12px 13px;
+  border: 1px solid #39414f;
+  border-radius: 8px;
+  background: #171c25;
+  box-shadow: 0 8px 24px rgba(4, 6, 10, 0.55);
+}
+#help h3 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5d6779;
+}
+#help p {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--dim);
 }
 
 /* 말풍선 두 종류 안내 — render.mjs의 BUBBLE_STYLE과 색을 맞춰 둔다 */

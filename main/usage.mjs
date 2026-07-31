@@ -51,6 +51,9 @@ export async function readUsage() {
     at: st.mtimeMs,
     stale: Date.now() - st.mtimeMs > STALE_MS,
     version: raw.version ?? null,
+    // 이 payload를 준 세션. 모델·추론 강도·Fast는 계정 값이 아니라 **이 세션의 값**이므로,
+    // 어느 세션인지 알아야 엉뚱한 자리에 적지 않을 수 있다.
+    sessionId: raw.session_id ?? null,
     model: raw.model?.display_name ?? raw.model?.id ?? null,
     effort: raw.effort?.level ?? null,
     fastMode: raw.fast_mode === true,

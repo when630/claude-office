@@ -27,6 +27,18 @@
       <aside id="panel"></aside>
     </main>
 
+    <!-- 한 번 읽으면 되는 안내는 기본 화면에서 빼고 여기 접어둔다.
+         내용이 고정이라 app.mjs가 만들지 않고 그대로 둔다. -->
+    <button id="help-open" type="button" title="말풍선 읽는 법" aria-expanded="false" aria-controls="help">?</button>
+    <div id="help" hidden>
+      <h3>말풍선 읽는 법</h3>
+      <ul class="legend">
+        <li><span class="chip real"></span>세션에서 읽어온 말 — 지금 상황·최근 지시·서브에이전트 보고</li>
+        <li><span class="chip idle"></span>혼잣말·잡담 — 분위기용으로 써 둔 문장</li>
+      </ul>
+      <p>자리를 클릭하면 그 세션이 뭘 하고 있는지 볼 수 있습니다.</p>
+    </div>
+
     <!-- 설정. <dialog>를 쓰면 배경 차단과 Esc 닫기가 공짜로 따라온다.
          내용은 app.mjs가 열 때마다 지금 떠 있는 방으로 다시 짠다. -->
     <dialog id="cfg">
