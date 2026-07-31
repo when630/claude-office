@@ -79,6 +79,20 @@ function icon(name) {
   }
 }
 
+// 트레이 아이콘. 맥 메뉴바는 16pt 규격이라 32px을 그대로 주면 거대하게 낀다 —
+// 16px을 1x, 32px을 2x(레티나) 표현으로 묶는다. Windows는 32px 하나로 알아서 줄인다.
+function trayImage(base) {
+  if (process.platform !== 'darwin') return icon(`${base}.png`);
+  const img = nativeImage.createEmpty();
+  try {
+    img.addRepresentation({ scaleFactor: 1, buffer: fs.readFileSync(path.join(ROOT, 'build', `${base}-16.png`)) });
+    img.addRepresentation({ scaleFactor: 2, buffer: fs.readFileSync(path.join(ROOT, 'build', `${base}.png`)) });
+  } catch {
+    /* 파일이 없으면 빈 이미지 — 트레이는 뜨되 아이콘만 비는 게 앱이 안 뜨는 것보다 낫다 */
+  }
+  return img;
+}
+
 // ── 창
 function createWindow(show = true) {
   win = new BrowserWindow({
@@ -187,16 +201,16 @@ function maybeNotifyWaiting(snapshot) {
 
 // ── 트레이
 function trayIconFor(stats) {
-  if (stats.waiting > 0) return 'tray-wait.png';
-  if (stats.failed > 0) return 'tray-fail.png';
-  return 'tray.png';
+  if (stats.waiting > 0) return 'tray-wait';
+  if (stats.failed > 0) return 'tray-fail';
+  return 'tray';
 }
 
 function updateTray(stats) {
   if (!tray) return;
   const next = trayIconFor(stats);
   if (next !== trayState) {
-    tray.setImage(icon(next));
+    tray.setImage(trayImage(next));
     trayState = next;
   }
   const parts = [`${stats.total}명 출근`];
@@ -277,7 +291,10 @@ function buildTrayMenu() {
       type: 'checkbox',
       checked: app.getLoginItemSettings().openAtLogin,
       click: (item) => {
-        app.setLoginItemSettings({ openAtLogin: item.checked, args: ['--hidden'] });
+        // args는 Windows 전용 — 맥의 로그인 실행은 wasOpenedAtLogin으로 구분한다(아래 hidden)
+        const opts = { openAtLogin: item.checked };
+        if (process.platform === 'win32') opts.args = ['--hidden'];
+        app.setLoginItemSettings(opts);
       },
     },
     { type: 'separator' },
@@ -292,8 +309,8 @@ function buildTrayMenu() {
 }
 
 function createTray() {
-  tray = new Tray(icon('tray.png'));
-  trayState = 'tray.png';
+  tray = new Tray(trayImage('tray'));
+  trayState = 'tray';
   tray.setToolTip('Claude Office');
   tray.setContextMenu(buildTrayMenu());
   tray.on('click', showWindow);
@@ -357,11 +374,12 @@ if (!app.requestSingleInstanceLock()) {
     });
 
     createTray();
-    const hidden = process.argv.includes('--hidden');
+    // 맥은 로그인 시작에 인자를 못 넘긴다 — 로그인으로 뜬 실행인지(wasOpenedAtLogin)로 대신한다
+    const hidden = process.argv.includes('--hidden') || app.getLoginItemSettings().wasOpenedAtLogin === true;
     createWindow(!hidden);
 
     // 새 버전은 받아만 두고 강제 재시작하지 않는다 — 재시작은 트레이 메뉴에서,
-    // 아니면 다음 종료 때 조용히 설치된다.
+    // 아니면 다음 종료 때 조용히 설치된다. 맥(서명 없음)은 알림만 띄운다(main/updater.mjs).
     initUpdater({
       onReady: (version) => {
         updateReady = version;
@@ -369,6 +387,11 @@ if (!app.requestSingleInstanceLock()) {
         notify(
           `Claude Office ${version} 준비됨`,
           '트레이 메뉴에서 재시작하면 적용됩니다. 그냥 두면 다음 종료 때 설치됩니다.',
+        );
+      },
+      onManual: (version) => {
+        notify(`Claude Office ${version} 나왔습니다`, '눌러서 Releases에서 새 버전을 받아주세요.', () =>
+          openExternal('https://github.com/when630/claude-office/releases/latest'),
         );
       },
     });
@@ -379,6 +402,9 @@ if (!app.requestSingleInstanceLock()) {
 
   // 트레이 상주 앱 — 창을 다 닫아도 살아있어야 한다
   app.on('window-all-closed', () => {});
+
+  // 맥에서 독 아이콘을 눌렀을 때 (Windows에서는 발생하지 않는 이벤트)
+  app.on('activate', showWindow);
 
   app.on('before-quit', () => {
     quitting = true;

@@ -53,11 +53,22 @@
 
 ## 설치와 업데이트
 
-[Releases](https://github.com/when630/claude-office/releases/latest)에서 `Claude Office Setup x.y.z.exe`를
-받아 실행한다. 코드 서명이 없어 SmartScreen 경고가 뜨면 `추가 정보 > 실행`.
+**Windows** — [Releases](https://github.com/when630/claude-office/releases/latest)에서
+`Claude-Office-Setup-x.y.z.exe`를 받아 실행한다. 코드 서명이 없어 SmartScreen 경고가 뜨면
+`추가 정보 > 실행`. 설치본은 4시간마다 새 릴리즈를 확인해 백그라운드로 받아 두고 —
+준비되면 알림이 뜨고, **트레이 메뉴 > 업데이트 설치하고 재시작**으로 바로 적용하거나
+그냥 두면 다음 종료 때 조용히 설치된다.
 
-설치본은 4시간마다 새 릴리즈를 확인해 백그라운드로 받아 둔다. 준비되면 알림이 뜨고,
-**트레이 메뉴 > 업데이트 설치하고 재시작**으로 바로 적용하거나 그냥 두면 다음 종료 때 조용히 설치된다.
+**macOS** — 같은 곳에서 `Claude-Office-x.y.z-arm64.dmg`(Apple Silicon) 또는
+`-x64.dmg`(Intel)를 받아 앱을 Applications에 끌어 넣는다. 서명·공증이 없어
+"손상되었기 때문에 열 수 없습니다"가 뜨는데, 터미널에서 한 번만 풀어주면 된다:
+
+```bash
+xattr -cr "/Applications/Claude Office.app"
+```
+
+서명 없는 맥 빌드는 자동 설치가 막혀 있어(Squirrel.Mac이 서명을 검증한다),
+새 버전이 나오면 **알림만** 뜬다 — 누르면 Releases가 열린다.
 
 ## 개발
 
@@ -65,8 +76,15 @@
 npm install       # 아이콘은 postinstall이 굽는다
 npm start         # 개발 실행
 npm run usage-tap # 세션·주간 사용률을 앱이 읽게 statusline에 한 줄 심는다 (선택)
-npm run build     # dist/ 에 설치본(NSIS) 생성
-npm run release   # 빌드해서 GitHub Releases 초안까지 올린다 (GH_TOKEN 필요)
+npm run build     # dist/ 에 Windows 설치본(NSIS) 생성
+npm run build:mac # 맥에서 실행하면 dmg+zip 생성 (Windows에서는 못 굽는다)
+```
+
+릴리스는 태그를 푸시하면 CI가 한다 — Windows·macOS를 다 빌드해 Releases **초안**에 올리므로,
+[Actions](https://github.com/when630/claude-office/actions)가 끝나면 릴리스 노트를 쓰고 Publish 한다.
+
+```powershell
+git tag v0.4.0; git push origin v0.4.0
 ```
 
 Electron 43 · 런타임 의존성은 자동 업데이트(electron-updater) 하나.
@@ -101,7 +119,10 @@ Electron 43 · 런타임 의존성은 자동 업데이트(electron-updater) 하�
 - 창이 가려져 있거나 다른 가상 데스크톱에 있으면 Chromium이 `requestAnimationFrame`을 멈춘다 —
   캔버스가 안 그려지는 게 정상이고, 창을 다시 보이게 하면 이어서 움직인다
 - `~/.claude` 구조는 Claude Code 내부 규약이라 버전이 오르면 바뀔 수 있다 (확인 시점: v2.1.220)
-- 빌드본은 코드 서명이 없어 SmartScreen 경고가 날 수 있다 (`추가 정보 > 실행`)
+- 빌드본은 코드 서명이 없다 — Windows는 SmartScreen 경고(`추가 정보 > 실행`),
+  맥은 첫 실행 전 `xattr -cr` 한 번과 수동 업데이트를 감수해야 한다
+- 사용량 연동 자동 설치는 statusline이 PowerShell(.ps1)일 때만 된다 — bash 등은
+  트레이 메뉴가 띄우는 안내대로 한 줄을 손으로 넣으면 똑같이 동작한다
 
 ---
 
