@@ -19,11 +19,15 @@ import {
   decideNotifications,
   longestWait,
   sanitizeNotify,
+  sanitizeQuiet,
+  isQuiet,
+  midnightAfter,
   BLINK_AFTER_MS,
   DONE_MIN_BUSY_MS,
+  NOTIFY_KINDS,
 } from './notify.mjs';
 import { openTerminal, reasonText as terminalReason } from './terminal.mjs';
-import { t, fmtDur, setLang, resolveLang, LANGS, LANG_NAMES } from '../shared/i18n.mjs';
+import { t, fmtDur, fmtWhen, setLang, resolveLang, LANGS, LANG_NAMES } from '../shared/i18n.mjs';
 import {
   diffEvents,
   bootEvent,
@@ -55,6 +59,7 @@ let blinkPhase = false; // 깜빡임의 꺼진 위상 — 이때는 평상 아�
 let blinkTimer = null;
 let lastBounds = null; // 창을 다시 열 때 있던 자리로 돌려놓는다
 let updateReady = null; // 받아 둔 새 버전 — 트레이 메뉴에 재시작 항목이 생긴다
+let quietNow = false; // 지금 무음인가 — 시간대에 들고 나면 트레이 메뉴를 다시 짠다
 
 // ── 설정 (userData/settings.json)
 //
@@ -66,6 +71,7 @@ let updateReady = null; // 받아 둔 새 버전 — 트레이 메뉴에 재시�
 const defaults = {
   lang: 'auto',
   notify: sanitizeNotify(), // 종류별 on/off — 어휘와 하위 호환은 main/notify.mjs가 정한다
+  quiet: sanitizeQuiet(), // 방해금지 — 조용한 시간대와 임시 무음(until)
   history: true,
   trayHintShown: false,
   view: { names: 'show', roomThemes: {} },
@@ -95,6 +101,7 @@ function loadSettings() {
     ...saved,
     lang: LANG_PREFS.includes(saved.lang) ? saved.lang : defaults.lang,
     notify: sanitizeNotify(saved.notify),
+    quiet: sanitizeQuiet(saved.quiet),
     view: sanitizeView(saved.view),
   };
   applyLang();
@@ -132,6 +139,31 @@ function notifyOn(kind) {
 function setNotify(kind, value) {
   settings.notify = { ...settings.notify, [kind]: value };
   saveSettings();
+}
+
+// 트레이 메뉴는 라벨이 박힌 채로 만들어져 있어 값이 바뀌면 통째로 다시 짜야 한다.
+function refreshTrayMenu() {
+  if (tray) tray.setContextMenu(buildTrayMenu());
+}
+
+// 방해금지. 시간대와 임시 무음(until)이 같은 문을 지난다 — 어느 쪽이 바뀌든 메뉴를 다시 짠다.
+function setQuiet(patch) {
+  settings.quiet = sanitizeQuiet({ ...settings.quiet, ...patch });
+  saveSettings();
+  quietNow = isQuiet(settings.quiet);
+  refreshTrayMenu();
+  return notifySettings();
+}
+
+// 설정 창이 알림을 다루는 데 필요한 것 한 벌. 종류 목록과 문턱까지 넘겨
+// 렌더러가 어휘를 따로 들고 있지 않게 한다.
+function notifySettings() {
+  return {
+    kinds: NOTIFY_KINDS,
+    notify: settings.notify,
+    quiet: settings.quiet,
+    doneAfterMs: DONE_MIN_BUSY_MS,
+  };
 }
 
 // 렌더러가 보낸 값도, 손으로 고친 settings.json도 같은 문을 지난다 — 모르는 키·엉뚱한 타입은
@@ -261,9 +293,14 @@ function notify(title, body, onClick) {
 
 // 판정은 main/notify.mjs가 한다 — 여기서는 종류별 on/off로 걸러 띄우기만 한다.
 // 꺼둔 종류도 판정은 돌아야 한다(notify.mjs 머리말) — 그래야 켜는 순간 밀린 알림이 안 터진다.
+//
+// 방해금지도 같은 규칙이다. 문턱은 조용한 동안에도 그대로 전진하고 여기서 **토스트만** 참는다 —
+// 밀린 것을 쌓아 뒀다 해제하는 순간 몰아 띄우지 않는다. 해제 시점에도 여전히 기다리고 있으면
+// 다음 문턱에서 자연히 다시 부른다. 트레이 점·깜빡임은 조용한 동안에도 그대로다.
 function maybeNotify(snapshot) {
+  const quiet = isQuiet(settings.quiet);
   for (const item of decideNotifications(notifyState, snapshot)) {
-    if (!notifyOn(item.kind)) continue;
+    if (!notifyOn(item.kind) || quiet) continue;
     // 세션에 딸린 알림은 그 자리를 펼쳐주고, 계정 사용량처럼 주인이 없는 건 창만 띄운다
     notify(item.title, item.body, item.key ? () => selectInWindow(item.key) : showWindow);
   }
@@ -456,6 +493,26 @@ function langMenu() {
   }));
 }
 
+// "지금부터 조용히". 남은 시간이 아니라 **끝나는 시각**을 적는다 — 메뉴는 열 때마다 다시
+// 짜이지 않으므로 "30분 남음"은 곧 거짓이 되지만 "14:35까지"는 언제 봐도 맞다.
+function quietMenu() {
+  const until = settings.quiet.until;
+  const on = until > Date.now();
+  return [
+    ...[30, 60].map((min) => ({
+      label: fmtDur(min * 60_000),
+      click: () => setQuiet({ until: Date.now() + min * 60_000 }),
+    })),
+    { label: t('tray.quietToday'), click: () => setQuiet({ until: midnightAfter() }) },
+    { type: 'separator' },
+    {
+      label: on ? t('tray.quietUntil', { when: fmtWhen(until) }) : t('tray.quietNone'),
+      enabled: on,
+      click: () => setQuiet({ until: 0 }),
+    },
+  ];
+}
+
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
     ...(updateReady
@@ -497,6 +554,15 @@ function buildTrayMenu() {
           checked: notifyOn('done'),
           click: (item) => setNotify('done', item.checked),
         },
+        { type: 'separator' },
+        {
+          // 시간대는 설정 창에서 고른다 — 메뉴에서는 켜고 끄는 것과 지금 값만 보인다
+          label: t('tray.quietHours', { from: settings.quiet.from, to: settings.quiet.to }),
+          type: 'checkbox',
+          checked: settings.quiet.hours,
+          click: (item) => setQuiet({ hours: item.checked }),
+        },
+        { label: t('tray.quietNow'), submenu: quietMenu() },
       ],
     },
     { label: t('tray.language'), submenu: langMenu() },
@@ -572,6 +638,15 @@ async function tick() {
     console.error('[collect]', err.message);
     return;
   }
+  // 시간대에 들고 나거나 임시 무음이 끝나면 트레이 메뉴의 표시가 실제와 어긋난다.
+  // 만료된 until은 여기서 정리해 둔다 — 다음에 메뉴를 열었을 때 지난 시각이 남아 있지 않게.
+  const quiet = isQuiet(settings.quiet);
+  if (quiet !== quietNow) {
+    quietNow = quiet;
+    if (!quiet && settings.quiet.until && Date.now() >= settings.quiet.until) setQuiet({ until: 0 });
+    else refreshTrayMenu();
+  }
+
   const json = signature(snapshot);
   // 전이만 남긴다 — lastSnapshot을 갈아 끼우기 전에 비교해야 한다
   if (settings.history) appendEvents(historyPath(), diffEvents(lastSnapshot, snapshot));
@@ -633,6 +708,16 @@ if (!app.requestSingleInstanceLock()) {
       };
     });
 
+    // 설정 창의 알림 설정. 트레이 메뉴와 같은 값을 만지므로 창을 열 때마다 새로 받아 간다.
+    ipcMain.handle('office:getNotify', () => notifySettings());
+    ipcMain.handle('office:setNotify', (_e, patch) => {
+      if (patch?.notify) settings.notify = sanitizeNotify({ ...settings.notify, ...patch.notify });
+      if (patch?.quiet) return setQuiet(patch.quiet);
+      saveSettings();
+      refreshTrayMenu();
+      return notifySettings();
+    });
+
     // 설정 창(렌더러)이 쓰는 표시 설정. 저장된 값을 되돌려주므로 렌더러는 반영만 하면 된다.
     ipcMain.handle('office:getView', () => settings.view);
     ipcMain.handle('office:setView', (_e, patch) => {
@@ -649,6 +734,7 @@ if (!app.requestSingleInstanceLock()) {
 
     upgradeUsageTap();
 
+    quietNow = isQuiet(settings.quiet);
     createTray();
     // 맥은 로그인 시작에 인자를 못 넘긴다 — 로그인으로 뜬 실행인지(wasOpenedAtLogin)로 대신한다
     const hidden = process.argv.includes('--hidden') || app.getLoginItemSettings().wasOpenedAtLogin === true;

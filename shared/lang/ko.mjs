@@ -143,6 +143,11 @@ export default {
   // ── 설정 창
   cfg: {
     title: '설정',
+    notifySection: '알림',
+    quiet: '조용한 시간대',
+    quietRange: '시간',
+    quietHint:
+      '조용한 동안에도 트레이 아이콘과 상단바 카운트는 그대로입니다 — 소리를 내지 않을 뿐 놓치게 하지 않습니다. <code>22:00 ~ 09:00</code>처럼 자정을 넘는 구간도 됩니다. 지금부터 잠깐만 조용히 하려면 <b>트레이 아이콘 &gt; 알림 &gt; 지금부터 조용히</b>.',
     langSection: '언어',
     lang: '언어',
     langNote: '앱 문구와 캐릭터 대사에 쓰는 언어',
@@ -203,6 +208,11 @@ export default {
     notifyContext: '컨텍스트 임박 (85 · 95%)',
     notifyUsage: '계정 사용량 임박 (80 · 95%)',
     notifyDone: '작업을 마쳤을 때 ({d} 넘게 걸린 일만)',
+    quietHours: '조용한 시간대 ({from} ~ {to})',
+    quietNow: '지금부터 조용히',
+    quietToday: '오늘 하루 (자정까지)',
+    quietUntil: '{when}까지 조용합니다 — 해제',
+    quietNone: '지금은 무음이 아닙니다',
     usageTap: '사용량 연동 (statusline)',
     notifyTap: '무엇을 기다리는지 알아내기 (Notification 훅)',
     history: '근태 기록 (출근부)',

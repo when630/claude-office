@@ -5,7 +5,17 @@
 // 돌리는 사람의 OS 로케일에 따라 단정이 갈린다.
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { createNotifyState, decideNotifications, longestWait, sanitizeNotify } from '../main/notify.mjs';
+import {
+  createNotifyState,
+  decideNotifications,
+  longestWait,
+  sanitizeNotify,
+  sanitizeQuiet,
+  isQuiet,
+  inQuietHours,
+  minutesOf,
+  midnightAfter,
+} from '../main/notify.mjs';
 import { fmtDur, setLang } from '../shared/i18n.mjs';
 
 const T0 = Date.parse('2026-07-31T09:00:00Z');
@@ -231,6 +241,64 @@ test('예전 설정에서 알림을 껐던 사람은 껐던 상태로 남는다'
     usage: true,
     done: true,
   });
+});
+
+// ── 방해금지
+//
+// 판정이 로컬 시각을 보므로(사람이 보는 밤이 기준이다) 여기서도 로컬 시각으로 만든다 —
+// UTC로 적으면 돌리는 사람의 타임존에 따라 단정이 갈린다.
+const at = (h, m = 0) => +new Date(2026, 6, 31, h, m);
+
+test('조용한 시간대는 자정을 넘는 구간을 다룬다', () => {
+  const night = sanitizeQuiet({ hours: true, from: '22:00', to: '09:00' });
+  assert.equal(inQuietHours(night, at(23, 30)), true);
+  assert.equal(inQuietHours(night, at(2)), true);
+  assert.equal(inQuietHours(night, at(8, 59)), true);
+  // 끝 시각은 포함하지 않는다 — 09:00에는 이미 조용하지 않다
+  assert.equal(inQuietHours(night, at(9)), false);
+  assert.equal(inQuietHours(night, at(21, 59)), false);
+
+  // 자정을 넘지 않는 구간(회의 시간대 같은 것)
+  const day = sanitizeQuiet({ hours: true, from: '13:00', to: '15:00' });
+  assert.equal(inQuietHours(day, at(14)), true);
+  assert.equal(inQuietHours(day, at(12, 59)), false);
+  assert.equal(inQuietHours(day, at(15)), false);
+
+  // 꺼져 있으면 시각과 무관하다
+  assert.equal(inQuietHours({ ...night, hours: false }, at(2)), false);
+  // 빈 구간 — 24시간 무음은 알림을 끄는 것과 같아서 여기서 표현할 일이 아니다
+  assert.equal(inQuietHours(sanitizeQuiet({ hours: true, from: '09:00', to: '09:00' }), at(9, 30)), false);
+});
+
+test('임시 무음은 만료 시각까지만', () => {
+  const q = sanitizeQuiet({ until: at(15) });
+  assert.equal(isQuiet(q, at(14, 59)), true);
+  assert.equal(isQuiet(q, at(15)), false);
+  // 시간대가 꺼져 있어도 임시 무음은 걸린다 (서로 독립이다)
+  assert.equal(q.hours, false);
+
+  // 자정까지 — 다음 날 0시
+  assert.equal(midnightAfter(at(23, 30)), +new Date(2026, 7, 1));
+  assert.equal(midnightAfter(at(0, 10)), +new Date(2026, 6, 31, 24));
+});
+
+test('방해금지 설정 — 모르는 값은 기본값으로, 지난 무음은 흘려보낸다', () => {
+  assert.deepEqual(sanitizeQuiet(), { hours: false, from: '22:00', to: '09:00', until: 0 });
+  assert.deepEqual(sanitizeQuiet(null), { hours: false, from: '22:00', to: '09:00', until: 0 });
+  // 손으로 고친 settings.json — 시각 꼴이 아니면 그 항목만 기본값으로 돈다
+  assert.deepEqual(sanitizeQuiet({ hours: true, from: '25:00', to: '7:30' }), {
+    hours: true,
+    from: '22:00',
+    to: '7:30',
+    until: 0,
+  });
+  assert.equal(sanitizeQuiet({ until: -1 }).until, 0);
+  assert.equal(sanitizeQuiet({ until: 'soon' }).until, 0);
+  assert.equal(sanitizeQuiet({ until: 1234 }).until, 1234);
+
+  assert.equal(minutesOf('09:05'), 545);
+  assert.equal(minutesOf('24:00'), null);
+  assert.equal(minutesOf(''), null);
 });
 
 test('fmtDur', () => {

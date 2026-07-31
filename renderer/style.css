@@ -874,6 +874,53 @@ b.lv-na {
   border-color: #39414f;
 }
 
+/* 알림 종류 — 켜고 끄는 것뿐이라 한 줄에 체크박스와 이름만 둔다 */
+.cfg-check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+.cfg-check + .cfg-check {
+  border-top: 1px solid #171c25;
+}
+.cfg-check span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cfg-check + .cfg-row {
+  border-top: 1px solid #171c25;
+}
+
+input[type='checkbox'] {
+  flex: none;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* 시각 표기는 로케일을 탄다 — 한국어는 `오후 10:00`, 영어는 `10:00 PM`이라 넉넉해야 안 잘린다 */
+.cfg-row input[type='time'] {
+  flex: none;
+  width: 118px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #171b23;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+.cfg-row input[type='time']:hover {
+  border-color: #39414f;
+}
+.cfg-sep {
+  flex: none;
+  color: #5d6779;
+}
+
 .cfg-reset {
   margin-top: 12px;
   padding: 5px 10px;

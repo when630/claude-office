@@ -45,6 +45,59 @@ export function sanitizeNotify(v) {
   return out;
 }
 
+// ── 방해금지
+//
+// 재알림이 5·15·30·60분에 계속 오고 5분을 넘기면 트레이가 깜빡인다. 회의 중이든 새벽이든
+// 똑같이 때리면 사람은 알림을 **통째로 꺼 버리고 다시 안 켠다** — 그러면 이 앱이 내세우는
+// 것이 통째로 무너진다. 시끄러운 시간을 따로 다룰 수 있어야 알림이 살아남는다.
+//
+// 참는 것은 **토스트뿐이다.** 트레이 점·깜빡임·상단바 카운트는 그대로 둔다(부르는 쪽 책임) —
+// 조용히 하는 것이지 놓치게 하는 것이 아니다.
+const QUIET_DEFAULTS = { hours: false, from: '22:00', to: '09:00', until: 0 };
+const HHMM = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+
+// 'HH:MM' → 자정부터의 분. 모르는 꼴이면 null이다.
+export function minutesOf(hhmm) {
+  const m = HHMM.exec(String(hhmm ?? ''));
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
+export function sanitizeQuiet(v) {
+  const time = (s, fallback) => (minutesOf(s) == null ? fallback : String(s));
+  return {
+    hours: v?.hours === true,
+    from: time(v?.from, QUIET_DEFAULTS.from),
+    to: time(v?.to, QUIET_DEFAULTS.to),
+    // 임시 무음의 만료 시각. 지난 값은 흘려보낸다 — 앱을 다시 켤 때 옛날 무음이 살아나지 않는다
+    until: Number.isFinite(v?.until) && v.until > 0 ? v.until : 0,
+  };
+}
+
+// 지금이 조용한 시간대인가. 22:00–09:00처럼 **자정을 넘는 구간이 오히려 흔하므로**
+// 분으로 펴서 두 갈래로 본다. from === to는 빈 구간으로 친다 — 24시간 무음은 알림을
+// 끄는 것과 같아서 여기서 표현할 일이 아니다.
+export function inQuietHours(q, now = Date.now()) {
+  if (!q?.hours) return false;
+  const from = minutesOf(q.from);
+  const to = minutesOf(q.to);
+  if (from == null || to == null || from === to) return false;
+  const d = new Date(now);
+  const m = d.getHours() * 60 + d.getMinutes();
+  return from < to ? m >= from && m < to : m >= from || m < to;
+}
+
+// 지금 토스트를 참아야 하는가.
+export function isQuiet(q, now = Date.now()) {
+  return now < (q?.until ?? 0) || inQuietHours(q, now);
+}
+
+// 로컬 자정. "오늘 하루 조용히"의 끝이다.
+export function midnightAfter(now = Date.now()) {
+  const d = new Date(now);
+  d.setHours(24, 0, 0, 0);
+  return d.getTime();
+}
+
 export function createNotifyState() {
   return {
     // key → { at, step } — at은 statusAt(기다리기 시작한 시각), step은 지금까지 넘긴 문턱 수

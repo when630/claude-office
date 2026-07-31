@@ -14,6 +14,9 @@ contextBridge.exposeInMainWorld('office', {
   openTerminal: (target) => ipcRenderer.invoke('office:openTerminal', target),
   // 출근부 — 오늘·최근 7일 집계 (main/history.mjs)
   history: () => ipcRenderer.invoke('office:history'),
+  // 설정 창의 알림 설정 — 종류별 on/off와 방해금지 (트레이 메뉴와 같은 값)
+  getNotify: () => ipcRenderer.invoke('office:getNotify'),
+  setNotify: (patch) => ipcRenderer.invoke('office:setNotify', patch),
   // 설정 창의 표시 설정 — 저장된 뒤의 값을 되돌려준다
   getView: () => ipcRenderer.invoke('office:getView'),
   setView: (patch) => ipcRenderer.invoke('office:setView', patch),
