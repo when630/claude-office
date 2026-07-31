@@ -495,10 +495,16 @@ function longestWaitMin() {
   return Math.floor(worst / 60000);
 }
 
+// 상단바에 지금 적어 둔 방치 시간(분). 스냅샷은 statusAt이 고정이면 다시 오지 않으므로
+// (main의 중복 전송 차단) 1초 타이머가 이 값을 보고 상단바만 다시 그린다 —
+// 그러지 않으면 30분째 방치된 대기가 "최장 3분"에서 멈춘 채로 남는다.
+let shownWaitMin = -1;
+
 function drawStats() {
   const s = state.stats ?? {};
   const u = state.usage;
   const waitMin = longestWaitMin();
+  shownWaitMin = waitMin;
   statsEl.innerHTML = [
     `<b>${s.total ?? 0}</b> 출근`,
     s.typing ? `<span class="t">${s.typing}</span> 작업 중` : '',
@@ -663,6 +669,8 @@ function connect() {
 setInterval(() => {
   clockEl.textContent = new Date().toLocaleTimeString('ko-KR', { hour12: false });
   tickPanel();
+  // 분이 넘어갈 때만 다시 그린다 — 매초 innerHTML을 갈면 상단바 텍스트 선택이 계속 풀린다
+  if (longestWaitMin() !== shownWaitMin) drawStats();
 }, 1000);
 
 window.addEventListener('resize', () => {

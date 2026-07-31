@@ -22,6 +22,7 @@
 머지 전에 이것을 돌린다:
 
 ```powershell
+npm test                             # 알림 문턱 판정 (node --test, 의존성 없음)
 npm run icons                        # 아이콘이 다시 구워지는지 (렌더 결과를 눈으로 확인)
 npx electron-builder --win --dir     # 설치본 없이 패키징 회귀 확인
 ```
