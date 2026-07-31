@@ -102,7 +102,8 @@ body {
   color: var(--red);
 }
 
-#cfg-open {
+#cfg-open,
+#att-open {
   padding: 3px 9px;
   border: 1px solid var(--line);
   border-radius: 5px;
@@ -112,7 +113,8 @@ body {
   font-size: 12px;
   cursor: pointer;
 }
-#cfg-open:hover {
+#cfg-open:hover,
+#att-open:hover {
   border-color: #39414f;
   color: var(--text);
 }
@@ -585,8 +587,9 @@ b.lv-na {
   color: var(--green);
 }
 
-/* ── 설정 창. 방이 많으면 목록만 길어지므로 창 높이를 묶고 안에서 스크롤한다. */
-#cfg {
+/* ── 설정 창·출근부. 방이 많으면 목록만 길어지므로 창 높이를 묶고 안에서 스크롤한다. */
+#cfg,
+#att {
   width: min(420px, calc(100vw - 32px));
   max-height: calc(100vh - 64px);
   padding: 0;
@@ -598,23 +601,27 @@ b.lv-na {
   font-size: 13px;
   overflow: hidden;
 }
-#cfg::backdrop {
+#cfg::backdrop,
+#att::backdrop {
   background: rgba(6, 8, 12, 0.62);
 }
-#cfg header {
+#cfg header,
+#att header {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 11px 14px;
   border-bottom: 1px solid var(--line);
 }
-#cfg header h2 {
+#cfg header h2,
+#att header h2 {
   margin: 0;
   font-size: 13px;
   letter-spacing: 0.04em;
   color: var(--accent);
 }
-#cfg-close {
+#cfg-close,
+#att-close {
   margin-left: auto;
   padding: 3px 9px;
   border: 1px solid var(--line);
@@ -625,14 +632,122 @@ b.lv-na {
   font-size: 12px;
   cursor: pointer;
 }
-#cfg-close:hover {
+#cfg-close:hover,
+#att-close:hover {
   border-color: #39414f;
   color: var(--text);
 }
-#cfg-body {
+#cfg-body,
+#att-body {
   max-height: calc(100vh - 124px);
   overflow-y: auto;
   padding: 4px 14px 16px;
+}
+
+/* ── 출근부. 범위 탭 + 요약 + 방별 표 + 오래 기다린 순간. */
+.att-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0 2px;
+}
+.att-tabs button {
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #171b23;
+  color: var(--dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.att-tabs button.on {
+  border-color: #3d4a5f;
+  background: #1d2431;
+  color: var(--text);
+}
+.att-range {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: #5d6779;
+  font-variant-numeric: tabular-nums;
+}
+
+.att-rooms {
+  width: 100%;
+  margin: 8px 0 0;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.att-rooms th {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5d6779;
+  text-align: right;
+}
+.att-rooms th:first-child {
+  text-align: left;
+}
+.att-rooms td {
+  padding: 5px 6px;
+  border-bottom: 1px solid #171c25;
+  font-size: 12px;
+  text-align: right;
+}
+.att-rooms td:first-child {
+  text-align: left;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.att-rooms .w {
+  color: var(--accent);
+}
+/* 0인 칸은 눈에서 빼 준다 — 숫자가 있는 칸만 읽히게 */
+.att-rooms .z {
+  color: #454d5c;
+}
+
+.att-waits {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.att-waits li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent);
+  border-radius: 4px;
+  background: #151a22;
+  font-size: 12px;
+}
+.att-waits b {
+  flex: none;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.att-waits span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dim);
+}
+.att-waits time {
+  flex: none;
+  color: #5d6779;
+  font-variant-numeric: tabular-nums;
 }
 
 .cfg-row {

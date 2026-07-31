@@ -9,6 +9,8 @@ const statsEl = document.getElementById('stats');
 const clockEl = document.getElementById('clock');
 const cfgDialog = document.getElementById('cfg');
 const cfgBody = document.getElementById('cfg-body');
+const attDialog = document.getElementById('att');
+const attBody = document.getElementById('att-body');
 
 let state = { rooms: [], recent: [], stats: {}, usage: null, ts: 0 };
 let meta = null;
@@ -661,6 +663,126 @@ cfgBody.addEventListener('change', (e) => {
 
 cfgBody.addEventListener('click', (e) => {
   if (e.target.classList?.contains('cfg-reset')) saveView({ roomThemes: {} }).then(drawCfg);
+});
+
+// ── 출근부
+//
+// 근태 기록은 main이 파일로 들고 있다(main/history.mjs). 스냅샷처럼 밀려 오지 않으므로
+// 창을 열 때 한 번 받아 오고, 범위 전환은 이미 받은 집계를 갈아 끼우기만 한다.
+let attData = null;
+let attRange = 'today';
+
+// 근태는 분 단위로 읽는 게 자연스럽다 — 초까지 적으면 표가 시끄러워진다
+function fmtSpan(ms) {
+  if (!ms) return '0분';
+  const m = Math.round(ms / 60000);
+  if (m < 60) return `${m}분`;
+  const h = Math.floor(m / 60);
+  return m % 60 ? `${h}시간 ${m % 60}분` : `${h}시간`;
+}
+
+// 0인 칸은 흐리게 — 숫자가 있는 칸만 눈에 들어오게
+function cell(ms, cls = '') {
+  return `<td class="${[cls, ms ? '' : 'z'].filter(Boolean).join(' ')}">${fmtSpan(ms)}</td>`;
+}
+
+function fmtDay(ms) {
+  const d = new Date(ms);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function attSummary(s) {
+  return `
+    <dl class="facts">
+      <div><dt>세션</dt><dd>${s.sessions}개</dd></div>
+      <div><dt>작업</dt><dd>${fmtSpan(s.busyMs)}</dd></div>
+      <div><dt>내 답 대기</dt><dd>${fmtSpan(s.waitMs)}</dd></div>
+      <div><dt>최고 컨텍스트</dt><dd>${s.maxCtx == null ? '—' : `${s.maxCtx}%`}</dd></div>
+    </dl>`;
+}
+
+function attRooms(s) {
+  if (!s.rooms.length) return '<p class="dim">이 구간에는 기록이 없습니다.</p>';
+  return `<table class="att-rooms">
+    <thead><tr><th>방</th><th>세션</th><th>작업</th><th>대기</th><th>대기중</th></tr></thead>
+    <tbody>
+      ${s.rooms
+        .map(
+          (r) => `<tr>
+            <td title="${esc(r.room)}">${esc(r.room)}</td>
+            <td>${r.sessions}</td>
+            ${cell(r.busyMs)}
+            ${cell(r.waitMs, 'w')}
+            ${cell(r.idleMs)}
+          </tr>`,
+        )
+        .join('')}
+    </tbody>
+  </table>`;
+}
+
+function attWaits(s) {
+  if (!s.waits.length) return '';
+  return `<section class="block">
+    <h3>오래 기다리게 한 순간</h3>
+    <ul class="att-waits">
+      ${s.waits
+        .map(
+          (w) => `<li><b>${fmtSpan(w.ms)}</b><span>${esc(w.room)}</span><time>${fmtTime(w.at)}</time></li>`,
+        )
+        .join('')}
+    </ul>
+  </section>`;
+}
+
+function drawAtt() {
+  if (!attData) {
+    attBody.innerHTML = '<p class="dim">근태 기록을 읽지 못했습니다.</p>';
+    return;
+  }
+  const s = attRange === 'week' ? attData.week : attData.today;
+  attBody.innerHTML = `
+    <div class="att-tabs">
+      <button type="button" data-range="today"${attRange === 'today' ? ' class="on"' : ''}>오늘</button>
+      <button type="button" data-range="week"${attRange === 'week' ? ' class="on"' : ''}>최근 7일</button>
+    </div>
+    <p class="att-range">${fmtDay(s.from)} ~ ${fmtDay(s.to)} · ${fmtTime(s.to)} 기준</p>
+
+    ${attSummary(s)}
+
+    <section class="block">
+      <h3>방별</h3>
+      ${attRooms(s)}
+    </section>
+
+    ${attWaits(s)}
+
+    ${
+      attData.on
+        ? `<p class="hint">기록은 ${attData.retainDays}일치만 남기고 오래된 것은 앱을 켤 때 지웁니다.
+            방 이름(작업 디렉터리)만 남기고 세션 이름·지시 내용은 남기지 않습니다.
+            <b>트레이 아이콘 &gt; 근태 기록</b>에서 끄거나 지울 수 있습니다.</p>`
+        : `<p class="hint warn">근태 기록이 꺼져 있습니다 — 지금은 아무것도 쌓이지 않습니다.
+            <b>트레이 아이콘 &gt; 근태 기록</b>에서 켤 수 있습니다.</p>`
+    }
+    <p class="hint">앱이 꺼져 있던 동안은 세지 않습니다. 볼 수 없었던 시간이라 근태로 넣으면 거짓이 됩니다.</p>
+  `;
+}
+
+async function openAtt() {
+  attBody.innerHTML = '<p class="dim">불러오는 중…</p>';
+  attDialog.showModal();
+  attData = await window.office?.history?.().catch(() => null);
+  drawAtt();
+}
+
+document.getElementById('att-open').addEventListener('click', openAtt);
+document.getElementById('att-close').addEventListener('click', () => attDialog.close());
+attBody.addEventListener('click', (e) => {
+  const range = e.target?.dataset?.range;
+  if (!range || range === attRange) return;
+  attRange = range;
+  drawAtt();
 });
 
 // ── main 프로세스에서 오는 스냅샷
