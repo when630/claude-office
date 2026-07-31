@@ -232,6 +232,15 @@ b.lv-na {
   color: #5d6779;
 }
 
+/* 패널 맨 아래 한 줄 — 버전. 위 블록과 확실히 떨어뜨려 꼬리표처럼 둔다. */
+.version {
+  margin: 20px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid #171c25;
+  font-size: 11px;
+  color: #4d5768;
+}
+
 .hint {
   margin: 12px 0 0;
   font-size: 11px;
