@@ -50,11 +50,20 @@ export function sanitizeRoomNotify(v) {
 
 const USAGE_LABEL = { session: 'notify.usageSession', week: 'notify.usageWeek' };
 
-export const NOTIFY_KINDS = ['waiting', 'escalate', 'context', 'usage', 'done'];
+export const NOTIFY_KINDS = ['waiting', 'escalate', 'context', 'usage', 'done', 'stuck'];
 
-// 종류별 기본값. 완료 알림만 꺼진 채로 온다 — 원래 "끝난 세션마다 알리면 시끄럽다"는 이유로
-// 없던 기능이라, 켜고 싶은 사람이 켜는 쪽이 맞다.
-const NOTIFY_DEFAULTS = { waiting: true, escalate: true, context: true, usage: true, done: false };
+// 종류별 기본값. 완료·헤맴은 꺼진 채로 온다.
+//  - 완료는 원래 "끝난 세션마다 알리면 시끄럽다"는 이유로 없던 기능이다
+//  - 헤맴은 판정에 오탐이 섞일 수 있는 자리라(긴 빌드는 정상적으로 조용하다) 켜 보고
+//    쓸 만한지 사람이 정하게 둔다
+const NOTIFY_DEFAULTS = {
+  waiting: true,
+  escalate: true,
+  context: true,
+  usage: true,
+  done: false,
+  stuck: false,
+};
 
 // 알림 종류별 on/off. 예전 설정은 notify가 boolean 하나였다.
 //  - `false`는 "내가 껐다"는 뜻이므로 아는 종류를 전부 끈 채로 편다
@@ -211,6 +220,26 @@ function decideWaiting(state, snapshot, now, first, out, rooms) {
   }
 }
 
+// 헤매기 시작한 자리. 들어선 순간 한 번만 부른다 — 계속 헤매는 동안 반복해 부르면
+// 그게 곧 소음이고, 어차피 사무실에서는 계속 그 모습으로 보인다.
+//
+// state.mood를 읽기만 한다. 갱신은 뒤따르는 decideDone이 하므로 여기서는 **직전 기분**이
+// 그대로 남아 있다 — 그래서 "처음 보는 자리인가"와 "방금 들어섰는가"를 가릴 수 있다.
+function decideStuck(state, snapshot, out) {
+  for (const w of everyWorker(snapshot)) {
+    if (w.mood !== 'stuck') continue;
+    const prev = state.mood.get(w.key);
+    if (!prev || prev.mood === 'stuck') continue;
+    out.push({
+      kind: 'stuck',
+      key: w.key,
+      room: w.room,
+      title: t('notify.stuckTitle', { name: w.name }),
+      body: w.detail || t('notify.stuckBody'),
+    });
+  }
+}
+
 // 일을 마친 자리. 백그라운드 잡은 state.json에 done·failed·stopped를 남기지만 터미널 세션은
 // 그런 파일이 없어 **끝나면 그냥 idle로 돌아온다**(main/collect.mjs의 moodOf) — 그래서 idle도
 // '끝났다'로 본다. 대신 얼마나 일했는지를 보고 짧은 문답은 걸러낸다.
@@ -314,6 +343,8 @@ export function decideNotifications(state, snapshot, now = Date.now(), rooms = n
   const first = !state.primed;
   state.primed = true;
   decideWaiting(state, snapshot, now, first, out, rooms);
+  // 순서가 뜻이 있다 — decideStuck은 decideDone이 갱신하기 전의 기분을 읽는다
+  if (!first) decideStuck(state, snapshot, out);
   decideDone(state, snapshot, now, first, out);
   decideContext(state, snapshot, first, out);
   decideUsage(state, snapshot?.usage, now, first, out);

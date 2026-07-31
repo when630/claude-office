@@ -602,7 +602,8 @@ function drawKeyboard(ctx, left, top, worker, t) {
 }
 
 function drawMonitor(ctx, left, top, worker, t, w = 13, h = 11) {
-  const on = worker.mood === 'typing' || worker.mood === 'waiting';
+  // 헤매는 중에도 화면은 켜져 있다 — 다만 아래 speed가 느려져 코드가 거의 안 흐른다
+  const on = worker.mood === 'typing' || worker.mood === 'waiting' || worker.mood === 'stuck';
   rect(ctx, left, top, w, h, COLORS.bezel);
   rect(ctx, left + 1, top + 1, w - 2, h - 3, on ? COLORS.screenOn : COLORS.screenOff);
 
@@ -860,7 +861,7 @@ function drawContextBar(ctx, cx, top, pct, w = 24) {
 // ── 캐릭터
 // 앉아 있는 상태: 일하는 중이거나, 멈췄거나, 실패해서 늘어져 있거나.
 function isSeated(mood) {
-  return mood === 'typing' || mood === 'failed' || mood === 'stopped';
+  return mood === 'typing' || mood === 'stuck' || mood === 'failed' || mood === 'stopped';
 }
 
 // ── 자리와 바닥 사이의 전환.
@@ -1130,6 +1131,9 @@ function walkPos(seat, t) {
 // 앉으면 상판이 하반신을 덮어 다리가 안 보이므로, 두드리는 동작은 **팔을 한 줄 올렸다
 // 내리는**(stand↔armsUp) 것으로 만든다 — 팔은 눈 높이라 상판 위에 늘 남는다.
 function clawdSeated(worker, t, station) {
+  // 헤매는 중 — 자리에는 있지만 손이 안 나간다. 아주 느리게 팔을 들었다 내리는 것이
+  // 머리를 긁적이는 모습으로 읽힌다(두드리는 150ms와 확연히 다른 주기여야 한다).
+  if (worker.mood === 'stuck') return Math.floor(t / 700) % 2 ? SPR.armsHigh : SPR.stand;
   if (worker.mood !== 'typing') return SPR.asleep;
   const flip = Math.floor(t / 150) % 2;
   switch (station) {
@@ -1163,6 +1167,8 @@ function bubbleFor(worker, chat, phase) {
   switch (worker.mood) {
     case 'waiting':
       return SPR.gBang;
+    case 'stuck':
+      return SPR.gStuck;
     case 'done':
       return SPR.gCheck;
     case 'failed':
@@ -1370,7 +1376,8 @@ function drawSeatBody(ctx, seat, t, hover, selected) {
 function tagColor(worker, plate, isSel) {
   if (plate) return isSel ? '#6b4a00' : '#2b313b';
   if (isSel) return COLORS.sel;
-  return worker.mood === 'typing' ? COLORS.label : COLORS.labelDim;
+  // 헤매는 자리도 밝게 둔다 — 흐려 놓으면 퇴근한 자리처럼 보여 눈에 안 걸린다
+  return worker.mood === 'typing' || worker.mood === 'stuck' ? COLORS.label : COLORS.labelDim;
 }
 
 // 이름표와 컨텍스트 게이지. 회의실 먼 쪽 자리에서는 바닥이 아니라 상판 위 명패에 얹힌다.

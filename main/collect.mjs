@@ -117,6 +117,28 @@ async function collectSessions() {
   return out;
 }
 
+// 일하는 중인데 진전이 없는가.
+//
+// mood가 여섯이던 시절에 빠져 있던 상태다 — 같은 도구 에러를 반복하거나 몇 분째 대화 파일에
+// 아무것도 안 붙는 세션이 "열심히 타자 치는 중"으로만 보였다. 기다리는 세션은 불러 주면서
+// 헤매는 세션은 못 본 척한 셈이다.
+//
+// 신호는 둘. 어느 쪽이든 걸리면 stuck으로 본다.
+//  - 도구가 **연달아 실패**하고 있다 (transcript.mjs의 scanErrorRun)
+//  - 대화 파일이 한동안 **안 자랐다** (mtime). 멈췄거나 도구 하나에 붙들려 있다는 뜻이다
+//
+// 무진전 문턱을 넉넉히 잡은 이유: 긴 빌드·테스트·설치는 정상적으로 조용하다. 그동안 대화
+// 파일에는 아무것도 안 쓰인다(도구 결과가 와야 다음 줄이 붙는다). 문턱이 짧으면 정상적으로
+// 오래 걸리는 일을 전부 "헤맨다"고 부르게 되고, 그러면 이 상태 자체를 아무도 안 믿는다.
+export const STUCK_ERRORS = 3;
+export const STUCK_QUIET_MS = 10 * 60 * 1000;
+
+export function isStuck(tr, now = Date.now()) {
+  if (!tr) return false;
+  if ((tr.errorRun ?? 0) >= STUCK_ERRORS) return true;
+  return tr.at != null && now - tr.at >= STUCK_QUIET_MS;
+}
+
 // status(실시간) → needs → state(스냅샷) 순으로 캐릭터의 기분을 정한다.
 //
 // `status: "waiting"`은 Claude Code가 **사용자 답을 기다리는 동안** 직접 넣어 주는 값이다 —
@@ -125,9 +147,9 @@ async function collectSessions() {
 //
 // 트랜스크립트로는 이걸 알 수 없다. 실측해 보면 선택지가 떠 있는 동안 대화 파일에는
 // **아무것도 안 쓰인다**(답한 뒤에야 tool_use 줄이 붙는다). 세션 파일의 status가 유일한 단서다.
-function moodOf(session, job) {
+function moodOf(session, job, tr, now) {
   const st = job?.state ?? {};
-  if (session.status === 'busy') return 'typing';
+  if (session.status === 'busy') return isStuck(tr, now) ? 'stuck' : 'typing';
   if (session.status === 'waiting') return 'waiting';
   if (st.needs) return 'waiting';
   if (st.state === 'failed') return 'failed';
@@ -259,7 +281,7 @@ export async function collect() {
       room: roomKeyOf(s.cwd),
       kind: s.kind === 'bg' ? 'bg' : 'interactive',
       status: s.status ?? 'idle',
-      mood: moodOf(s, job),
+      mood: moodOf(s, job, tr, now),
       // 잡은 state.json의 detail이 가장 최신. 터미널 세션은 그런 파일이 없으니
       // 자리를 비운 사용자에게 남긴 요약(away_summary) → 마지막으로 한 말 순으로 대신한다.
       detail: trimText(st.detail || tr?.summary || tr?.lastMessage || ''),
@@ -329,6 +351,8 @@ export async function collect() {
   const stats = {
     total: staff.length,
     typing: staff.filter((w) => w.mood === 'typing').length,
+    // 헤매는 자리는 typing에 섞지 않는다 — 섞으면 "작업 중 5"가 되고 구분한 뜻이 사라진다
+    stuck: staff.filter((w) => w.mood === 'stuck').length,
     waiting: staff.filter((w) => w.mood === 'waiting').length,
     idle: staff.filter((w) => ['idle', 'done', 'stopped'].includes(w.mood)).length,
     failed: staff.filter((w) => w.mood === 'failed').length,

@@ -19,6 +19,7 @@ room, mutters to itself and occasionally chats with a neighbour.
 | Session state | In the office |
 |---|---|
 | working | Sits and hammers the keyboard, code scrolling on the monitor |
+| going in circles | Still at the desk but the claws stop — a slow scratch of the head, and a ❓ |
 | **waiting on you** | Gets up, raises both claws and holds a ❗ — see below |
 | done | Walks out to the floor holding a ✓ and goes for a stroll |
 | failed · stopped | Slumped in the chair (✗ / zZ) |
@@ -131,6 +132,9 @@ Automatic installation is blocked for unsigned macOS builds, so there a new vers
   memory; the usage one only appears when the statusline tap is in place. Work finished is off by
   default and only fires for jobs over **three minutes** — it carries how long it took and where
   the session left off
+- **Looks stuck** is off by default too. It fires when a session is busy but going nowhere — tools
+  failing three times in a row, or ten minutes without a single line written to its transcript.
+  Long builds are legitimately quiet, which is exactly why the threshold sits where it does
 - Each room gets its own **alert level** in Settings — `No alerts` for a scratch folder you never
   want to hear from, `Keen` for one you cannot miss (repeat nudges move in to 1 · 3 · 10 · 30 min)
 - Set **quiet hours** in Settings (`22:00 ~ 09:00` and other ranges crossing midnight are fine)

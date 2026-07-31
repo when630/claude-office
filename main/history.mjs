@@ -21,7 +21,10 @@ const WAIT_WORTH_MS = 60_000;
 
 // mood를 세 갈래로 접는다. done·failed·stopped는 자리에 남아 있을 뿐 일하는 것도,
 // 나를 기다리는 것도 아니라 idle로 본다.
-const BUCKET = { typing: 'busy', waiting: 'wait' };
+//
+// stuck(헤매는 중)은 busy에 접는다. 세션은 실제로 돌고 있고, 근태가 세는 것은 "얼마나
+// 일했는가"이지 그 일이 잘 풀렸는가가 아니다.
+const BUCKET = { typing: 'busy', stuck: 'busy', waiting: 'wait' };
 
 function bucketOf(mood) {
   return BUCKET[mood] ?? 'idle';

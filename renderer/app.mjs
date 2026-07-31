@@ -279,6 +279,7 @@ function idlePanel() {
         <div><dt>${t('idle.in')}</dt><dd>${t('idle.inValue', { n: s.total ?? 0 })}</dd></div>
         <div><dt>${t('idle.typing')}</dt><dd>${s.typing ?? 0}</dd></div>
         <div><dt>${t('idle.waiting')}</dt><dd>${s.waiting ?? 0}</dd></div>
+        ${s.stuck ? `<div><dt>${t('idle.stuck')}</dt><dd>${s.stuck}</dd></div>` : ''}
         <div><dt>${t('idle.ctxMax')}</dt><dd>${s.contextMax == null ? '—' : `${s.contextMax}%`}</dd></div>
         <div><dt>${t('idle.aides')}</dt><dd>${s.aides ?? 0}</dd></div>
         ${s.spare ? `<div><dt>${t('idle.spare')}</dt><dd>${s.spare}</dd></div>` : ''}
@@ -543,6 +544,7 @@ function drawStats() {
     s.waiting && waitMin >= 1
       ? `<span class="dim">${t('topbar.longest', { d: fmtDur(waitMin * 60_000) })}</span>`
       : '',
+    s.stuck ? `<span class="s">${s.stuck}</span> ${t('topbar.stuck')}` : '',
     s.failed ? `<span class="f">${s.failed}</span> ${t('topbar.failed')}` : '',
     `<span class="dim">${t('topbar.tokens', { n: fmtTokens(s.tokens) })}</span>`,
     u?.session ? `<span class="dim">5h ${u.session.pct}%</span>` : '',

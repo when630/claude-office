@@ -182,6 +182,34 @@ test('세션이 통째로 사라지면(터미널을 닫았다) 완료를 알리�
   assert.deepEqual(kinds(decideNotifications(state, snap([ended('a', 'idle', T0 + 40 * MIN)]), T0 + 40 * MIN)), ['done']);
 });
 
+test('헤매기 시작하면 한 번 부르고, 헤매는 동안엔 다시 부르지 않는다', () => {
+  const state = primed();
+  const stuck = (key, extra = {}) => ended(key, 'stuck', T0, extra);
+
+  // 처음 보는 자리는 어디서 왔는지 모른다 — 켜자마자 헤매고 있었다고 부르지 않는다
+  assert.deepEqual(kinds(decideNotifications(state, snap([stuck('a')]), T0)), []);
+  assert.deepEqual(kinds(decideNotifications(state, snap([busy('b', T0)]), T0)), []);
+
+  const out = decideNotifications(state, snap([stuck('b', { detail: '같은 에러가 세 번째' })]), T0 + MIN);
+  assert.deepEqual(kinds(out), ['stuck']);
+  assert.equal(out[0].key, 'b');
+  assert.match(out[0].title, /헤매는 것 같습니다/);
+  assert.equal(out[0].body, '같은 에러가 세 번째');
+
+  // 계속 헤매는 동안은 조용하다 — 사무실에서는 계속 그 모습으로 보인다
+  assert.deepEqual(kinds(decideNotifications(state, snap([stuck('b')]), T0 + 10 * MIN)), []);
+
+  // 풀렸다가 다시 헤매면 새로 부른다
+  decideNotifications(state, snap([busy('b', T0 + 11 * MIN)]), T0 + 11 * MIN);
+  assert.deepEqual(kinds(decideNotifications(state, snap([stuck('b')]), T0 + 12 * MIN)), ['stuck']);
+});
+
+test('헤매다 끝난 자리는 완료로 부르지 않는다 — 일하다 끝난 것만 센다', () => {
+  const state = primed();
+  decideNotifications(state, snap([ended('a', 'stuck', T0)]), T0);
+  assert.deepEqual(kinds(decideNotifications(state, snap([ended('a', 'idle', T0 + 30 * MIN)]), T0 + 30 * MIN)), []);
+});
+
 test('컨텍스트는 문턱을 넘을 때만, 압축으로 떨어지면 다시 무장된다', () => {
   const state = primed();
   assert.deepEqual(kinds(decideNotifications(state, snap([ctxWorker('a', 84)]), T0)), []);
@@ -224,22 +252,27 @@ test('longestWait은 대기 중인 놈만 본다', () => {
 });
 
 test('예전 설정에서 알림을 껐던 사람은 껐던 상태로 남는다', () => {
-  const on = { waiting: true, escalate: true, context: true, usage: true };
-  // 기본값 — 완료 알림만 꺼진 채로 온다
-  assert.deepEqual(sanitizeNotify(), { ...on, done: false });
-  assert.deepEqual(sanitizeNotify(null), { ...on, done: false });
+  // 기본값 — 완료·헤맴만 꺼진 채로 온다
+  const on = { waiting: true, escalate: true, context: true, usage: true, done: false, stuck: false };
+  assert.deepEqual(sanitizeNotify(), on);
+  assert.deepEqual(sanitizeNotify(null), on);
 
   // 껐던 사람은 새로 생긴 종류까지 꺼진 채로
-  assert.deepEqual(sanitizeNotify(false), { waiting: false, escalate: false, context: false, usage: false, done: false });
-  // 켜져 있던 사람에게 완료 알림이 저절로 생기지는 않는다 — 그때의 기본 상태였을 뿐이다
-  assert.deepEqual(sanitizeNotify(true), { ...on, done: false });
+  assert.deepEqual(sanitizeNotify(false), {
+    waiting: false,
+    escalate: false,
+    context: false,
+    usage: false,
+    done: false,
+    stuck: false,
+  });
+  // 켜져 있던 사람에게 새 알림이 저절로 생기지는 않는다 — 그때의 기본 상태였을 뿐이다
+  assert.deepEqual(sanitizeNotify(true), on);
 
   // 손으로 고친 settings.json — 모르는 키와 엉뚱한 타입은 버리고 아는 것만 받는다
   assert.deepEqual(sanitizeNotify({ escalate: false, done: true, nope: true, context: 'yes' }), {
-    waiting: true,
+    ...on,
     escalate: false,
-    context: true,
-    usage: true,
     done: true,
   });
 });

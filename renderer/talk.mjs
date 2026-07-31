@@ -155,7 +155,9 @@ export function speechFor(worker, tms, extra = []) {
   const real = realLine(worker);
   const base = t(`talk.lines.${worker.mood}`);
   // 일하는 중이 아니면 방 분위기와 시간대 얘기도 한다
-  const flavour = worker.mood === 'typing' || worker.mood === 'waiting' ? [] : [...extra, ...timeLines()];
+  // 일하는 중(헤매는 것도 일하는 중이다)이나 기다리는 중에는 방 분위기 얘기를 섞지 않는다
+  const IN_WORK = ['typing', 'waiting', 'stuck'];
+  const flavour = IN_WORK.includes(worker.mood) ? [] : [...extra, ...timeLines()];
   const pool = flavour.length && rnd(seed, i * 7 + 1) < 0.3 ? flavour : (Array.isArray(base) ? base : t('talk.lines.idle'));
   const useReal = Boolean(real) && i % 2 === 0;
   const text = useReal ? real : pick(pool, seed, i);
