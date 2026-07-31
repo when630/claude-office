@@ -26,10 +26,18 @@ const stage = document.getElementById('stage');
 const panel = document.getElementById('panel');
 const statsEl = document.getElementById('stats');
 const clockEl = document.getElementById('clock');
+const miniStatsEl = document.getElementById('mini-stats');
 const cfgDialog = document.getElementById('cfg');
 const cfgBody = document.getElementById('cfg-body');
 const attDialog = document.getElementById('att');
 const attBody = document.getElementById('att-body');
+
+// 미니 모드는 **같은 페이지를 다른 창에서** 여는 것이다(main/index.mjs의 createMini).
+// 프레임 유무는 창을 만들 때 정해지고 나중에 못 바꾸므로 창을 갈아 끼우는 쪽을 골랐고,
+// 여기서는 그 창인지만 보고 상단바·패널을 접는다.
+const MINI = new URLSearchParams(location.search).get('mini') === '1';
+// 미니에 다 들어가지 않으니 방을 추린다. 기다리는 방·헤매는 방이 먼저다.
+const MINI_ROOMS = 3;
 
 let state = { rooms: [], recent: [], stats: {}, usage: null, ts: 0 };
 let meta = null;
@@ -146,7 +154,30 @@ function pickScale(width) {
   return 2;
 }
 
-const STAGE_PAD = 24; // style.css의 #stage padding 12px 상하좌우
+const STAGE_PAD = MINI ? 12 : 24; // style.css의 #stage padding 상하좌우 (미니는 6px)
+
+// 미니에 그릴 방을 고른다. 좁은 창에 방을 다 밀어 넣으면 아무것도 안 읽히므로,
+// **지금 봐야 하는 방**부터 남긴다 — 나를 기다리는 방, 헤매는 방, 일하는 방 순.
+function roomScore(room) {
+  let best = 0;
+  for (const w of room.workers ?? []) {
+    const rank = { waiting: 3, stuck: 2, typing: 1 }[w.mood] ?? 0;
+    if (rank > best) best = rank;
+  }
+  return best;
+}
+
+function roomsToDraw() {
+  const rooms = state.rooms ?? [];
+  if (!MINI) return rooms;
+  // 미니는 첫 방밖에 안 보이는 크기일 수 있다 — 급한 방을 **맨 앞으로** 올린다.
+  // 같은 급끼리는 원래 순서(인원수 순)를 지킨다: 매 스냅샷 자리가 뒤집히면 곁눈질이 안 된다.
+  return [...rooms]
+    .map((r, i) => ({ r, i, s: roomScore(r) }))
+    .sort((a, b) => b.s - a.s || a.i - b.i)
+    .slice(0, MINI_ROOMS)
+    .map((x) => x.r);
+}
 
 function relayout() {
   // clientWidth는 padding을 포함한다 — 빼지 않으면 가로 스크롤바가 생기고
@@ -154,7 +185,7 @@ function relayout() {
   const avail = Math.max(120, (stage.clientWidth || 800) - STAGE_PAD);
   scale = pickScale(avail);
   const logicalW = Math.max(120, Math.floor(avail / scale));
-  const rooms = state.rooms ?? [];
+  const rooms = roomsToDraw();
   view = layout(rooms, logicalW, { themes: cfg.roomThemes, nameOf: canvasName });
 
   // 방이 적어도 바닥은 화면을 채운다 — 빈 캔버스가 잘려 보이지 않게
@@ -190,6 +221,11 @@ canvas.addEventListener('mouseleave', () => {
 });
 canvas.addEventListener('click', (e) => {
   const seat = seatAt(e.clientX, e.clientY);
+  // 미니에는 패널이 없다 — 자리를 누르면 큰 창으로 올라가며 그 자리가 펼쳐진다
+  if (MINI) {
+    if (seat) window.office?.miniSelect?.(seat.worker.key);
+    return;
+  }
   selected = seat?.worker.key ?? null;
   drawPanel();
 });
@@ -532,11 +568,28 @@ function longestWaitMin() {
 // 그러지 않으면 30분째 방치된 대기가 "최장 3분"에서 멈춘 채로 남는다.
 let shownWaitMin = -1;
 
+// 미니의 한 줄. 곁눈질용이라 숫자만 남긴다 — 여기서 길어지면 창을 줄인 뜻이 없다.
+function drawMiniStats() {
+  const s = state.stats ?? {};
+  miniStatsEl.innerHTML = [
+    `<b>${s.total ?? 0}</b>`,
+    s.waiting ? `<span class="w">${s.waiting}</span> ${t('topbar.waiting')}` : '',
+    s.stuck ? `<span class="s">${s.stuck}</span> ${t('topbar.stuck')}` : '',
+    s.failed ? `<span class="f">${s.failed}</span> ${t('topbar.failed')}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
 function drawStats() {
   const s = state.stats ?? {};
   const u = state.usage;
   const waitMin = longestWaitMin();
   shownWaitMin = waitMin;
+  if (MINI) {
+    drawMiniStats();
+    return;
+  }
   statsEl.innerHTML = [
     `<b>${s.total ?? 0}</b> ${t('topbar.in')}`,
     s.typing ? `<span class="t">${s.typing}</span> ${t('topbar.typing')}` : '',
@@ -952,6 +1005,10 @@ async function openAtt() {
   drawAtt();
 }
 
+// ── 미니 모드 여닫기. 창을 갈아 끼우는 일이라 main이 한다(별도 창이다).
+document.getElementById('mini-open').addEventListener('click', () => window.office?.setMini?.(true));
+document.getElementById('mini-grow').addEventListener('click', () => window.office?.setMini?.(false));
+
 document.getElementById('att-open').addEventListener('click', openAtt);
 document.getElementById('att-close').addEventListener('click', () => attDialog.close());
 attBody.addEventListener('click', (e) => {
@@ -1106,6 +1163,9 @@ window.__office = {
     applyLang({ lang: next, pref: next });
   },
 };
+
+// 미니 창인지에 따라 상단바·패널이 접힌다 — 첫 그림 전에 세워야 레이아웃이 한 번에 잡힌다
+document.body.classList.toggle('mini', MINI);
 
 // 첫 그림은 기본 언어(en)로 나가고, meta가 오면 설정된 언어로 다시 짠다 —
 // IPC를 기다리는 동안 빈 화면을 보여주지 않기 위해서다.

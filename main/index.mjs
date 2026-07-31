@@ -61,6 +61,7 @@ const APP_ID = 'com.when630.claude-office';
 const BLINK_MS = 700;
 
 let win = null;
+let mini = null; // 미니 모드 창 — 프레임을 나중에 못 바꾸므로 별도 창으로 둔다
 let tray = null;
 let timer = null;
 let lastSnapshot = null;
@@ -89,6 +90,9 @@ const defaults = {
   roomNotify: {}, // 방 이름 → 알림 세기('off' | 'keen'). 보통인 방은 적지 않는다
   // 전역 단축키. 빈 문자열이면 그 자리는 안 잡는다 — 끄는 방법이 곧 비우는 것이다.
   hotkeys: { toggle: 'CommandOrControl+Alt+O', jump: 'CommandOrControl+Alt+W' },
+  // 미니 모드와 두 모습의 창 자리. 다시 켜면 있던 모습으로 그 자리에 뜬다.
+  mini: false,
+  bounds: { normal: null, mini: null },
   history: true,
   trayHintShown: false,
   view: { names: 'show', roomThemes: {} },
@@ -121,6 +125,8 @@ function loadSettings() {
     quiet: sanitizeQuiet(saved.quiet),
     roomNotify: sanitizeRoomNotify(saved.roomNotify),
     hotkeys: sanitizeHotkeys(saved.hotkeys),
+    mini: saved.mini === true,
+    bounds: { normal: sanitizeBounds(saved.bounds?.normal), mini: sanitizeBounds(saved.bounds?.mini) },
     view: sanitizeView(saved.view),
   };
   applyLang();
@@ -144,7 +150,7 @@ function setLangPref(pref) {
     tray.setContextMenu(buildTrayMenu());
     if (lastSnapshot) updateTray(lastSnapshot);
   }
-  if (win && !win.isDestroyed()) win.webContents.send('office:lang', langPayload());
+  sendAll('office:lang', langPayload());
 }
 
 function langPayload() {
@@ -238,8 +244,18 @@ function applyHotkeys({ announce = false } = {}) {
 // 창 토글. 보이고 초점까지 있으면 내리고, 아니면 올려서 초점을 준다 —
 // 다른 창에 가려 있을 때 눌렀는데 사라지면 그건 고장으로 읽힌다.
 function toggleWindow() {
-  if (win && !win.isDestroyed() && win.isVisible() && win.isFocused()) win.hide();
-  else showWindow();
+  // 미니로 쓰는 중이면 미니를 여닫는다 — 여기서 큰 창으로 바꿔 버리면 모드를 뺏는 셈이다
+  const w = settings.mini ? mini : win;
+  if (w && !w.isDestroyed() && w.isVisible() && w.isFocused()) {
+    w.hide();
+    return;
+  }
+  if (settings.mini) {
+    setMini(true); // 창이 없으면 다시 만들고, 있으면 올린다
+    mini?.focus();
+    return;
+  }
+  showWindow();
 }
 
 // 가장 오래 기다린 세션의 터미널로. 기다리는 게 없으면 창만 띄운다 — 아무 일도 안 일어나면
@@ -265,6 +281,15 @@ function sanitizeView(v) {
     names: NAME_MODES.includes(v?.names) ? v.names : defaults.view.names,
     roomThemes,
   };
+}
+
+// 창 자리는 다음에 켤 때 그대로 되살릴 값이라 모양을 확인하고 받는다 —
+// 깨진 값이 들어오면 창이 화면 밖에 뜨거나 아예 안 뜬다.
+function sanitizeBounds(b) {
+  if (!b || typeof b !== 'object') return null;
+  const num = (v) => (Number.isFinite(v) ? Math.round(v) : null);
+  const out = { x: num(b.x), y: num(b.y), width: num(b.width), height: num(b.height) };
+  return out.width > 0 && out.height > 0 ? out : null;
 }
 
 function saveSettings() {
@@ -304,7 +329,7 @@ function createWindow(show = true) {
   win = new BrowserWindow({
     width: 1120,
     height: 720,
-    ...(lastBounds ?? {}),
+    ...(lastBounds ?? settings.bounds.normal ?? {}),
     minWidth: 560,
     minHeight: 360,
     show,
@@ -330,7 +355,9 @@ function createWindow(show = true) {
   });
 
   const remember = () => {
-    if (win && !win.isDestroyed() && !win.isMinimized()) lastBounds = win.getBounds();
+    if (!win || win.isDestroyed() || win.isMinimized()) return;
+    lastBounds = win.getBounds();
+    settings.bounds = { ...settings.bounds, normal: lastBounds };
   };
   win.on('resize', remember);
   win.on('move', remember);
@@ -350,6 +377,11 @@ function createWindow(show = true) {
 }
 
 function showWindow() {
+  // 미니로 내려가 있었다면 큰 창을 부르는 순간 미니는 접는다 — 둘이 같이 떠 있을 이유가 없다
+  if (settings.mini) {
+    setMini(false);
+    return;
+  }
   if (!win || win.isDestroyed()) createWindow(true);
   else {
     if (win.isMinimized()) win.restore();
@@ -358,8 +390,85 @@ function showWindow() {
   }
 }
 
+// ── 미니 모드
+//
+// 곁눈질하라고 만든 앱인데 창은 전부 아니면 전무였다. 작업하면서 모니터 구석에 띄워 둘
+// 크기가 필요하다.
+//
+// **창을 따로 만든다.** 프레임 유무는 BrowserWindow를 만들 때 정해지고 나중에 못 바꾸는데,
+// 미니의 값어치 절반은 테두리 없이 작게 뜨는 데 있다. 같은 index.html을 `?mini=1`로 열어
+// 렌더러가 상단바·패널을 접고 사무실만 그린다.
+function createMini() {
+  mini = new BrowserWindow({
+    width: 420,
+    height: 300,
+    ...(settings.bounds.mini ?? {}),
+    minWidth: 220,
+    minHeight: 150,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    backgroundColor: '#0b0d12',
+    icon: icon('icon.png'),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      contextIsolation: true,
+      sandbox: true,
+    },
+  });
+
+  mini.loadFile(path.join(ROOT, 'renderer', 'index.html'), { query: { mini: '1' } });
+  mini.webContents.setWindowOpenHandler(({ url }) => {
+    openExternal(url);
+    return { action: 'deny' };
+  });
+
+  const remember = () => {
+    if (mini && !mini.isDestroyed()) settings.bounds = { ...settings.bounds, mini: mini.getBounds() };
+  };
+  mini.on('resize', remember);
+  mini.on('move', remember);
+  mini.on('closed', () => {
+    mini = null;
+  });
+}
+
+function setMini(on) {
+  if (on) {
+    if (win && !win.isDestroyed()) win.hide();
+    if (!mini || mini.isDestroyed()) createMini();
+    else mini.show();
+  } else {
+    if (mini && !mini.isDestroyed()) {
+      settings.bounds = { ...settings.bounds, mini: mini.getBounds() };
+      mini.destroy();
+      mini = null;
+    }
+    if (!win || win.isDestroyed()) createWindow(true);
+    else {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+    }
+  }
+  settings.mini = on;
+  saveSettings();
+  refreshTrayMenu();
+}
+
+// 지금 화면에 있는 창. 스냅샷·언어를 밀어 보낼 곳이다.
+function liveWindows() {
+  return [win, mini].filter((w) => w && !w.isDestroyed());
+}
+
+function sendAll(channel, payload) {
+  for (const w of liveWindows()) w.webContents.send(channel, payload);
+}
+
 // 알림을 눌러 창이 새로 뜨는 경우엔 렌더러가 아직 로드 전이라 곧장 보내면 유실된다
 function selectInWindow(key) {
+  // 이미 있던 창이면 곧장 보내고, 새로 만들어진 창이면 로드가 끝나기를 기다린다.
+  // (미니에서 올라오는 길도 여기를 지난다 — showWindow가 미니를 접어 준다)
   const existed = win && !win.isDestroyed();
   showWindow();
   if (existed) win.webContents.send('office:select', key);
@@ -641,6 +750,12 @@ function buildTrayMenu() {
       ? [{ label: t('tray.update', { v: updateReady }), click: installNow }, { type: 'separator' }]
       : []),
     { label: t('tray.open'), click: showWindow },
+    {
+      label: t('tray.mini'),
+      type: 'checkbox',
+      checked: settings.mini,
+      click: (item) => setMini(item.checked),
+    },
     { label: t('tray.waitingList'), submenu: waitingMenu() },
     { type: 'separator' },
     {
@@ -802,7 +917,7 @@ async function tick() {
   maybeNotify(snapshot);
   if (json === lastJson) return;
   lastJson = json;
-  if (win && !win.isDestroyed()) win.webContents.send('office:state', snapshot);
+  sendAll('office:state', snapshot);
 }
 
 // ── 수명주기
@@ -866,6 +981,12 @@ if (!app.requestSingleInstanceLock()) {
       return notifySettings();
     });
 
+    // 미니 모드. 상단바 버튼과 미니 창의 확대 버튼이 같은 문을 지난다.
+    ipcMain.handle('office:getMini', () => settings.mini);
+    ipcMain.on('office:setMini', (_e, on) => setMini(on === true));
+    // 미니에서 자리를 누르면 큰 창으로 올라오며 그 자리가 펼쳐진다
+    ipcMain.on('office:mini-select', (_e, key) => selectInWindow(String(key ?? '')));
+
     // 전역 단축키. 등록 실패는 반환값으로만 알 수 있어(register가 false를 낼 뿐이다)
     // 실패한 조합을 함께 넘긴다 — 설정 창이 그 자리를 표시한다.
     ipcMain.handle('office:getHotkeys', () => ({ hotkeys: settings.hotkeys, failed: hotkeyFailed }));
@@ -897,7 +1018,10 @@ if (!app.requestSingleInstanceLock()) {
     applyHotkeys({ announce: true });
     // 맥은 로그인 시작에 인자를 못 넘긴다 — 로그인으로 뜬 실행인지(wasOpenedAtLogin)로 대신한다
     const hidden = process.argv.includes('--hidden') || app.getLoginItemSettings().wasOpenedAtLogin === true;
-    createWindow(!hidden);
+    // 큰 창은 미니로 쓰던 사람에게도 만들어 둔다(숨긴 채로) — 자리를 눌러 올라올 때
+    // 새로 만들면서 렌더러가 로드되기를 기다리지 않아도 된다.
+    createWindow(!hidden && !settings.mini);
+    if (settings.mini && !hidden) createMini();
 
     // 새 버전은 받아만 두고 강제 재시작하지 않는다 — 재시작은 트레이 메뉴에서,
     // 아니면 다음 종료 때 조용히 설치된다. 맥(서명 없음)은 알림만 띄운다(main/updater.mjs).
@@ -926,6 +1050,8 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('before-quit', () => {
     quitting = true;
+    // 마지막 자리를 남긴다 — 다음에 켤 때 있던 모습으로 그 자리에 뜬다
+    saveSettings();
     if (timer) clearInterval(timer);
     if (blinkTimer) clearInterval(blinkTimer);
     globalShortcut.unregisterAll();

@@ -36,6 +36,8 @@ main/updater.mjs    GitHub Releases 자동 업데이트 — 받아두고 트레�
                     (서명 없는 맥은 설치가 거부되므로 검사만 하고 알림으로 안내)
 main/preload.cjs    contextBridge (샌드박스라 CJS여야 한다)
 renderer/           픽셀 렌더러 (app · render · sprites · themes · talk · style)
+                    미니 모드는 같은 index.html을 `?mini=1`로 연 **별도 창**이다 — 프레임
+                    유무는 창을 만들 때 정해지고 나중에 못 바꾸기 때문이다
 renderer/fonts/     사무실 영역 픽셀 폰트 (Mona S 12px, OFL 1.1)
 shared/pixels.mjs   픽셀 데이터 — 렌더러와 아이콘 생성기가 공유
 shared/i18n.mjs     화면에 나가는 문구 — t()·언어 정하기, 기간·시각 셈법(언어별로 분기하는 것만)

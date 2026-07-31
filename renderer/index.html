@@ -18,9 +18,17 @@
       <div id="stats"></div>
       <div class="right">
         <span id="clock"></span>
+        <button id="mini-open" type="button" data-i18n-title="topbar.mini">▭</button>
         <button id="att-open" type="button" data-i18n="topbar.attendance" data-i18n-title="topbar.attendance"></button>
         <button id="cfg-open" type="button" data-i18n="topbar.settings" data-i18n-title="topbar.settings"></button>
       </div>
+    </header>
+
+    <!-- 미니 모드의 손잡이. 프레임 없는 창이라 여기가 유일한 드래그 영역이고,
+         큰 창으로 돌아가는 길도 여기 있다. 평소에는 style.css가 감춰 둔다. -->
+    <header id="mini-bar">
+      <span id="mini-stats"></span>
+      <button id="mini-grow" type="button" data-i18n-title="mini.grow">▣</button>
     </header>
 
     <main>

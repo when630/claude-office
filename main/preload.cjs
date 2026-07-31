@@ -17,6 +17,10 @@ contextBridge.exposeInMainWorld('office', {
   // 설정 창의 알림 설정 — 종류별 on/off와 방해금지 (트레이 메뉴와 같은 값)
   getNotify: () => ipcRenderer.invoke('office:getNotify'),
   setNotify: (patch) => ipcRenderer.invoke('office:setNotify', patch),
+  // 미니 모드 — 작게 띄워 두는 사무실 (별도 창이라 렌더러는 켜고 끄기만 한다)
+  getMini: () => ipcRenderer.invoke('office:getMini'),
+  setMini: (on) => ipcRenderer.send('office:setMini', on),
+  miniSelect: (key) => ipcRenderer.send('office:mini-select', key),
   // 전역 단축키 — 저장된 조합과 못 잡은 조합을 함께 돌려준다
   getHotkeys: () => ipcRenderer.invoke('office:getHotkeys'),
   setHotkeys: (patch) => ipcRenderer.invoke('office:setHotkeys', patch),
