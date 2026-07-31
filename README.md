@@ -5,13 +5,16 @@
 A tray-resident app that shows your local Claude Code sessions as a pixel office.
 One working directory = one room, one session = one Clawd working in it.
 
-![The office — each room a different type, some Clawds working, some wandering](docs/images/office.png)
+![The office — each room a different type, some Clawds working, some wandering](docs/images/en/office.png)
+
+You leave a session running, go do something else, and come back to find it has been sitting
+there for twenty minutes waiting for you to answer a permission prompt. This app is the office
+you can glance at instead — and the nudge that arrives when someone is waiting.
+
+## What you are looking at
 
 While a session works, its Clawd sits and types. With nothing to do it gets up, wanders the
-room, mutters to itself and occasionally chats with a neighbour. A white bubble (blue stripe on
-the left) is text actually read from the session; a dark one is flavour.
-
-*(The screenshots on this page are of the Korean UI.)*
+room, mutters to itself and occasionally chats with a neighbour.
 
 | Session state | In the office |
 |---|---|
@@ -21,19 +24,21 @@ the left) is text actually read from the session; a dark one is flavour.
 | failed · stopped | Slumped in the chair (✗ / zZ) |
 | idle | Mills about the room; now and then everyone gathers on the rug |
 
-If a subagent is running, an **aide** stands beside the desk with a clipboard and reports
-progress. The bar under the name tag is that session's **context usage** (60% yellow · 85% red).
+A white speech bubble (blue stripe on the left) is text actually read from the session; a dark
+one is a flavour line we wrote. If a subagent is running, an **aide** stands beside the desk with
+a clipboard and reports progress. The bar under the name tag is that session's **context usage**
+(60% yellow · 85% red).
 
 App text and character lines come in **English and Korean** — it follows your OS language by
-default, and you can switch it in [Settings](docs/settings.md) in the top bar or under
-tray menu > Language. No restart needed.
+default, and you can switch it in **Settings** in the top bar or under tray menu > Language.
+No restart needed.
 
 ## It will not let you miss a session waiting on you
 
-The reason this app exists. When a permission prompt, a set of choices, or a plan approval
-leaves a session **waiting for your answer** —
+When a permission prompt, a set of choices, or a plan approval leaves a session **waiting for
+your answer** —
 
-![Waiting on you — up from the desk, holding an exclamation mark](docs/images/waiting.png)
+![Waiting on you — up from the desk, holding an exclamation mark](docs/images/en/waiting.png)
 
 - The crab steps out in front of its desk holding a ❗ and says what it is waiting for
 - A **yellow dot** goes on the tray icon and an **OS notification** fires (Windows toast · macOS
@@ -43,18 +48,17 @@ leaves a session **waiting for your answer** —
   **tray icon starts blinking** — a toast slides past (you were in a meeting, or full-screen)
   but the tray stays where it is
 
-Sessions merely resting at the prompt (`idle`) are told apart from this, so you do not get a
-notification for every session that finishes. How the call is made:
-[What the characters do](docs/characters.md#선택지가-뜨면-산책하지-않는다) (Korean).
+Sessions merely resting at the prompt are told apart from this, so you do not get a notification
+for every session that finishes.
 
-For terminal sessions it cannot tell **what** is being asked — nothing is written to the
-transcript while the choices are on screen. Turn on the
+For sessions you run in a terminal, the app cannot tell **what** is being asked — nothing is
+written to the session's transcript while the choices are on screen. Turn on the
 [Notification hook](docs/notify-hook.md) (Korean) from the tray menu and the **actual wording**
 lands in the panel and the notification.
 
 ## The right-hand panel
 
-<img src="docs/images/panel.png" width="345" alt="Session panel — context gauge, subagents, timeline, reattach command" align="right" />
+<img src="docs/images/en/panel.png" width="345" alt="Session panel — context gauge, subagents, timeline, reattach command" align="right" />
 
 Click a desk to see what that session is really up to.
 
@@ -64,14 +68,13 @@ Click a desk to see what that session is really up to.
 - **Right now · latest instruction · linked MRs**
 - **Timeline** — instructions received (yellow) ↔ things said (blue)
 - **Open in terminal** at the bottom — launches a terminal in that session's working directory
-  running `claude attach <id>` (or `claude --resume <sessionId>` for terminal sessions).
-  If Windows Terminal is present it attaches as a new tab in the open window. The **copy button**
-  next to it hands you just the command
+  and reattaches to it. If Windows Terminal is present it comes up as a new tab in the open
+  window. The **copy button** next to it hands you just the command
 
 With nothing selected, the default view is a clock and your **account usage** (5-hour session ·
-7-day week). Usage only appears once a tap is installed in your statusline — see
-[the panel](docs/panel.md#사용량은-왜-tap이-필요한가) (Korean). The **question mark** in the bottom
-right explains how to read the bubbles.
+7-day week). Usage only appears once a tap is installed in your statusline — the tray menu's
+**Usage feed (statusline)** sets that up for you. The **question mark** in the bottom right
+explains how to read the bubbles.
 
 <br clear="right" />
 
@@ -80,22 +83,21 @@ right explains how to read the bubbles.
 The **Attendance** button in the top bar. The office shows you how many are waiting right now,
 but **without a record there is no way to know how many minutes you left them waiting today.**
 
+<img src="docs/images/en/attendance.png" width="420" alt="Attendance — today and the last 7 days, by room, longest waits" align="right" />
+
 - Today · last 7 days — session count · time working · **time spent waiting on me** · peak context
 - A per-room breakdown and the **longest waits** (only those over a minute)
 - What gets recorded stops at state transitions and room names. Session names, paths and
   instructions are not kept, and entries are retained for 14 days. You can turn it off or clear
   it from the tray menu
 
-Full rules: [Attendance](docs/attendance.md) (Korean).
+<br clear="right" />
 
-## Install and update
+## Install
 
 **Windows** — grab `Claude-Office-Setup-x.y.z.exe` from
 [Releases](https://github.com/when630/claude-office/releases/latest) and run it. There is no code
-signing, so if SmartScreen warns you: `More info > Run anyway`. The installed build checks for a
-new release every four hours and downloads it in the background — you get a notification when it
-is ready, and either apply it right away via **tray menu > Install update and restart** or leave
-it and it installs quietly the next time you quit.
+signing, so if SmartScreen warns you: `More info > Run anyway`.
 
 **macOS** — from the same place take `Claude-Office-x.y.z-arm64.dmg` (Apple Silicon) or
 `-x64.dmg` (Intel) and drag the app into Applications. It is neither signed nor notarized, so
@@ -105,30 +107,14 @@ macOS will claim it "is damaged and can't be opened"; clear that once from a ter
 xattr -cr "/Applications/Claude Office.app"
 ```
 
-Automatic installation is blocked for unsigned macOS builds (Squirrel.Mac verifies the
-signature), so a new version gets you **a notification only** — clicking it opens Releases.
+Nothing else to install. The app reads the same `~/.claude` files Claude Code already keeps, so
+if Claude Code runs on this machine you are done.
 
-## Development
-
-```powershell
-npm install       # postinstall bakes the icons
-npm start         # run from source
-npm test          # notification thresholds, attach commands, language switching (node --test, no deps)
-npm run usage-tap # add one line to your statusline so the app can read session/weekly usage (optional)
-npm run build     # Windows installer (NSIS) into dist/
-npm run build:mac # dmg + zip, on a Mac (cannot be built on Windows)
-```
-
-Releases are cut by CI when you push a tag — it builds Windows and macOS and puts them in a
-**draft** release, so once [Actions](https://github.com/when630/claude-office/actions) is done you
-write the release notes and hit Publish.
-
-```powershell
-git tag v0.4.0; git push origin v0.4.0
-```
-
-Electron 43, with exactly one runtime dependency (electron-updater, for auto-update).
-It reads the same `~/.claude` files `claude agents` uses, so nothing beyond Claude Code is needed.
+**Updates.** The Windows build checks for a new release every four hours and downloads it in the
+background — you get a notification when it is ready, and either apply it right away via **tray
+menu > Install update and restart** or leave it and it installs quietly the next time you quit.
+Automatic installation is blocked for unsigned macOS builds, so there a new version gets you
+**a notification only** — clicking it opens Releases.
 
 ## Living in the tray
 
@@ -148,7 +134,34 @@ It reads the same `~/.claude` files `claude agents` uses, so nothing beyond Clau
   the item that clears the log you have collected
 - Settings live in `%APPDATA%\claude-office\settings.json`
   (`~/Library/Application Support/claude-office/settings.json` on macOS) — the tray menu and
-  [Settings](docs/settings.md) in the top bar write the same file
+  **Settings** in the top bar write the same file
+
+## What it does not do
+
+- **Local sessions only.** Sessions run from `claude.ai/code` (web) or the desktop app leave
+  nothing in these files, so they do not show up
+- **It cannot answer or stop a session for you.** That would mean writing to someone else's
+  terminal stdin, so it does not — when you spot one waiting, it takes you as far as
+  **Open in terminal** and no further
+- **It does not send your work anywhere.** Everything on screen is read from files already on
+  your machine; the only thing that leaves it is the check for a new release
+- Account usage depends on the statusline tap. A Claude Code session has to paint its statusline
+  once before there is a value, and anything older than 30 minutes is marked stale
+- Attendance is only recorded **while the app is running.** Whatever happened between quitting
+  and starting again is not there
+- The app speaks **English and Korean only**, and text read from a session (titles, instructions,
+  activity) is not translated — those are the session's own words. The documents under `docs/`
+  are Korean only
+- When the window is covered or on another virtual desktop the animation stops and picks up where
+  it left off once the window is visible again — that is the browser engine saving your battery,
+  not a hang
+- Builds are not code signed — on Windows that means the SmartScreen warning
+  (`More info > Run anyway`), and on macOS one `xattr -cr` before first launch plus manual updates
+- The `~/.claude` layout is Claude Code's internal arrangement and can change between versions
+  (checked against v2.1.220)
+- Installing the usage tap automatically only works when your statusline is PowerShell (`.ps1`).
+  For bash and friends, add the one line by hand as the tray menu's guide shows and it behaves
+  identically
 
 ## Further reading
 
@@ -156,45 +169,15 @@ The documents under `docs/` are in Korean.
 
 | Document | Contents |
 |---|---|
-| [What it reads](docs/data-sources.md) | Which `~/.claude` files and how · spare slots · parsing terminal-session transcripts |
-| [Room types](docs/rooms.md) | The 8 rooms and their props · why the meeting room is laid out differently |
-| [What the characters do](docs/characters.md) | The 16×12 pixel rules · transition animations · how "waiting" is decided · bubbles · aides |
-| [The right-hand panel](docs/panel.md) | Panel layout · the pixel font · how the usage tap works |
 | [What it is waiting for](docs/notify-hook.md) | Installing the Notification hook to capture permission and choice prompts |
 | [Attendance](docs/attendance.md) | What is recorded · how time is counted · turning it off and clearing it |
 | [Settings](docs/settings.md) | Language · masking names · picking room types |
-| [Architecture](docs/architecture.md) | File map · what is worth touching · debug entry points |
-
-## Limits
-
-- **Local only.** Sessions run from `claude.ai/code` (web) or the desktop app leave nothing in
-  these files, so they do not show up
-- **It cannot answer or stop a session for you.** That would mean writing to someone else's
-  terminal stdin, so it does not — when you spot one waiting, it takes you as far as
-  [Open in terminal](docs/panel.md#터미널에서-열기) and no further
-- Account usage depends on the statusline tap. A Claude Code session has to paint its statusline
-  once before there is a value, and anything older than 30 minutes is marked stale
-- When the window is covered or on another virtual desktop, Chromium stops
-  `requestAnimationFrame` — the canvas not drawing is normal, and it picks up where it left off
-  once the window is visible again
-- Attendance is only recorded **while the app is running.** Whatever happened between quitting
-  and starting again is not there
-- The app speaks **English and Korean only**, and text read from a session (titles, instructions,
-  activity) is not translated — those are the session's own words. The documents under `docs/`
-  are Korean only
-- The `~/.claude` layout is Claude Code's internal arrangement and can change between versions
-  (checked against v2.1.220)
-- Builds are not code signed — on Windows that means the SmartScreen warning
-  (`More info > Run anyway`), and on macOS one `xattr -cr` before first launch plus manual updates
-- Installing the usage tap automatically only works when your statusline is PowerShell (`.ps1`).
-  For bash and friends, add the one line by hand as the tray menu's guide shows and it behaves
-  identically. On Korean Windows the stdin encoding has to be fixed too, or payloads containing
-  non-ASCII text break ([why](docs/panel.md#stdin-인코딩을-왜-맞추나)) — taps installed by older
-  versions get that added on startup
+| [The right-hand panel](docs/panel.md) | Panel layout · opening a terminal · how the usage tap works |
+| [Room types](docs/rooms.md) | The 8 rooms and their props |
+| [What the characters do](docs/characters.md) | How "waiting" is decided · bubbles · aides · the pixel rules |
+| [What it reads](docs/data-sources.md) | Which `~/.claude` files and how |
 
 ---
 
-The pixel font inside the office is the 12px Korean variant of
+MIT. The pixel font inside the office is the 12px Korean variant of
 [Mona](https://github.com/MonadABXY/mona-font) (SIL OFL 1.1).
-The screenshots were baked by running the real renderer headless — see
-[debug entry points](docs/architecture.md#디버그-입구).
