@@ -16,6 +16,7 @@
 | `~/.claude/jobs/<id>/timeline.jsonl` | 상태 전이 이력 (마지막 12건) — 백그라운드 잡만 |
 | `~/.claude/projects/<cwd>/<sessionId>.jsonl` | **모든 세션**의 제목·최근 지시·진행 요약·MR·컨텍스트 사용량·타임라인 |
 | `~/.claude/office-usage.json` | 계정 사용량 — statusline이 떨어뜨려 준 payload ([사용량 tap](panel.md#사용량은-왜-tap이-필요한가) 참고) |
+| `~/.claude/office-notify/<sessionId>.json` | 지금 무엇을 기다리는지 — Notification 훅이 떨어뜨려 준 payload ([훅 tap](notify-hook.md) 참고) |
 
 `process.kill(pid, 0)`으로 살아있는 프로세스만 남기므로, 죽은 세션 파일이 남아 있어도 출근시키지 않는다.
 `CLAUDE_CONFIG_DIR`을 설정해 뒀다면 그쪽을 따라간다.

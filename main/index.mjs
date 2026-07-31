@@ -6,6 +6,13 @@ import { fileURLToPath } from 'node:url';
 import { collect } from './collect.mjs';
 import { CLAUDE_DIR, USAGE_FILE } from './paths.mjs';
 import { installTap, removeTap, tapStatus, manualGuide, REASONS } from './usage-tap.mjs';
+import {
+  installNotifyTap,
+  removeNotifyTap,
+  notifyTapStatus,
+  manualGuide as notifyManualGuide,
+  REASONS as NOTIFY_REASONS,
+} from './notify-tap.mjs';
 import { initUpdater, installNow } from './updater.mjs';
 import {
   createNotifyState,
@@ -338,6 +345,55 @@ function confirmClearHistory() {
     });
 }
 
+// ── 무엇을 기다리는지 알아내기. Notification 훅이 그 순간의 문구를 떨어뜨려 준다
+// (main/notify-tap.mjs). 훅이 실행할 스크립트는 userData에 둔다 — asar 안의 파일은
+// 밖에서 node로 실행할 수 없다.
+function notifyScriptPath() {
+  return path.join(app.getPath('userData'), 'notify-tap.mjs');
+}
+
+function toggleNotifyTap(want) {
+  const script = notifyScriptPath();
+  const res = want ? installNotifyTap(script) : removeNotifyTap(script);
+
+  // 실패하면 체크가 원래대로 돌아가 있어야 한다
+  if (tray) tray.setContextMenu(buildTrayMenu());
+
+  if (res.ok) {
+    if (res.already) {
+      notify('무엇을 기다리는지', want ? '이미 연동돼 있습니다.' : '연동된 것이 없습니다.');
+    } else if (want) {
+      // 훅은 세션을 띄울 때 읽힌다 — 이미 돌고 있는 세션에는 적용되지 않는다
+      notify(
+        '무엇을 기다리는지 알려줍니다',
+        '지금 돌고 있는 세션에는 적용되지 않습니다 — 새로 띄운 세션부터 권한 확인·선택지 문구가 그대로 보입니다.',
+      );
+    } else {
+      notify('연동을 껐습니다', 'settings.json에서 훅을 뺐습니다. 대기 자체는 그대로 알려줍니다.');
+    }
+    return;
+  }
+
+  const guide = notifyManualGuide(script);
+  dialog
+    .showMessageBox({
+      type: 'warning',
+      title: '무엇을 기다리는지 알아내기',
+      message: NOTIFY_REASONS[res.reason] ?? '연동에 실패했습니다.',
+      detail: guide,
+      buttons: ['확인', '안내 복사'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    })
+    .then(({ response }) => {
+      if (response === 1) clipboard.writeText(guide);
+    })
+    .catch(() => {
+      /* 대화상자를 못 띄우는 상황이면 그냥 넘긴다 */
+    });
+}
+
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
     ...(updateReady
@@ -382,6 +438,12 @@ function buildTrayMenu() {
       type: 'checkbox',
       checked: tapStatus().installed,
       click: (item) => toggleTap(item.checked),
+    },
+    {
+      label: '무엇을 기다리는지 알아내기 (Notification 훅)',
+      type: 'checkbox',
+      checked: notifyTapStatus(notifyScriptPath()).installed,
+      click: (item) => toggleNotifyTap(item.checked),
     },
     {
       label: '근태 기록 (출근부)',
