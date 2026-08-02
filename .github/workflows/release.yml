@@ -65,8 +65,43 @@ jobs:
         with:
           path: dist
           merge-multiple: true
-      # 무엇이 올라가는지 로그에 남긴다 — 갈라졌던 전례가 있어 눈으로 세는 자리가 필요하다
-      - run: ls -l dist
+      # dist의 실제 파일명에는 공백이 있다(`Claude Office Setup 0.4.0.exe`). 그대로 올리면
+      # GitHub이 공백을 '.'으로 바꾸는데, 같이 올라가는 latest*.yml은 '-'로 바꾼 이름을
+      # 가리킨다 — 어긋나면 자동 업데이트가 404를 받는다(#48). yml 쪽에 맞춘다.
+      - name: Match asset names to latest*.yml
+        run: |
+          shopt -s nullglob
+          for f in dist/*" "*; do mv -- "$f" "${f// /-}"; done
+          ls -l dist
+
+      # 이름이 어긋나도 릴리스는 성공한 것처럼 보이고 자산 개수도 맞는다 — 사람 눈에 기대지 않는다.
+      #
+      # url을 뽑는 데 `grep -oP`를 쓰지 않는다. 로케일에 따라 "-P supports only unibyte and
+      # UTF-8 locales"로 죽는데, 그러면 읽을 url이 하나도 없어 **검사가 통과해 버린다.**
+      # 그래서 한 줄도 못 뽑은 경우 자체를 실패로 본다 — 검증이 조용히 무력화되는 쪽이
+      # 어긋난 이름보다 위험하다.
+      - name: Verify latest*.yml points at real files
+        run: |
+          bad=0
+          for y in dist/latest*.yml; do
+            urls=$(sed -n 's/^.*url: *//p' "$y")
+            if [ -z "$urls" ]; then
+              echo "::error::$y has no url entries — the check would pass without checking anything"
+              bad=1
+              continue
+            fi
+            while read -r u; do
+              [ -n "$u" ] || continue
+              if [ -f "dist/$u" ]; then
+                echo "ok  $u"
+              else
+                echo "::error::$y references missing asset: $u"
+                bad=1
+              fi
+            done <<< "$urls"
+          done
+          [ "$bad" = 0 ]
+
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
