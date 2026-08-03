@@ -28,7 +28,8 @@ room, mutters to itself and occasionally chats with a neighbour.
 A white speech bubble (blue stripe on the left) is text actually read from the session; a dark
 one is a flavour line we wrote. If a subagent is running, an **aide** stands beside the desk with
 a clipboard and reports progress. The bar under the name tag is that session's **context usage**
-(60% yellow · 85% red).
+(60% yellow · 85% red). As the context fills, **paper piles up on the desk** so you can spot it
+by glancing at the office rather than reading the bar.
 
 **After 22:00 the office dims.** Room colours still tell the rooms apart, and whoever is still
 around in the small hours hums to itself with a ♪.

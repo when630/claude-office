@@ -712,10 +712,42 @@ function drawMonitor(ctx, left, top, worker, t, w = 13, h = 11) {
 const DESK_WIDE = ['mug', 'snack', 'papers', 'phone', 'headset', 'mug'];
 const DESK_NARROW = ['sticky', 'can'];
 
-function drawDeskItems(ctx, seat, surface) {
+// ── 컨텍스트가 차면 책상에 서류가 쌓인다.
+//
+// 이름표 밑 얇은 막대 하나로만 보이던 값이라, 사무실을 훑는 것만으로는 어느 자리가 곧
+// 압축될지 안 읽혔다. 막대를 **대체하는 게 아니라 거든다** — 정확한 숫자는 패널이 말한다.
+//
+// 문턱은 막대와 같은 것을 쓴다(60% 노랑 · 85% 빨강). 두 표시가 다른 문턱을 쓰면 막대는
+// 노란데 서류는 안 쌓인 상태가 생겨 서로를 못 믿게 된다.
+const PAPER_STEPS = [40, 60, 85];
+// 한 장마다 위로 2px, 왼쪽으로 1px 어긋나게 쌓는다. 세 장이면 +4px — 모니터 아래턱과
+// 말풍선 사이에 든다(굽어서 확인했다).
+const PAPER_DX = 1;
+const PAPER_DY = 2;
+
+function paperCount(pct) {
+  return pct == null ? 0 : PAPER_STEPS.filter((step) => pct >= step).length;
+}
+
+// 자리 모양과 무관하게 **상판 오른쪽 끝**에 쌓는다. 모니터·키보드·플라스크는 다 왼쪽~가운데에
+// 있고 비서는 상판 아래(DY_DESK.aide)에 서므로 이 자리만 비어 있다.
+function drawPaperStack(ctx, seat, surface) {
+  const n = paperCount(seat.worker.context?.pct);
+  if (!n) return 0;
+  const spr = SPR.papers;
+  for (let i = 0; i < n; i++) {
+    drawSprite(ctx, spr, seat.x + 47 - spr.w - i * PAPER_DX, surface + 2 - spr.h - i * PAPER_DY);
+  }
+  return n;
+}
+
+function drawDeskItems(ctx, seat, surface, stacked) {
   const seed = hashStr(seat.worker.key);
-  const wide = SPR[DESK_WIDE[Math.floor(rnd(seed, 11) * DESK_WIDE.length)]];
-  if (wide && rnd(seed, 12) > 0.15) drawSprite(ctx, wide, seat.x + 47 - wide.w, surface + 2 - wide.h);
+  // 서류가 쌓여 있으면 넓은 칸은 그쪽 몫이다 — 머그와 겹쳐 찍히지 않게 비켜준다
+  if (!stacked) {
+    const wide = SPR[DESK_WIDE[Math.floor(rnd(seed, 11) * DESK_WIDE.length)]];
+    if (wide && rnd(seed, 12) > 0.15) drawSprite(ctx, wide, seat.x + 47 - wide.w, surface + 2 - wide.h);
+  }
   const narrow = SPR[DESK_NARROW[Math.floor(rnd(seed, 13) * DESK_NARROW.length)]];
   if (narrow && rnd(seed, 14) > 0.5) drawSprite(ctx, narrow, seat.x + 19, surface + 2 - narrow.h);
 }
@@ -741,6 +773,7 @@ function drawGear(ctx, seat, t) {
         const on = rnd(seed, i * 3 + Math.floor(t / 300)) > (busy ? 0.3 : 0.75);
         rect(ctx, seat.x + 34 + i * 2, surface + 3, 1, 1, on ? '#8fd6b4' : '#2b313b');
       }
+      drawPaperStack(ctx, seat, surface); // LED는 상판 아래줄이라 겹치지 않는다
       break;
     }
     case 'bench': {
@@ -766,6 +799,7 @@ function drawGear(ctx, seat, t) {
       const grow = busy ? (t / 3400) % 1 : 0.62;
       rect(ctx, sheet.x + 2, sheet.y + 1, Math.round((sheet.w - 6) * grow), 1, `hsl(${seat.box.hue} 60% 55%)`);
       rect(ctx, sheet.x + 2, sheet.y + 4, Math.round((sheet.w - 10) * grow), 1, `hsl(${seat.box.hue} 60% 45%)`);
+      drawPaperStack(ctx, seat, surface); // 제도용지는 상판 아래줄이라 겹치지 않는다
       drawSprite(ctx, SPR.pencup, seat.x + 42, surface + 2 - SPR.pencup.h);
       break;
     }
@@ -786,7 +820,7 @@ function drawGear(ctx, seat, t) {
     default: {
       drawMonitor(ctx, seat.x + 5, seat.y + 10, worker, t);
       drawKeyboard(ctx, cx - 3, surface + 1, worker, t);
-      drawDeskItems(ctx, seat, surface);
+      drawDeskItems(ctx, seat, surface, drawPaperStack(ctx, seat, surface));
     }
   }
 }
