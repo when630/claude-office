@@ -69,6 +69,9 @@ Click a desk to see what that session is really up to.
 - That session's **model · context window · effort · Fast** (per-session values, not account ones)
 - Attached **subagents** and the instruction each was given
 - **Right now · latest instruction · linked MRs**
+- The session's own **to-do list** — `2/6` with a progress bar and whatever is still open. Only
+  the item in progress is bright; ones waiting their turn are marked `waits on #3`. Sessions that
+  never wrote a list get no block at all
 - **Timeline** — instructions received (yellow) ↔ things said (blue)
 - **Open in terminal** at the bottom — launches a terminal in that session's working directory
   and reattaches to it. If Windows Terminal is present it comes up as a new tab in the open

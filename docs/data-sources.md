@@ -15,6 +15,7 @@
 | `~/.claude/jobs/<id>/state.json` | 백그라운드 잡의 detail·`needs`·토큰·연결된 MR |
 | `~/.claude/jobs/<id>/timeline.jsonl` | 상태 전이 이력 (마지막 12건) — 백그라운드 잡만 |
 | `~/.claude/projects/<cwd>/<sessionId>.jsonl` | **모든 세션**의 제목·최근 지시·진행 요약·MR·컨텍스트 사용량·타임라인 |
+| `~/.claude/tasks/<sessionId>/<n>.json` | 세션이 스스로 세운 **할 일 목록** (아래 참고) |
 | `~/.claude/office-usage.json` | 계정 사용량 — statusline이 떨어뜨려 준 payload ([사용량 tap](panel.md#사용량은-왜-tap이-필요한가) 참고) |
 | `~/.claude/office-notify/<sessionId>.json` | 지금 무엇을 기다리는지 — Notification 훅이 떨어뜨려 준 payload ([훅 tap](notify-hook.md) 참고) |
 
@@ -73,3 +74,24 @@ id로 떠서 정체를 알 수 없다(name도 intent도 없어 id가 그대로 �
 
 컨텍스트 퍼센트 계산은 Claude Code statusline이 쓰는 것과 같다. 모델별 창 크기는
 `main/transcript.mjs`의 `CONTEXT_LIMITS` — 지금은 haiku만 200K이고 나머지 현행 모델은 1M이다.
+
+## 세션이 세운 할 일 (`main/tasks.mjs`)
+
+항목 하나가 파일 하나다. 실측한 필드는 늘 같았다 —
+`{ id, subject, description, activeForm, status, blocks, blockedBy }`.
+`status` 어휘는 셋뿐이다: `pending` · `in_progress` · `completed`.
+
+| 값 | 쓰임 |
+|---|---|
+| 머릿수·끝낸 수 | 패널의 `할 일 2/6`과 진행 막대 |
+| `subject` | 아직 안 끝난 항목의 목록 (끝낸 것은 머릿수로 접는다) |
+| `activeForm` | **말풍선.** 우리가 요약한 상황보다 그 세션이 쓴 문장이 정확하다 |
+| `blockedBy` 중 안 끝난 것 | `#3 끝나야 시작` |
+
+**대부분 세션은 할 일을 안 쓴다** — 실측 32개 디렉터리 중 항목이 있는 것은 4개였고 나머지는
+`.lock`·`.highwatermark`만 있었다. 그래서 없을 때는 패널에 블록을 아예 그리지 않는다.
+
+캐시 열쇠는 **파일마다의 mtime + 크기**다. 디렉터리 mtime으로는 안 된다 — NTFS는 이미 있는
+파일을 덮어써도 디렉터리 mtime을 안 바꾸는데, 할 일의 status가 바뀌는 것은 항목이 추가되는 게
+아니라 `<n>.json`을 제자리에서 다시 쓰는 일이다. 디렉터리만 보면 `pending`에서 `completed`로
+넘어간 것을 영원히 못 본다(`test/tasks.test.mjs`가 이걸 붙잡는다).

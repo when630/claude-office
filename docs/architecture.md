@@ -25,6 +25,7 @@ main/index.mjs      앱 수명주기 · 창 · 트레이 · 알림 · 폴링 · 
 main/paths.mjs      ~/.claude 위치 (서로 import하지 않게 여기로 뺐다)
 main/collect.mjs    세션·잡·트랜스크립트·사용량 → 스냅샷 한 장
 main/transcript.mjs 대화 파일 꼬리에서 제목·상황·MR·컨텍스트·비서 캐내기
+main/tasks.mjs      세션이 세운 할 일 목록 (tasks/<sessionId>/<n>.json)
 main/usage.mjs      office-usage.json → 5시간·주간 사용률
 main/notify.mjs     무엇을 알릴지 — 대기 재알림·컨텍스트·사용량 문턱 판정.
                     Electron을 모르고 `now`를 인자로 받는다(그래서 테스트가 된다)
@@ -77,6 +78,8 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   트레이·상단바는 `index.mjs`가 그대로 그린다),
   방별 세기(`ROOM_LEVELS`·`KEEN_STEPS_MS` — 끈 방은 판정을 다 돌린 뒤 마지막에 걸러낸다).
   문턱을 건드렸으면 `npm test`로 확인한다 (시각을 인자로 받으므로 30분을 기다릴 필요가 없다)
+- `main/tasks.mjs` — 패널에 늘어놓을 최대 개수(`MAX_ITEMS`), 캐시 열쇠(`signature` — 디렉터리
+  mtime으로는 제자리 덮어쓰기를 못 본다. 주석에 이유가 있다)
 - `main/terminal.mjs` — 터미널을 띄우는 방법(`openWindows`·`openMac`), 셸에 넘길 id의 허용 문자(`ID_OK`).
   다른 터미널 앱을 쓰려면 여기에 분기를 넣는다
 - `main/history.mjs` — 무엇을 남길지(`diffEvents`), 시간을 어떻게 셀지(`summarize`·`BUCKET`),
