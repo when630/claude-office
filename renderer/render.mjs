@@ -533,6 +533,7 @@ function drawMoveIn(ctx, box, t) {
 }
 
 function drawProps(ctx, box, t) {
+  drawFloorMess(ctx, box, box.tint);
   drawMoveIn(ctx, box, t);
   for (const p of box.props) {
     drawSprite(ctx, p.spr, p.x, p.y);
@@ -786,6 +787,50 @@ const PAPER_DY = 2;
 
 function paperCount(pct) {
   return pct == null ? 0 : PAPER_STEPS.filter((step) => pct >= step).length;
+}
+
+// ── 상판이 다 차면 바닥으로 넘친다.
+//
+// 책상은 세 장이 상한이라 그 위로는 더 보여줄 것이 없었다. 컨텍스트가 90%인 자리와 60%인 자리가
+// 상판만 보면 비슷해 보이는데, 정작 급한 것은 그 위쪽 구간이다.
+//
+// **막대가 노랑으로 바뀌는 지점(60%)부터** 바닥이 어지러워지고 5%마다 한 장 늘어난다.
+// 자리 순서(k)로 위치를 정하므로 **이미 흘린 장은 그 자리에 그대로 있고 새 장만 더해진다** —
+// 프레임마다 다시 뽑으면 종이가 바닥에서 춤을 춘다.
+const FLOOR_FROM = 60;
+const FLOOR_PER = 5;
+const FLOOR_MAX = 6;
+
+export function floorSheetCount(pct) {
+  if (pct == null || pct < FLOOR_FROM) return 0;
+  return Math.min(FLOOR_MAX, 1 + Math.floor((pct - FLOOR_FROM) / FLOOR_PER));
+}
+
+// 흘린 종이는 **자기 구역 안에만** 둔다(bandBounds) — 어느 자리가 넘치고 있는지가 보여야 한다.
+// 게보다 먼저 그려 밟고 지나가게 하고, 비품보다도 먼저 그려 비품 뒤로 깔린다.
+function drawFloorMess(ctx, box, tint) {
+  const spr = SPR.sheet;
+  if (!spr) return;
+  // 심야·퇴근 조명을 같이 받는다 — 안 그러면 어두운 방에서 종이만 하얗게 뜬다.
+  // drawSprite에는 밝기 인자가 없어서 알파로 낮춘다(어두운 바닥에 섞이며 같이 어두워진다).
+  const dim = tint?.l ?? 1;
+  if (dim !== 1) {
+    ctx.save();
+    ctx.globalAlpha = dim;
+  }
+  for (const seat of box.seats ?? []) {
+    const n = floorSheetCount(seat.worker.context?.pct);
+    if (!n) continue;
+    const b = bandBounds(seat);
+    const seed = hashStr(seat.worker.key);
+    for (let k = 0; k < n; k++) {
+      const x = Math.round(b.x0 + rnd(seed, 400 + k * 2) * Math.max(1, b.x1 - b.x0 - spr.w));
+      const y = Math.round(b.y0 + rnd(seed, 401 + k * 2) * Math.max(1, b.y1 - b.y0 - spr.h));
+      // 심야·퇴근 조명을 같이 받는다 — 안 그러면 어두운 방에서 종이만 하얗게 뜬다
+      drawSprite(ctx, spr, x, y);
+    }
+  }
+  if (dim !== 1) ctx.restore();
 }
 
 // 자리 모양과 무관하게 **상판 오른쪽 끝**에 쌓는다. 모니터·키보드·플라스크는 다 왼쪽~가운데에

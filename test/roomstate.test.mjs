@@ -53,3 +53,39 @@ test('퇴근한 방은 심야 조명 위에 한 번 더 어두워진다', () => 
   // 채도는 심야 값을 그대로 쓴다 — 방 색 구분을 지키는 몫이다
   assert.equal(roomTint(room('done'), night).s, night.s);
 });
+
+// ── 바닥에 흘린 서류 (#89)
+//
+// 책상 위 더미는 세 장이 상한이라 그 위 구간이 안 보였다. 바닥으로 넘치게 하면서
+// **이미 흘린 장은 그 자리에 그대로 있고 새 장만 더해지는 것**이 요점이다 — 그건 장 번호(k)로
+// 위치를 정하는 구조가 보장하고, 여기서는 장수 셈법을 붙잡는다.
+const { floorSheetCount } = await import('../renderer/render.mjs');
+
+test('60% 아래에서는 바닥이 깨끗하다', () => {
+  // 막대가 노랑으로 바뀌는 지점부터 흘린다 — 책상 더미(40%부터)보다 늦다
+  for (const pct of [null, undefined, 0, 40, 55, 59]) assert.equal(floorSheetCount(pct), 0, String(pct));
+});
+
+test('60%에서 한 장, 5%마다 한 장 늘어난다', () => {
+  assert.equal(floorSheetCount(60), 1);
+  assert.equal(floorSheetCount(64), 1);
+  assert.equal(floorSheetCount(65), 2);
+  assert.equal(floorSheetCount(70), 3);
+  assert.equal(floorSheetCount(85), 6);
+});
+
+test('한없이 늘지는 않는다', () => {
+  // 방이 종이로 덮이면 게가 안 보인다 — 여섯 장에서 멈춘다
+  assert.equal(floorSheetCount(90), 6);
+  assert.equal(floorSheetCount(100), 6);
+});
+
+test('장수는 컨텍스트에 대해 단조 증가한다', () => {
+  // 줄어드는 구간이 있으면 "찰수록 어지러워진다"가 깨진다
+  let prev = 0;
+  for (let pct = 0; pct <= 100; pct++) {
+    const n = floorSheetCount(pct);
+    assert.ok(n >= prev, `${pct}%에서 ${prev} → ${n}로 줄었다`);
+    prev = n;
+  }
+});

@@ -74,6 +74,7 @@ export const SPR = {
   snack: sprite(PX.SNACK),
   sticky: sprite(PX.STICKY),
   papers: sprite(PX.PAPERS),
+  sheet: sprite(PX.SHEET),
   phone: sprite(PX.PHONE),
   can: sprite(PX.CAN),
   headset: sprite(PX.HEADSET),
