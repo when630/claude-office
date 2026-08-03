@@ -64,6 +64,9 @@
            탭 바는 헤더 아래 고정이고, 아래 몸통만 굴러간다. -->
       <nav id="cfg-tabs" role="tablist"></nav>
       <div id="cfg-body"></div>
+      <!-- ? 설명이 떠오르는 자리. 창의 자식이고 position: fixed다 — dialog는 top layer라 그 안의
+           고정 요소도 위에 그려지고, 스크롤되는 몸통 밖이라 잘리지 않는다. -->
+      <div class="caption" hidden></div>
     </dialog>
 
     <!-- 출근부. 열 때마다 main에서 집계를 받아 온다(스냅샷과 달리 밀려 오지 않는다). -->
@@ -77,6 +80,7 @@
            섞으면 무엇을 고르는 것인지 흐려진다. -->
       <nav id="att-tabs" role="tablist"></nav>
       <div id="att-body"></div>
+      <div class="caption" hidden></div>
     </dialog>
 
     <script type="module" src="./app.mjs"></script>

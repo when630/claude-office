@@ -189,4 +189,4 @@ else if (cache.lastComputedDate < 어제) // 빠진 날만 스캔해 병합하�
   남의 캐시를 깨뜨린다
 - `lastComputedDate`와 빠진 날수를 화면에 그대로 적는다 — 사용량의 stale 표시와 같은 원칙이다
 - **방별로는 못 쓴다.** `dailyActivity`에 프로젝트별 분해가 없다(전체 합계뿐). 그래서 출근부의
-  방별 표와 나란히 놓을 수 없고 [접어 둔 별도 자리](attendance.md#claude-code-자체-기록)에 있다
+  방별 표와 나란히 놓을 수 없고 [별도 탭](attendance.md#claude-code-자체-기록)에 있다
