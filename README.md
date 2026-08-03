@@ -135,6 +135,10 @@ Automatic installation is blocked for unsigned macOS builds, so there a new vers
 
 - Closing the window does not quit — it drops to the tray (menu bar on macOS). To really quit:
   **tray icon > Quit**
+- When one repo spreads over several working directories, Settings lets you **⊞ group everything
+  under a parent into one room** and give a cryptic name like `src` an **alias**. Attendance is
+  not grouped — it keeps recording the working-directory name, so changing the rule never breaks
+  continuity with past records
 - Once you have a lot of rooms, **filter them by name** in the top-right box. Pin the ones you
   watch with `☆` in Settings and collapse the rest with `▥` — all three change the view only,
   so a collapsed room still nudges you. A `3 hidden` badge appears while anything is out of

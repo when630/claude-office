@@ -1396,3 +1396,22 @@ input[type='checkbox'] {
 .spark.hours i {
   background: #6b7688;
 }
+
+/* 방 별칭 칸. 종류·세기 셀렉트와 한 줄에 서므로 좁게 둔다. */
+.cfg-alias {
+  width: 92px;
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #171b23;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+.cfg-alias:focus {
+  outline: none;
+  border-color: #39414f;
+}
+.cfg-alias::placeholder {
+  color: #4d5768;
+}

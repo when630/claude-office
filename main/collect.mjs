@@ -13,6 +13,7 @@ import { readNotes, noteNeeds } from './notify-tap.mjs';
 import { readTasks } from './tasks.mjs';
 import { readPromptLog, lastPromptFor } from './prompts.mjs';
 import { readTouchedFiles } from './files.mjs';
+import { groupOf, labelOf } from './rooms.mjs';
 
 export { CLAUDE_DIR };
 
@@ -260,7 +261,8 @@ function isSpare(w) {
   );
 }
 
-export async function collect() {
+// `view`는 방 묶기·별칭이다(main/rooms.mjs). 안 넘기면 예전처럼 작업 디렉터리마다 한 방이다.
+export async function collect({ groups = [], alias = {} } = {}) {
   const [sessions, jobs, usage] = await Promise.all([collectSessions(), collectJobs(), readUsage()]);
   const now = Date.now();
   const seenJobs = new Set();
@@ -314,7 +316,11 @@ export async function collect() {
       name: s.name || roomKeyOf(s.cwd) || `pid ${s.pid}`,
       title: tr?.title || '',
       cwd: s.cwd ?? '',
-      room: roomKeyOf(s.cwd),
+      // 화면·설정이 쓰는 방 이름. 묶기가 켜져 있으면 묶음 이름이 온다.
+      room: groupOf(s.cwd, groups) ?? roomKeyOf(s.cwd),
+      // **근태가 쓰는 방 이름 — 언제나 작업 디렉터리 그대로다.** 묶기 규칙이 바뀌어도 과거
+      // 기록과 이어지도록 갈라 뒀다(main/rooms.mjs 머리말).
+      histRoom: roomKeyOf(s.cwd),
       kind: s.kind === 'bg' ? 'bg' : 'interactive',
       status: s.status ?? 'idle',
       mood,
@@ -385,7 +391,9 @@ export async function collect() {
   // 방 = 작업 디렉터리
   const byRoom = new Map();
   for (const w of staff) {
-    if (!byRoom.has(w.room)) byRoom.set(w.room, { key: w.room, label: w.room, cwd: w.cwd, workers: [] });
+    if (!byRoom.has(w.room)) {
+      byRoom.set(w.room, { key: w.room, label: labelOf(w.room, alias), cwd: w.cwd, workers: [] });
+    }
     byRoom.get(w.room).workers.push(w);
   }
   const rooms = [...byRoom.values()].sort(

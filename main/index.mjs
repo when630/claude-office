@@ -57,6 +57,7 @@ import {
 } from './history.mjs';
 import { readPromptLog, summarizePrompts } from './prompts.mjs';
 import { readCodeStats, staleDays } from './stats.mjs';
+import { sanitizeGroups, sanitizeAlias } from './rooms.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -107,7 +108,7 @@ const defaults = {
   bounds: { normal: null, mini: null },
   history: true,
   trayHintShown: false,
-  view: { names: 'show', roomThemes: {}, pinned: [], collapsed: [] },
+  view: { names: 'show', roomThemes: {}, pinned: [], collapsed: [], roomGroups: [], roomAlias: {} },
 };
 const NAME_MODES = ['show', 'mask', 'hide'];
 const LANG_PREFS = ['auto', ...LANGS];
@@ -297,6 +298,9 @@ function sanitizeView(v) {
     roomThemes,
     pinned: keyList(v?.pinned),
     collapsed: keyList(v?.collapsed),
+    // 방 묶기·별칭 (main/rooms.mjs). 묶기는 부모 경로 목록이고 별칭은 방 이름 → 부를 이름이다.
+    roomGroups: sanitizeGroups(v?.roomGroups),
+    roomAlias: sanitizeAlias(v?.roomAlias),
   };
 }
 
@@ -949,7 +953,7 @@ function waitMenuSig() {
 async function tick() {
   let snapshot;
   try {
-    snapshot = await collect();
+    snapshot = await collect({ groups: settings.view.roomGroups, alias: settings.view.roomAlias });
   } catch (err) {
     console.error('[collect]', err.message);
     return;
