@@ -247,6 +247,20 @@ export default {
     mineEmpty: '이 구간에 넣은 지시가 없습니다.',
     mineHint:
       '이 숫자만 Claude Code가 남기는 프롬프트 이력에서 셉니다 — 위의 다른 숫자와 달리 <b>앱이 꺼져 있던 동안도 셈에 들어갑니다.</b> 지시 내용은 세지도, 남기지도 않습니다.',
+    code: 'Claude Code 자체 기록',
+    codeFresh: '{to}까지의 기록입니다. Claude Code가 스스로 계산해 둔 값이라 <b>앱이 꺼져 있던 날도 들어 있습니다.</b>',
+    codeStale:
+      '{to}까지의 기록이고 <b>그 뒤 {n}일이 빠져 있습니다.</b> 이 집계는 Claude Code의 통계 화면을 열 때만 다시 계산되기 때문입니다 — 데이터가 없는 것이 아니라 아직 세지 않은 것입니다.',
+    codeSessions: '전체 세션',
+    codeMessages: '전체 메시지',
+    codeLongest: '가장 긴 세션',
+    codePeak: '가장 바쁜 시간',
+    codePeakValue: '{h}시',
+    codeDays: '최근 {n}일 메시지',
+    codeBusiest: '가장 바빴던 날은 {date} ({n}개)',
+    codeHours: '시간대 분포 (0~23시)',
+    codeHourSuffix: '시',
+    codeModels: '모델별 토큰',
     unknownRoom: '(알 수 없음)',
   },
 

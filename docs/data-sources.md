@@ -18,6 +18,7 @@
 | `~/.claude/tasks/<sessionId>/<n>.json` | 세션이 스스로 세운 **할 일 목록** (아래 참고) |
 | `~/.claude/file-history/<sessionId>/` | **만진 파일 수·편집 횟수** — 이름만 읽고 내용은 안 본다 (아래 참고) |
 | `~/.claude/history.jsonl` | 내가 친 **프롬프트 이력** — 출근부의 "내가 시킨 것", 그리고 꼬리 밖으로 밀려난 마지막 지시 (아래 참고) |
+| `~/.claude/stats-cache.json` | Claude Code **자체 집계** — 출근부의 참고 자료. 읽기만 한다 (아래 참고) |
 | `~/.claude/office-usage.json` | 계정 사용량 — statusline이 떨어뜨려 준 payload ([사용량 tap](panel.md#사용량은-왜-tap이-필요한가) 참고) |
 | `~/.claude/office-notify/<sessionId>.json` | 지금 무엇을 기다리는지 — Notification 훅이 떨어뜨려 준 payload ([훅 tap](notify-hook.md) 참고) |
 
@@ -157,3 +158,35 @@ file-history/<sessionId>/06baf9de0651d69c@v2
 파일을 여는 것은 main이 한다(`openPlan`). **경로는 `~/.claude/plans` 아래의 `.md`로 가둔다** —
 우리가 보낸 값이 돌아오는 것이지만 IPC 표면은 아무 문자열이나 받을 수 있어서, 안 가두면 렌더러가
 임의 파일을 열게 하는 통로가 된다(`openExternal`이 https만 받는 것과 같은 이유).
+
+## Claude Code 자체 집계 (`main/stats.mjs`)
+
+근태는 **앱이 돌던 동안만** 기록한다. 껐다 켠 사이는 볼 수 없었으니 세면 거짓이 된다.
+그 구멍을 메울 유일한 후보가 Claude Code 자신의 집계다 — 일별 메시지·세션·도구 호출,
+시간대 분포, 모델별 토큰, 전체 세션·메시지, 가장 긴 세션.
+
+### 언제 갱신되는가 (번들을 뜯어 확인했다)
+
+**통계 화면을 열 때만** 다시 계산된다. 주기적으로 도는 것이 아니다.
+
+```js
+const cache = readCache();
+if (!cache.lastComputedDate)            // 전체 히스토리를 스캔해 캐시를 만든다
+else if (cache.lastComputedDate < 어제) // 빠진 날만 스캔해 병합하고 다시 쓴다
+결과 = 캐시 + (오늘분은 매번 트랜스크립트를 다시 스캔)
+```
+
+따라오는 것이 둘이다.
+
+- `lastComputedDate`가 오래됐다는 것은 **데이터가 없다는 뜻이 아니라 그동안 통계 화면을 안
+  봤다는 뜻**이다. 실측한 파일은 한 달째 그대로였다
+- 캐시는 **어제까지만** 담는다. 오늘분은 애초에 여기 없다 — 그래서 `staleDays`는 오늘을
+  빠진 날로 세지 않는다(그러면 늘 "1일 빠졌다"가 되어 표시가 뜻을 잃는다)
+
+### 지키는 것
+
+- **읽기만 한다. 절대 쓰지 않는다.** Claude Code가 잠금까지 걸고 쓰는 파일이라 끼어들면
+  남의 캐시를 깨뜨린다
+- `lastComputedDate`와 빠진 날수를 화면에 그대로 적는다 — 사용량의 stale 표시와 같은 원칙이다
+- **방별로는 못 쓴다.** `dailyActivity`에 프로젝트별 분해가 없다(전체 합계뿐). 그래서 출근부의
+  방별 표와 나란히 놓을 수 없고 [접어 둔 별도 자리](attendance.md#claude-code-자체-기록)에 있다

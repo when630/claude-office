@@ -54,6 +54,7 @@ import {
   RETAIN_MS,
 } from './history.mjs';
 import { readPromptLog, summarizePrompts } from './prompts.mjs';
+import { readCodeStats, staleDays } from './stats.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -999,6 +1000,8 @@ if (!app.requestSingleInstanceLock()) {
       // 내가 시킨 횟수는 우리 기록이 아니라 Claude Code의 프롬프트 이력에서 그때그때 센다
       // (main/prompts.mjs). 그래서 **근태 기록을 꺼 뒀거나 앱이 꺼져 있던 날도 셈이 맞는다.**
       const prompts = await readPromptLog().catch(() => []);
+      // Claude Code 자신의 집계(main/stats.mjs). 읽기만 한다 — 그쪽이 잠금까지 걸고 쓰는 파일이다.
+      const code = await readCodeStats().catch(() => null);
       return {
         on: settings.history,
         retainDays: Math.round(RETAIN_MS / 86_400_000),
@@ -1008,6 +1011,9 @@ if (!app.requestSingleInstanceLock()) {
           today: summarizePrompts(prompts, { from: dayStart(now), to: now }),
           week: summarizePrompts(prompts, { from: dayStart(now, 6), to: now }),
         },
+        // 출처가 또 다른 값이라 따로 실어 보낸다. staleDays는 시각을 인자로 받는 순수 함수라
+        // 여기서 한 번 계산해 넘긴다 — 렌더러가 날짜 셈법을 또 갖지 않게.
+        code: code ? { ...code, staleDays: staleDays(code, now) } : null,
       };
     });
 
