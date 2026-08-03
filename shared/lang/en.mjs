@@ -244,6 +244,9 @@ export default {
       'The attendance log is off — nothing is being recorded. Turn it on from <b>tray icon &gt; Attendance log</b>.',
     offlineHint:
       'Time while the app was closed is not counted. It could not be observed, so counting it would be a lie.',
+    trend: 'Waiting, last 7 days',
+    trendUnseen: 'the app was closed',
+    trendHint: 'Yellow is time spent waiting on me. The tallest bar is {max}. <b>A dashed baseline means the app was closed that day</b> — not the same as a zero.',
     mine: 'What I asked for',
     minePrompts: 'Instructions',
     minePromptsValue: '{n}',

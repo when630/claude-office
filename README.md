@@ -96,6 +96,8 @@ but **without a record there is no way to know how many minutes you left them wa
 
 - Today · last 7 days — session count · time working · **time spent waiting on me** · peak context
 - A per-room breakdown and the **longest waits** (only those over a minute)
+- A **7-day trend** of that waiting time, so you can see whether it is getting better. Days the
+  app was closed are left blank with a dashed baseline rather than drawn as a zero
 - What gets recorded stops at state transitions and room names. Session names, paths and
   instructions are not kept, and entries are retained for 14 days. You can turn it off or clear
   it from the tray menu

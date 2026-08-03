@@ -50,6 +50,7 @@ import {
   pruneFile,
   clearFile,
   summarize,
+  dailyTrend,
   dayStart,
   RETAIN_MS,
 } from './history.mjs';
@@ -1007,6 +1008,8 @@ if (!app.requestSingleInstanceLock()) {
         retainDays: Math.round(RETAIN_MS / 86_400_000),
         today: summarize(events, { from: dayStart(now), to: now }),
         week: summarize(events, { from: dayStart(now, 6), to: now }),
+        // 7일 추이. 기록 형식을 바꾸지 않고 같은 집계를 날짜별로 한 번씩 돌린 것이다.
+        trend: dailyTrend(events, { days: 7, now }),
         mine: {
           today: summarizePrompts(prompts, { from: dayStart(now), to: now }),
           week: summarizePrompts(prompts, { from: dayStart(now, 6), to: now }),

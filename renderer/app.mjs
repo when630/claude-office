@@ -1173,6 +1173,30 @@ function attMine(mine) {
   </section>`;
 }
 
+// 7일 추이. 출근부의 숫자는 "오늘 21분"처럼 한 점이라, 나아지고 있는지는 일곱 개를 눈으로
+// 비교해야 알 수 있었다.
+//
+// **앱을 안 켠 날과 0인 날을 다르게 그린다.** 안 켠 날을 0으로 그리면 "그날은 아무도 안
+// 기다렸다"는 거짓말이 된다 — 빈 날은 막대 대신 점선 바닥만 남긴다.
+function attTrend(trend) {
+  if (!trend?.length) return '';
+  const max = Math.max(...trend.map((d) => d.waitMs), 1);
+  return `<section class="block">
+    <h3>${t('att.trend')}</h3>
+    <ul class="spark trend">${trend
+      .map((d) =>
+        d.observed
+          ? `<li title="${fmtDay(d.at)} · ${fmtSpan(d.waitMs)}"><i data-pct="${Math.round(
+              (d.waitMs / max) * 100,
+            )}"></i></li>`
+          : `<li class="unseen" title="${fmtDay(d.at)} · ${t('att.trendUnseen')}"><i data-pct="0"></i></li>`,
+      )
+      .join('')}</ul>
+    <ul class="spark-axis">${trend.map((d) => `<li>${fmtDay(d.at)}</li>`).join('')}</ul>
+    <p class="hint">${t('att.trendHint', { max: fmtSpan(max) })}</p>
+  </section>`;
+}
+
 // Claude Code 자신의 집계(main/stats.mjs). 출근부의 다른 숫자와 **출처가 다르다** —
 // 우리가 센 것이 아니라 Claude Code가 스스로 계산해 둔 것이고, 그래서 앱이 꺼져 있던 날도 들어 있다.
 //
@@ -1288,6 +1312,7 @@ function drawAtt() {
     </section>
 
     ${attWaits(s)}
+    ${attTrend(attData.trend)}
     ${attMine(attRange === 'week' ? attData.mine?.week : attData.mine?.today)}
     ${attCodeStats(attData.code)}
 

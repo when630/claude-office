@@ -1356,6 +1356,38 @@ input[type='checkbox'] {
 .spark li:hover i {
   opacity: 1;
 }
+/* 대기 추이는 일곱 칸이라 넉넉하고, 노랑(나를 기다린 시간)으로 칠한다 */
+.spark.trend {
+  height: 52px;
+  gap: 4px;
+}
+.spark.trend i {
+  background: var(--accent);
+  opacity: 0.85;
+}
+/* 앱을 안 켠 날 — 막대 대신 점선 바닥만. 0으로 그리면 "아무도 안 기다렸다"는 거짓말이 된다 */
+.spark.trend li.unseen {
+  border-bottom: 1px dashed #39414f;
+}
+.spark.trend li.unseen i {
+  background: none;
+}
+.spark-axis {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  gap: 4px;
+  font-size: 10px;
+  color: #4d5768;
+  font-variant-numeric: tabular-nums;
+}
+.spark-axis li {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
 /* 시간대는 24칸이라 더 촘촘하다 */
 .spark.hours {
   height: 34px;

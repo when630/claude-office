@@ -157,6 +157,34 @@ export function summarize(events, { from, to }) {
   };
 }
 
+// 하루 단위 추이. 숫자 일곱 개를 눈으로 비교하는 대신 선으로 보려는 것이다.
+//
+// **기록 형식을 바꾸지 않는다.** 이미 있는 `summarize`를 날짜별로 한 번씩 돌리면 나온다 —
+// 남기는 줄을 늘리면 지난 기록에는 그 값이 없어 과거가 비어 보인다.
+//
+// `observed`는 **그 날 앱이 켜져 있었는가**다. 안 켠 날을 0으로 그리면 "그날은 아무도 안
+// 기다렸다"는 거짓말이 된다 — 화면에서 빈 날과 0인 날이 달라야 한다.
+//
+// 판정은 "그 날 안에 이벤트가 하나라도 있는가"다. 근태 기록이 켜져 있으면 앱을 켤 때마다
+// `boot` 줄이 남으므로 켠 날에는 최소 한 줄이 있다. 자정을 넘겨 아무 일도 없었던 날은
+// 이벤트가 없어 안 켠 날로 보이는데, 그건 실제로 "볼 수 있었지만 아무 일도 없었던" 날이라
+// 0으로 그리는 것보다 비워 두는 편이 안전하다.
+export function dailyTrend(events, { days = 7, now = Date.now() } = {}) {
+  const out = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const from = dayStart(now, i);
+    const to = Math.min(dayStart(now, i - 1), now); // 마지막 칸은 지금까지만
+    const day = summarize(events, { from, to });
+    out.push({
+      at: from,
+      waitMs: day.waitMs,
+      busyMs: day.busyMs,
+      observed: events.some((e) => e.at >= from && e.at < to),
+    });
+  }
+  return out;
+}
+
 // ── 파일 (userData/history.jsonl)
 
 export function appendEvents(file, events) {
