@@ -39,6 +39,7 @@ import {
   DONE_MIN_BUSY_MS,
   NOTIFY_KINDS,
   ROOM_LEVELS,
+  soundFor,
 } from './notify.mjs';
 import { openTerminal, reasonText as terminalReason } from './terminal.mjs';
 import { t, fmtDur, fmtWhen, setLang, resolveLang, LANGS, LANG_NAMES } from '../shared/i18n.mjs';
@@ -89,6 +90,10 @@ let quietNow = false; // 지금 무음인가 — 시간대에 들고 나면 트�
 const defaults = {
   lang: 'auto',
   notify: sanitizeNotify(), // 종류별 on/off — 어휘와 하위 호환은 main/notify.mjs가 정한다
+  // 알림 소리. **기본은 꺼짐** — 소리는 토스트보다 방해가 크므로 사람이 켜서 쓴다.
+  // 이 값이 없던 시절에는 Windows 토스트가 OS 기본 소리를 그대로 냈다(Electron의 silent
+  // 기본값이 "소리 냄"이다) — 이제 그 소리도 이 설정을 따른다.
+  sound: false,
   quiet: sanitizeQuiet(), // 방해금지 — 조용한 시간대와 임시 무음(until)
   roomNotify: {}, // 방 이름 → 알림 세기('off' | 'keen'). 보통인 방은 적지 않는다
   // 전역 단축키. 빈 문자열이면 그 자리는 안 잡는다 — 끄는 방법이 곧 비우는 것이다.
@@ -129,6 +134,7 @@ function loadSettings() {
     ...saved,
     lang: LANG_PREFS.includes(saved.lang) ? saved.lang : defaults.lang,
     notify: sanitizeNotify(saved.notify),
+    sound: saved.sound === true,
     quiet: sanitizeQuiet(saved.quiet),
     roomNotify: sanitizeRoomNotify(saved.roomNotify),
     hotkeys: sanitizeHotkeys(saved.hotkeys),
@@ -514,9 +520,16 @@ async function openPlan(file) {
 }
 
 // ── 알림
-function notify(title, body, onClick) {
+function notify(title, body, onClick, sound = false) {
   if (!Notification.isSupported()) return;
-  const n = new Notification({ title, body, icon: icon('icon.png'), timeoutType: 'default' });
+  // `silent`는 **끄는** 쪽 스위치다(OS 알림음을 억제한다). 소리를 내고 싶으면 false여야 한다.
+  const n = new Notification({
+    title,
+    body,
+    icon: icon('icon.png'),
+    timeoutType: 'default',
+    silent: !sound,
+  });
   if (onClick) n.on('click', onClick);
   n.show();
 }
@@ -532,7 +545,12 @@ function maybeNotify(snapshot) {
   for (const item of decideNotifications(notifyState, snapshot, Date.now(), settings.roomNotify)) {
     if (!notifyOn(item.kind) || quiet) continue;
     // 세션에 딸린 알림은 그 자리를 펼쳐주고, 계정 사용량처럼 주인이 없는 건 창만 띄운다
-    notify(item.title, item.body, item.key ? () => selectInWindow(item.key) : showWindow);
+    notify(
+      item.title,
+      item.body,
+      item.key ? () => selectInWindow(item.key) : showWindow,
+      soundFor(item.kind, settings.sound),
+    );
   }
 }
 
@@ -795,6 +813,16 @@ function buildTrayMenu() {
     {
       label: t('tray.notify'),
       submenu: [
+        {
+          label: t('tray.notifySound'),
+          type: 'checkbox',
+          checked: settings.sound,
+          click: (item) => {
+            settings.sound = item.checked;
+            saveSettings();
+          },
+        },
+        { type: 'separator' },
         {
           label: t('tray.notifyWaiting'),
           type: 'checkbox',

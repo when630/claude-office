@@ -87,7 +87,9 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   알림 종류(`NOTIFY_KINDS`·`NOTIFY_DEFAULTS` — 트레이 메뉴와 짝이다),
   방해금지(`QUIET_DEFAULTS`·`inQuietHours` — 자정을 넘는 구간을 다룬다. 참는 것은 토스트뿐이고
   트레이·상단바는 `index.mjs`가 그대로 그린다),
-  방별 세기(`ROOM_LEVELS`·`KEEN_STEPS_MS` — 끈 방은 판정을 다 돌린 뒤 마지막에 걸러낸다).
+  방별 세기(`ROOM_LEVELS`·`KEEN_STEPS_MS` — 끈 방은 판정을 다 돌린 뒤 마지막에 걸러낸다),
+  소리(`soundFor`·`SOUND_SILENT_KINDS` — 재알림에는 안 낸다. Electron의 `silent`는 끄는 쪽
+  스위치라 부르는 쪽에서 뒤집는다).
   문턱을 건드렸으면 `npm test`로 확인한다 (시각을 인자로 받으므로 30분을 기다릴 필요가 없다)
 - `main/tasks.mjs` — 패널에 늘어놓을 최대 개수(`MAX_ITEMS`), 캐시 열쇠(`signature` — 디렉터리
   mtime으로는 제자리 덮어쓰기를 못 본다. 주석에 이유가 있다)
