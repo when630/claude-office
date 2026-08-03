@@ -173,6 +173,7 @@ export default {
     opened: 'Opened',
     copy: 'Copy',
     copied: 'Copied',
+    copyReply: 'Copy the reply',
     copiedCmd: 'Copied the command to the clipboard.',
   },
 
