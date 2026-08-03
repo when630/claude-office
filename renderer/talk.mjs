@@ -59,6 +59,33 @@ function timeLines(now = new Date()) {
   return slot ? t(`talk.time.${slot}`) : [];
 }
 
+// ── 다 같이 모이는 주기. 점심(12~14시)엔 평소보다 자주 모인다.
+//
+// **"지금이 점심인가"로 판단하면 안 된다.** 12시 경계에서 규칙이 바뀌면 이미 걷고 있던 구간의
+// 출발점이 함께 바뀌어 게가 방 폭만큼 튄다 — 이 앱이 앵커를 도입해 가며 없앤 그 종류의
+// 점프다. 그래서 **구간 번호에서 시각을 유도한다.** 한 번 정해진 구간의 시각은 다시 바뀌지 않는다.
+//
+// `Date.now() - tms`는 tms가 흐르는 만큼 같이 흘러 값이 고정된다(= 애니메이션 tms=0의 벽시계).
+const segSlots = new Map(); // 구간 번호 → 시간대 이름
+
+export function slotOfSeg(i, tms, segMs, now = Date.now()) {
+  const hit = segSlots.get(i);
+  if (hit) return hit;
+  const slot = slotNow(new Date(now - tms + i * segMs));
+  if (segSlots.size > 64) segSlots.clear(); // 앞뒤 몇 구간만 쓰인다
+  segSlots.set(i, slot);
+  return slot;
+}
+
+export function hangEveryAt(i, tms, segMs, normal, lunch, now = Date.now()) {
+  return slotOfSeg(i, tms, segMs, now) === 'lunch' ? lunch : normal;
+}
+
+// 테스트에서 구간 캐시를 비운다 — 같은 구간 번호를 다른 시각으로 다시 물어봐야 할 때만 쓴다.
+export function _resetSegSlots() {
+  segSlots.clear();
+}
+
 // ── 머리 옆에 띄울 기호. **키만 돌려준다** — 그림은 렌더러가 SPR에서 찾아 붙인다.
 //
 // 시간대(slot)와 시각(tms)을 인자로 받으므로 새벽까지 기다리지 않고 테스트할 수 있다.

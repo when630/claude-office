@@ -23,12 +23,15 @@ room, mutters to itself and occasionally chats with a neighbour.
 | **waiting on you** | Gets up, raises both claws and holds a ❗ — see below |
 | done | Walks out to the floor holding a ✓ and goes for a stroll |
 | failed · stopped | Slumped in the chair (✗ / zZ) |
-| idle | Mills about the room; now and then everyone gathers on the rug |
+| idle | Mills about the room; now and then everyone gathers on the rug (more often at lunch) |
 
 A white speech bubble (blue stripe on the left) is text actually read from the session; a dark
 one is a flavour line we wrote. If a subagent is running, an **aide** stands beside the desk with
 a clipboard and reports progress. The bar under the name tag is that session's **context usage**
 (60% yellow · 85% red).
+
+**After 22:00 the office dims.** Room colours still tell the rooms apart, and whoever is still
+around in the small hours hums to itself with a ♪.
 
 App text and character lines come in **English and Korean** — it follows your OS language by
 default, and you can switch it in **Settings** in the top bar or under tray menu > Language.
