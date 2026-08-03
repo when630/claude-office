@@ -72,7 +72,8 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   (회의실은 테이블 때문에 자리 줄 높이가 달라 그대로 두면 줄이 어긋난다), 자리 배치(`DY_DESK` 주석에 y좌표 정리 · 그리는 곳은 `drawSurface`·`drawGear`·`clawdSeated`),
   돌아다니는 범위·속도(`bandBounds`·`SEG_MS`), 모이는 주기(`HANG_EVERY`·`HANG_EVERY_LUNCH`),
   잡담 거리(`CHAT_NEAR_X`), 말풍선 색(`BUBBLE_STYLE`), 방 색상 `HUES`,
-  심야 조명(`nightTint`·`NIGHT_L`·`NIGHT_S` — 명도를 내린 만큼 채도를 올려 방 색 구분을 남긴다)
+  심야 조명(`nightTint`·`NIGHT_L`·`NIGHT_S` — 명도를 내린 만큼 채도를 올려 방 색 구분을 남긴다),
+  컨텍스트 서류(`PAPER_STEPS`·`drawPaperStack` — 문턱은 이름표 밑 막대(`level`)와 같은 값이어야 한다)
 - `main/collect.mjs` — `moodOf`(상태 판정), `RECENT_DONE_MS`(퇴근 목록 유지 기간),
   `isSpare`(빈 예비 슬롯 판정), 헤매는 세션 문턱(`STUCK_ERRORS`·`STUCK_QUIET_MS` — 무진전 쪽은
   긴 빌드가 정상적으로 조용하다는 이유로 넉넉히 잡혀 있다),
