@@ -600,9 +600,25 @@ export const STICKY = ['yyyy.', 'yyyy.', '.eeee', '.eeee'];
 
 export const PAPERS = ['..wwwww', '.wwwwww', 'wwwwwww', 'zzzzzzz'];
 
-// 바닥에 흘린 낱장. 책상 위 PAPERS는 쌓인 더미라 네 줄인데, 이건 **한 장이 펼쳐진** 것이라
-// 두 줄로 눕힌다 — 아랫줄을 회색으로 두면 바닥에 닿은 그림자로 읽힌다.
-export const SHEET = ['.wwww.', 'zzzzzz'];
+// ── 바닥에 널브러진 것.
+//
+// 책상 위 PAPERS는 쌓인 더미라 네 줄인데, 이건 **한 장이 펼쳐진** 것이다.
+// **픽셀에서 회전은 변형을 따로 그려 낸다** — 6px짜리를 돌릴 방법이 없으므로 각도가 다른
+// 넉 장을 손으로 그린다. 아랫줄을 회색(z)으로 두면 바닥에 닿은 그림자로 읽힌다.
+export const SHEET_FLAT = ['.wwwww.', 'wwwwwww', '.zzzzz.'];
+export const SHEET_TILT_R = ['..wwww', '.wwwww', 'wwwww.', 'zzzz..'];
+export const SHEET_TILT_L = ['wwww..', 'wwwww.', '.wwwww', '..zzzz'];
+export const SHEET_NARROW = ['.www.', 'wwwww', 'wwwww', '.zzz.'];
+
+// 오래 앉아 있던 자리에 섞이는 쓰레기.
+//
+// 이 크기에서는 **모양보다 색이 먼저 읽힌다.** 처음에 넘어진 컵을 머그색으로 그렸더니 낱장과
+// 구분이 안 됐다 — 캔은 빨강이라 흰 종이들 사이에서 한눈에 갈린다.
+//
+// 구겨진 종이는 색이 낱장과 같으므로 **실루엣을 일부러 어긋나게** 둔다. 좌우가 대칭이면
+// 눕힌 낱장으로 읽힌다.
+export const PAPER_BALL = ['.ww..', 'wwzw.', '.wzzw', '..zz.'];
+export const CAN_DOWN = ['.iiii.', 'siyyis', '.zzzz.'];
 
 export const PHONE = ['.ddddd.', 'ddddddd', 'dSSSSSd', 'ddddddd', '.d...d.'];
 
