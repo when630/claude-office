@@ -72,7 +72,9 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   크기를 재고 줄을 나눈 뒤, **줄마다 가장 높은 방에 맞춰** 나머지 방의 바닥을 늘린다
   (회의실은 테이블 때문에 자리 줄 높이가 달라 그대로 두면 줄이 어긋난다), 자리 배치(`DY_DESK` 주석에 y좌표 정리 · 그리는 곳은 `drawSurface`·`drawGear`·`clawdSeated`),
   돌아다니는 범위·속도(`bandBounds`·`SEG_MS`), 모이는 주기(`HANG_EVERY`·`HANG_EVERY_LUNCH`),
-  잡담 거리(`CHAT_NEAR_X`), 말풍선 색(`BUBBLE_STYLE`), 방 색상 `HUES`,
+  잡담 거리(`CHAT_NEAR_X`), 비품 들르기(`VISIT_EVERY`·`VISIT_KEYS`·`DRINK_KEYS`·`VISIT_GAP` —
+  목표만 갈아 끼우고 보간은 안 건드린다. `test/walk.test.mjs`가 점프를 지킨다),
+  말풍선 색(`BUBBLE_STYLE`), 방 색상 `HUES`,
   심야 조명(`nightTint`·`NIGHT_L`·`NIGHT_S` — 명도를 내린 만큼 채도를 올려 방 색 구분을 남긴다),
   컨텍스트 서류(`PAPER_STEPS`·`drawPaperStack` — 문턱은 이름표 밑 막대(`level`)와 같은 값이어야 한다)
 - `main/rooms.mjs` — 묶음 판정(`groupOf` — 가장 깊이 맞는 부모가 이기고 경계를 구분자로 끊는다),

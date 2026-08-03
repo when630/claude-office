@@ -14,7 +14,9 @@ you can glance at instead — and the nudge that arrives when someone is waiting
 ## What you are looking at
 
 While a session works, its Clawd sits and types. With nothing to do it gets up, wanders the
-room, mutters to itself and occasionally chats with a neighbour.
+room, mutters to itself and occasionally chats with a neighbour. It stops by the vending machine
+or the water cooler and comes away holding a cup; the printer spits out a sheet and the arcade
+cabinet blinks to itself.
 
 | Session state | In the office |
 |---|---|
