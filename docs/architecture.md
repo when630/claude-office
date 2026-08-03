@@ -59,7 +59,9 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   두 파일의 키 모양이 같아야 하고, `en`이 없는 키의 대체값이다
 - `renderer/talk.mjs` — **언제 무엇을 고르는지**만 정한다(문장은 사전에 있다). 시간대 구간(`TIME_SLOTS`),
   주기(`CYCLE`·`SHOW`·`AIDE_CYCLE`). 문장을 고를 때 `kind`를 실어 보내면 말풍선 색이 그에 따라 갈린다
-- `renderer/render.mjs` — 방 크기(`SLOT_W`·`SLOT_H`·`FLOOR_BASE`), 자리 배치(`DY_DESK` 주석에 y좌표 정리 · 그리는 곳은 `drawSurface`·`drawGear`·`clawdSeated`),
+- `renderer/render.mjs` — 방 크기(`SLOT_W`·`SLOT_H`·`FLOOR_BASE`). `layout()`은 두 걸음이다 —
+  크기를 재고 줄을 나눈 뒤, **줄마다 가장 높은 방에 맞춰** 나머지 방의 바닥을 늘린다
+  (회의실은 테이블 때문에 자리 줄 높이가 달라 그대로 두면 줄이 어긋난다), 자리 배치(`DY_DESK` 주석에 y좌표 정리 · 그리는 곳은 `drawSurface`·`drawGear`·`clawdSeated`),
   돌아다니는 범위·속도(`bandBounds`·`SEG_MS`), 모이는 주기(`HANG_EVERY`), 잡담 거리(`CHAT_NEAR_X`),
   말풍선 색(`BUBBLE_STYLE`), 방 색상 `HUES`
 - `main/collect.mjs` — `moodOf`(상태 판정), `RECENT_DONE_MS`(퇴근 목록 유지 기간),

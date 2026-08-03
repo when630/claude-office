@@ -165,15 +165,22 @@ export function layout(rooms, maxWidth, opts = {}) {
   const seats = [];
   const hues = assignHues(rooms);
   const themes = assignThemes(rooms, hashStr, opts.themes);
-  let x = 0;
-  let y = 0;
-  let rowH = 0;
+  // ── 1걸음: 크기만 재고 줄을 나눈다.
+  //
+  // 방마다 자리 줄 높이가 다르다 — 회의실은 테이블을 놓고 마주 앉히느라(MEET_BLOCK_H)
+  // 보통 자리 줄(SLOT_H)과 어긋나고, 바닥도 인원수를 탄다. 그대로 놓으면 한 줄에 선
+  // 방들의 아래가 들쭉날쭉하다. 그래서 **줄을 먼저 나누고 그 줄의 최대 높이를 안 뒤에**
+  // 박스를 만든다. 한 걸음으로는 지금 방이 어느 줄의 몇 번째인지 알 수 없다.
+  const deskTop = ROOM_HEAD + DESK_PAD;
+  const fitCols = Math.max(1, Math.floor((usable - ROOM_PAD * 2) / SLOT_W));
+  const lines = [];
+  let line = [];
+  let lineW = 0;
 
   for (const room of rooms) {
     const theme = themes.get(room.key) ?? THEMES[0];
     const meet = theme.station === 'table';
     const n = Math.max(1, room.workers.length);
-    const fitCols = Math.max(1, Math.floor((usable - ROOM_PAD * 2) / SLOT_W));
     // 회의실은 한 줄에 절반만 앉힌다 — 나머지 절반이 테이블 반대편에 마주 앉는다
     const cols = Math.min(meet ? Math.ceil(n / 2) : n, MAX_COLS, fitCols);
     const per = meet ? cols * 2 : cols; // 줄(또는 테이블) 하나가 받는 인원
@@ -183,89 +190,115 @@ export function layout(rooms, maxWidth, opts = {}) {
     const deskH = meet ? (rows - 1) * MEET_BLOCK_H + (lastFacing ? MEET_BLOCK_H : MEET_LONE_H) : rows * SLOT_H;
     const w = Math.max(MIN_ROOM_W, cols * SLOT_W + ROOM_PAD * 2);
     const floorH = FLOOR_BASE + Math.min(n, 6) * 4;
-    const deskTop = ROOM_HEAD + DESK_PAD;
-    const h = deskTop + deskH + floorH + ROOM_PAD;
+    const plan = { room, theme, meet, cols, per, rows, deskH, w, floorH, h: deskTop + deskH + floorH + ROOM_PAD };
 
-    if (x > 0 && x + w > usable) {
-      x = 0;
-      y += rowH + ROOM_GAP;
-      rowH = 0;
+    // 줄바꿈 판정은 예전과 같다 — 방이 어느 줄에 서는지가 달라지면 그건 다른 변경이다
+    if (lineW > 0 && lineW + w > usable) {
+      lines.push(line);
+      line = [];
+      lineW = 0;
     }
+    line.push(plan);
+    lineW += w + ROOM_GAP;
+  }
+  if (line.length) lines.push(line);
 
-    // 방이 최소 폭까지 늘어난 경우 자리 줄을 가운데로 모은다
-    const deskOff = Math.floor((w - (cols * SLOT_W + ROOM_PAD * 2)) / 2) + ROOM_PAD;
-    const area = {
-      x: x + 4,
-      y: y + deskTop + deskH,
-      w: w - 8,
-      h: floorH - 3,
-    };
-    const box = {
-      room,
-      theme,
-      x,
-      y,
-      w,
-      h,
-      cols,
-      rows,
-      floor: area,
-      hue: hues.get(room.key) ?? HUES[0],
-      props: placeProps(area, theme),
-      // 다 같이 모이는 자리 — 정수기 앞 잡담이 여기서 벌어진다
-      hang: { x: area.x + Math.floor(area.w / 2), y: area.y + area.h - 6 },
-      seats: [],
-      // 회의실만 채운다. 한 테이블을 두 줄이 나눠 쓰므로 그리는 순서를 여기서 잡아야 한다.
-      blocks: meet
-        ? Array.from({ length: rows }, (_, b) => ({
-            top: y + deskTop + b * MEET_BLOCK_H,
-            x: x + deskOff - MEET_OVERHANG,
-            w: cols * SLOT_W + MEET_OVERHANG * 2,
-            far: [],
-            near: [],
-          }))
-        : null,
-    };
-    box.decor = placeWallDecor(box, theme);
-    boxes.push(box);
-
-    room.workers.forEach((worker, i) => {
-      const seat = {
-        worker,
-        box,
-        name: opts.nameOf ? opts.nameOf(worker) : worker.name,
-        floor: area,
-        idx: i, // 바닥을 인원수만큼 나눠 각자 제 구역 근처를 돈다 — 안 그러면 한곳에 뭉친다
-        count: room.workers.length,
-        w: SLOT_W,
-        h: SLOT_H,
-        side: null, // 회의실에서만 'far' | 'near'
-        dy: DY_DESK,
-        actor: null, // 매 프레임 갱신 — 히트 테스트가 이걸 본다
-      };
-      if (meet) {
-        const blk = box.blocks[Math.floor(i / per)];
-        const within = i % per;
-        const far = within < cols;
-        seat.side = far ? 'far' : 'near';
-        seat.dy = far ? DY_MEET_FAR : DY_MEET_NEAR;
-        seat.x = x + deskOff + (within % cols) * SLOT_W;
-        seat.y = blk.top + (far ? 0 : MEET_NEAR - SEAT_HEAD);
-        seat.h = MEET_BLOCK_H - (MEET_NEAR - SEAT_HEAD); // 마주 앉은 두 줄의 판정 영역이 겹치지 않을 만큼
-        blk[seat.side].push(seat);
-      } else {
-        seat.x = x + deskOff + (i % cols) * SLOT_W;
-        seat.y = y + deskTop + Math.floor(i / cols) * SLOT_H;
-      }
-      seats.push(seat);
-      box.seats.push(seat);
-    });
-
-    x += w + ROOM_GAP;
-    rowH = Math.max(rowH, h);
+  // 줄마다 가장 높은 방에 맞춘다. 남는 높이는 **바닥에 준다** — 돌아다닐 자리가 넓어질 뿐
+  // 자리 배치는 그대로다(자리는 벽 쪽 기준이라 아래로만 늘어난다).
+  for (const row of lines) {
+    const tallest = Math.max(...row.map((p) => p.h));
+    for (const p of row) {
+      p.floorH += tallest - p.h;
+      p.h = tallest;
+    }
   }
 
-  return { boxes, seats, width: usable, height: y + rowH };
+  // ── 2걸음: 맞춘 높이로 좌표를 붙여 박스를 만든다
+  let x = 0;
+  let y = 0;
+  let rowH = 0;
+
+  for (const row of lines) {
+    x = 0;
+    rowH = row[0]?.h ?? 0;
+
+    for (const { room, theme, meet, cols, per, rows, deskH, w, floorH, h } of row) {
+      // 방이 최소 폭까지 늘어난 경우 자리 줄을 가운데로 모은다
+      const deskOff = Math.floor((w - (cols * SLOT_W + ROOM_PAD * 2)) / 2) + ROOM_PAD;
+      const area = {
+        x: x + 4,
+        y: y + deskTop + deskH,
+        w: w - 8,
+        h: floorH - 3,
+      };
+      const box = {
+        room,
+        theme,
+        x,
+        y,
+        w,
+        h,
+        cols,
+        rows,
+        floor: area,
+        hue: hues.get(room.key) ?? HUES[0],
+        props: placeProps(area, theme),
+        // 다 같이 모이는 자리 — 정수기 앞 잡담이 여기서 벌어진다
+        hang: { x: area.x + Math.floor(area.w / 2), y: area.y + area.h - 6 },
+        seats: [],
+        // 회의실만 채운다. 한 테이블을 두 줄이 나눠 쓰므로 그리는 순서를 여기서 잡아야 한다.
+        blocks: meet
+          ? Array.from({ length: rows }, (_, b) => ({
+              top: y + deskTop + b * MEET_BLOCK_H,
+              x: x + deskOff - MEET_OVERHANG,
+              w: cols * SLOT_W + MEET_OVERHANG * 2,
+              far: [],
+              near: [],
+            }))
+          : null,
+      };
+      box.decor = placeWallDecor(box, theme);
+      boxes.push(box);
+
+      room.workers.forEach((worker, i) => {
+        const seat = {
+          worker,
+          box,
+          name: opts.nameOf ? opts.nameOf(worker) : worker.name,
+          floor: area,
+          idx: i, // 바닥을 인원수만큼 나눠 각자 제 구역 근처를 돈다 — 안 그러면 한곳에 뭉친다
+          count: room.workers.length,
+          w: SLOT_W,
+          h: SLOT_H,
+          side: null, // 회의실에서만 'far' | 'near'
+          dy: DY_DESK,
+          actor: null, // 매 프레임 갱신 — 히트 테스트가 이걸 본다
+        };
+        if (meet) {
+          const blk = box.blocks[Math.floor(i / per)];
+          const within = i % per;
+          const far = within < cols;
+          seat.side = far ? 'far' : 'near';
+          seat.dy = far ? DY_MEET_FAR : DY_MEET_NEAR;
+          seat.x = x + deskOff + (within % cols) * SLOT_W;
+          seat.y = blk.top + (far ? 0 : MEET_NEAR - SEAT_HEAD);
+          seat.h = MEET_BLOCK_H - (MEET_NEAR - SEAT_HEAD); // 마주 앉은 두 줄의 판정 영역이 겹치지 않을 만큼
+          blk[seat.side].push(seat);
+        } else {
+          seat.x = x + deskOff + (i % cols) * SLOT_W;
+          seat.y = y + deskTop + Math.floor(i / cols) * SLOT_H;
+        }
+        seats.push(seat);
+        box.seats.push(seat);
+      });
+
+      x += w + ROOM_GAP;
+    }
+    y += rowH + ROOM_GAP;
+  }
+
+  // 마지막 줄 뒤에 붙은 간격은 뺀다 — 사무실 아래에 빈 띠가 남는다
+  return { boxes, seats, width: usable, height: Math.max(0, y - ROOM_GAP) };
 }
 
 // 클릭·호버 판정. 캐릭터가 자리를 떠나 있으므로 "지금 서 있는 곳"을 먼저 본다.
