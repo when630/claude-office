@@ -31,7 +31,7 @@ A white speech bubble (blue stripe on the left) is text actually read from the s
 one is a flavour line we wrote. If a subagent is running, an **aide** stands beside the desk with
 a clipboard and reports progress. The bar under the name tag is that session's **context usage**
 (60% yellow · 85% red). As the context fills, **paper piles up on the desk**, and once the desk is full it starts
-**littering the floor** — you can spot the desk that is about to compact by glancing at the
+**littering the floor** with sheets at every angle, crumpled paper and the odd empty can — you can spot the desk that is about to compact by glancing at the
 office rather than reading the bar.
 
 A room that just appeared gets a **stack of moving boxes** for a few seconds, and a room whose

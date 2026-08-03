@@ -799,18 +799,34 @@ function paperCount(pct) {
 // 프레임마다 다시 뽑으면 종이가 바닥에서 춤을 춘다.
 const FLOOR_FROM = 60;
 const FLOOR_PER = 5;
-const FLOOR_MAX = 6;
+const FLOOR_MAX = 9; // 100%에서 상한에 닿는다
 
 export function floorSheetCount(pct) {
   if (pct == null || pct < FLOOR_FROM) return 0;
   return Math.min(FLOOR_MAX, 1 + Math.floor((pct - FLOOR_FROM) / FLOOR_PER));
 }
 
-// 흘린 종이는 **자기 구역 안에만** 둔다(bandBounds) — 어느 자리가 넘치고 있는지가 보여야 한다.
+// 무엇이 널브러졌나. **각도가 다른 낱장 넷**이 대부분이고 쓰레기가 섞인다.
+// 픽셀에서 회전은 변형을 따로 그려 내는 것이라(shared/pixels.mjs) 여기서는 고르기만 한다.
+//
+// 쓰레기는 **세 장째부터** 섞는다. 처음부터 캔이 굴러다니면 "서류가 넘친다"가 아니라
+// "지저분한 방"으로 읽힌다 — 이 연출이 말하려는 것은 컨텍스트다.
+const LITTER_PAPER = ['sheetFlat', 'sheetTiltR', 'sheetTiltL', 'sheetNarrow'];
+const LITTER_TRASH = ['paperBall', 'canDown'];
+const TRASH_FROM = 2;
+const TRASH_CHANCE = 0.4;
+
+// 장 번호(k)로만 고른다 — 프레임마다 다시 뽑으면 종이가 모양을 바꾸며 깜빡인다.
+// 테스트에서 고르기만 떼어 확인한다 (test/roomstate.test.mjs)
+export function litterKeyFor(seed, k) {
+  const trash = k >= TRASH_FROM && rnd(seed, 520 + k) < TRASH_CHANCE;
+  const pool = trash ? LITTER_TRASH : LITTER_PAPER;
+  return pool[Math.floor(rnd(seed, 560 + k) * pool.length)];
+}
+
+// 널브러진 것은 **자기 구역 안에만** 둔다(bandBounds) — 어느 자리가 넘치고 있는지가 보여야 한다.
 // 게보다 먼저 그려 밟고 지나가게 하고, 비품보다도 먼저 그려 비품 뒤로 깔린다.
 function drawFloorMess(ctx, box, tint) {
-  const spr = SPR.sheet;
-  if (!spr) return;
   // 심야·퇴근 조명을 같이 받는다 — 안 그러면 어두운 방에서 종이만 하얗게 뜬다.
   // drawSprite에는 밝기 인자가 없어서 알파로 낮춘다(어두운 바닥에 섞이며 같이 어두워진다).
   const dim = tint?.l ?? 1;
@@ -824,9 +840,11 @@ function drawFloorMess(ctx, box, tint) {
     const b = bandBounds(seat);
     const seed = hashStr(seat.worker.key);
     for (let k = 0; k < n; k++) {
+      const spr = SPR[litterKeyFor(seed, k)];
+      if (!spr) continue;
+      // 자리는 고른 것의 크기로 재야 구역 밖으로 삐져나가지 않는다 (7×3 ~ 5×4로 서로 다르다)
       const x = Math.round(b.x0 + rnd(seed, 400 + k * 2) * Math.max(1, b.x1 - b.x0 - spr.w));
       const y = Math.round(b.y0 + rnd(seed, 401 + k * 2) * Math.max(1, b.y1 - b.y0 - spr.h));
-      // 심야·퇴근 조명을 같이 받는다 — 안 그러면 어두운 방에서 종이만 하얗게 뜬다
       drawSprite(ctx, spr, x, y);
     }
   }

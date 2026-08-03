@@ -75,9 +75,10 @@ test('60%에서 한 장, 5%마다 한 장 늘어난다', () => {
 });
 
 test('한없이 늘지는 않는다', () => {
-  // 방이 종이로 덮이면 게가 안 보인다 — 여섯 장에서 멈춘다
-  assert.equal(floorSheetCount(90), 6);
-  assert.equal(floorSheetCount(100), 6);
+  // 방이 종이로 덮이면 게가 안 보인다 — 아홉 개에서 멈추고 100%에서 그 상한에 닿는다
+  assert.equal(floorSheetCount(95), 8);
+  assert.equal(floorSheetCount(100), 9);
+  assert.equal(floorSheetCount(120), 9);
 });
 
 test('장수는 컨텍스트에 대해 단조 증가한다', () => {
@@ -88,4 +89,40 @@ test('장수는 컨텍스트에 대해 단조 증가한다', () => {
     assert.ok(n >= prev, `${pct}%에서 ${prev} → ${n}로 줄었다`);
     prev = n;
   }
+});
+
+// 널브러진 것의 모양 고르기 (#91). 위치와 마찬가지로 **장 번호로만** 고른다 —
+// 프레임마다 다시 뽑으면 종이가 모양을 바꾸며 깜빡인다.
+const { litterKeyFor } = await import('../renderer/render.mjs');
+const { SPR } = await import('../renderer/sprites.mjs');
+
+test('고른 모양은 다 스프라이트가 있다', () => {
+  for (let seed = 0; seed < 40; seed++) {
+    for (let k = 0; k < 9; k++) {
+      const key = litterKeyFor(seed * 7919, k);
+      assert.ok(SPR[key], `${key} 스프라이트가 없다`);
+    }
+  }
+});
+
+test('같은 장 번호면 늘 같은 모양이다', () => {
+  for (let k = 0; k < 9; k++) assert.equal(litterKeyFor(12345, k), litterKeyFor(12345, k));
+});
+
+test('처음 두 개는 종이다 — 쓰레기부터 나오면 지저분한 방으로 읽힌다', () => {
+  const trash = ['paperBall', 'canDown'];
+  for (let seed = 0; seed < 200; seed++) {
+    for (const k of [0, 1]) {
+      assert.ok(!trash.includes(litterKeyFor(seed * 31, k)), `seed ${seed} k ${k}`);
+    }
+  }
+});
+
+test('여러 모양이 섞이고 쓰레기도 나온다', () => {
+  const seen = new Set();
+  for (let seed = 0; seed < 200; seed++) for (let k = 0; k < 9; k++) seen.add(litterKeyFor(seed * 31, k));
+  // 각도 넉 장이 다 쓰이고
+  for (const key of ['sheetFlat', 'sheetTiltR', 'sheetTiltL', 'sheetNarrow']) assert.ok(seen.has(key), key);
+  // 쓰레기 둘도 나온다
+  for (const key of ['paperBall', 'canDown']) assert.ok(seen.has(key), key);
 });
