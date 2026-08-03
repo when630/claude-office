@@ -29,6 +29,7 @@ main/tasks.mjs      세션이 세운 할 일 목록 (tasks/<sessionId>/<n>.json)
 main/prompts.mjs    내가 친 프롬프트 이력 (~/.claude/history.jsonl) — 읽기만 한다
 main/files.mjs      만진 파일 수·편집 횟수 (file-history/) — 이름만 읽고 내용은 안 본다
 main/stats.mjs      Claude Code 자체 집계 (stats-cache.json) — 읽기만 한다
+main/rooms.mjs      방 묶기·별칭 (근태의 방 이름은 안 건드린다)
 main/usage.mjs      office-usage.json → 5시간·주간 사용률
 main/notify.mjs     무엇을 알릴지 — 대기 재알림·컨텍스트·사용량 문턱 판정.
                     Electron을 모르고 `now`를 인자로 받는다(그래서 테스트가 된다)
@@ -74,6 +75,9 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   잡담 거리(`CHAT_NEAR_X`), 말풍선 색(`BUBBLE_STYLE`), 방 색상 `HUES`,
   심야 조명(`nightTint`·`NIGHT_L`·`NIGHT_S` — 명도를 내린 만큼 채도를 올려 방 색 구분을 남긴다),
   컨텍스트 서류(`PAPER_STEPS`·`drawPaperStack` — 문턱은 이름표 밑 막대(`level`)와 같은 값이어야 한다)
+- `main/rooms.mjs` — 묶음 판정(`groupOf` — 가장 깊이 맞는 부모가 이기고 경계를 구분자로 끊는다),
+  별칭(`labelOf`), 설정 정리(`sanitizeGroups`·`sanitizeAlias`).
+  **묶기는 화면용 `room`만 바꾸고 근태용 `histRoom`은 그대로 둔다** — 규칙을 바꿔도 과거 기록과 이어진다
 - `main/collect.mjs` — `moodOf`(상태 판정), `RECENT_DONE_MS`(퇴근 목록 유지 기간),
   `isSpare`(빈 예비 슬롯 판정), 헤매는 세션 문턱(`STUCK_ERRORS`·`STUCK_QUIET_MS` — 무진전 쪽은
   긴 빌드가 정상적으로 조용하다는 이유로 넉넉히 잡혀 있다),

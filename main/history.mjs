@@ -38,6 +38,12 @@ function indexWorkers(snapshot) {
   return map;
 }
 
+// 근태가 남기는 방 이름은 **언제나 작업 디렉터리 그대로**다(main/rooms.mjs 머리말).
+// 화면의 `room`은 묶기·별칭을 타므로, 그걸 남기면 규칙을 바꾼 날부터 과거 기록과 이어지지 않는다.
+function roomKeyOf(w) {
+  return w.histRoom ?? w.room;
+}
+
 // 컨텍스트는 있을 때만 싣는다 — undefined 필드는 JSON.stringify가 빼 주므로 줄이 짧아진다
 function ctxOf(w) {
   const pct = w.context?.pct;
@@ -55,11 +61,12 @@ export function diffEvents(prev, next, now = Date.now()) {
 
   for (const [key, w] of after) {
     const was = before.get(key);
-    if (!was) events.push({ at: now, ev: 'on', key, room: w.room, mood: w.mood, ctx: ctxOf(w) });
-    else if (was.mood !== w.mood) events.push({ at: now, ev: 'mood', key, room: w.room, mood: w.mood, ctx: ctxOf(w) });
+    if (!was) events.push({ at: now, ev: 'on', key, room: roomKeyOf(w), mood: w.mood, ctx: ctxOf(w) });
+    else if (was.mood !== w.mood)
+      events.push({ at: now, ev: 'mood', key, room: roomKeyOf(w), mood: w.mood, ctx: ctxOf(w) });
   }
   for (const [key, w] of before) {
-    if (!after.has(key)) events.push({ at: now, ev: 'off', key, room: w.room, ctx: ctxOf(w) });
+    if (!after.has(key)) events.push({ at: now, ev: 'off', key, room: roomKeyOf(w), ctx: ctxOf(w) });
   }
   return events;
 }

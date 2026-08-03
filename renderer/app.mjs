@@ -46,7 +46,7 @@ const MINI_ROOMS = 3;
 let state = { rooms: [], recent: [], stats: {}, usage: null, ts: 0 };
 let meta = null;
 // 표시 설정 — main의 settings.json(view)에 저장된다. 상태(state)와 달리 스냅샷마다 오지 않는다.
-let cfg = { names: 'show', roomThemes: {}, pinned: [], collapsed: [] };
+let cfg = { names: 'show', roomThemes: {}, pinned: [], collapsed: [], roomGroups: [], roomAlias: {} };
 // 이름으로 거르기. **저장하지 않는다** — 다시 켰을 때 걸러진 채로 뜨면 그건 "방이 안 보인다"가 된다.
 let roomFilter = '';
 let view = { boxes: [], seats: [], width: 100, height: 100 };
@@ -741,6 +741,31 @@ function drawStats() {
 // 방 구성이 그대로면 건드리지 않는다 — 다시 그리면 펼쳐둔 목록이 닫히고 초점이 튄다.
 let cfgRooms = null;
 
+// 방 묶기용 경로 다루기. main/rooms.mjs와 같은 셈법이어야 하지만 렌더러는 node:path를 못
+// 쓰므로 문자열로 처리한다 — 구분자를 하나로 펴고 대소문자를 무시한다(Windows).
+const SEP = /[\\/]+/g;
+
+function flatPath(p) {
+  return String(p ?? '')
+    .replace(SEP, '/')
+    .replace(/\/+$/, '');
+}
+
+function samePath(a, b) {
+  const x = flatPath(a).toLowerCase();
+  return x !== '' && x === flatPath(b).toLowerCase();
+}
+
+// 이 방을 묶을 때 등록할 부모 경로. 드라이브 루트까지 올라가면 온 사무실이 한 방이 되므로
+// 빈 문자열을 돌려 버튼을 만들지 않는다.
+function parentPath(cwd) {
+  const flat = flatPath(cwd);
+  const cut = flat.lastIndexOf('/');
+  if (cut <= 0) return '';
+  const parent = flat.slice(0, cut);
+  return /^[a-zA-Z]:$/.test(parent) ? '' : parent;
+}
+
 function roomSig() {
   return (state.rooms ?? []).map((r) => r.key).join('|');
 }
@@ -753,6 +778,8 @@ function normalizeView(v) {
     roomThemes: v?.roomThemes && typeof v.roomThemes === 'object' ? { ...v.roomThemes } : {},
     pinned: list(v?.pinned),
     collapsed: list(v?.collapsed),
+    roomGroups: list(v?.roomGroups),
+    roomAlias: v?.roomAlias && typeof v.roomAlias === 'object' ? { ...v.roomAlias } : {},
   };
 }
 
@@ -934,12 +961,26 @@ function roomsPane() {
                         data-collapse="${esc(r.key)}" title="${t('cfg.roomCollapse')}">${
                           cfg.collapsed.includes(r.key) ? '▤' : '▥'
                         }</button>
+                      ${
+                        // 부모 경로를 손으로 적지 않게 한다 — 이 방의 부모를 한 번에 등록한다.
+                        // 부모가 드라이브 루트면 온 사무실이 한 방이 되므로 버튼을 안 만든다.
+                        parentPath(r.cwd)
+                          ? `<button type="button" class="cfg-mark${
+                              cfg.roomGroups.some((g) => samePath(g, parentPath(r.cwd))) ? ' on' : ''
+                            }" data-group="${esc(parentPath(r.cwd))}" title="${t('cfg.roomGroup', {
+                              parent: esc(parentPath(r.cwd)),
+                            })}">⊞</button>`
+                          : ''
+                      }
                     </span>
                   </label>
                   <select id="cfg-room-${i}" data-room="${esc(r.key)}" aria-label="${t('cfg.roomTheme')}">${options(
                     [['', t('common.auto')], ...THEMES.map((theme) => [theme.key, theme.label])],
                     cfg.roomThemes[r.key] ?? '',
                   )}</select>
+                  <input type="text" class="cfg-alias" data-alias="${esc(r.key)}"
+                    aria-label="${t('cfg.roomAlias')}" placeholder="${t('cfg.roomAliasPlaceholder')}"
+                    maxlength="40" value="${esc(cfg.roomAlias[r.key] ?? '')}">
                   ${
                     notifyCfg
                       ? `<select data-room-notify="${esc(r.key)}" aria-label="${t('cfg.roomNotify')}">${options(
@@ -1082,6 +1123,18 @@ cfgBody.addEventListener('change', (e) => {
   if (reset) reset.disabled = !Object.keys(roomThemes).length;
 });
 
+// 별칭은 **다 치고 나서** 저장한다. input마다 저장하면 글자 하나에 스냅샷이 한 번씩 다시 와
+// 입력 칸이 다시 그려지고 커서가 튄다.
+cfgBody.addEventListener('change', (e) => {
+  const key = e.target?.dataset?.alias;
+  if (key == null) return;
+  const name = e.target.value.replace(/\s+/g, ' ').trim().slice(0, 40);
+  const next = { ...cfg.roomAlias };
+  if (name) next[key] = name;
+  else delete next[key]; // 비우면 별칭을 뗀다 — 지우는 방법이 곧 비우는 것이다
+  saveView({ roomAlias: next });
+});
+
 cfgBody.addEventListener('click', (e) => {
   const hintKey = e.target?.dataset?.hint;
   if (hintKey) {
@@ -1109,6 +1162,15 @@ cfgBody.addEventListener('click', (e) => {
   const collapse = e.target.dataset?.collapse;
   if (collapse) {
     saveView({ collapsed: toggle(cfg.collapsed, collapse) }).then(drawCfg);
+    return;
+  }
+  // 부모로 묶기. 방 이름이 아니라 **부모 경로**를 저장한다 — 그 아래 방이 나중에 새로 떠도
+  // 같이 묶이고, 지금 없는 방까지 목록에 이름으로 남겨 두지 않아도 된다.
+  const group = e.target.dataset?.group;
+  if (group) {
+    const on = cfg.roomGroups.some((g) => samePath(g, group));
+    const next = on ? cfg.roomGroups.filter((g) => !samePath(g, group)) : [...cfg.roomGroups, group];
+    saveView({ roomGroups: next }).then(drawCfg);
     return;
   }
   const action = e.target.dataset?.hotkey;
