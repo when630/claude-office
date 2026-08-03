@@ -220,6 +220,12 @@ export default {
   // ── 출근부
   att: {
     title: '출근부',
+    tab: {
+      att: '근태',
+      trend: '추이',
+      mine: '내가 시킨 것',
+      code: 'Claude Code',
+    },
     today: '오늘',
     week: '최근 7일',
     range: '{from} ~ {to} · {time} 기준',
@@ -246,7 +252,6 @@ export default {
     trend: '대기 추이 (7일)',
     trendUnseen: '앱이 꺼져 있었습니다',
     trendHint: '노란 막대는 내가 답을 기다리게 한 시간입니다. 가장 높은 칸이 {max}입니다. <b>점선만 있는 칸은 앱이 꺼져 있던 날</b>이고 0인 날과 다릅니다.',
-    mine: '내가 시킨 것',
     minePrompts: '지시',
     minePromptsValue: '{n}번',
     mineRooms: '방',

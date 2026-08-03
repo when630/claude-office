@@ -943,21 +943,53 @@ b.lv-na {
 }
 
 /* 설정 탭. 출근부의 범위 탭과 같은 모양을 쓴다 — 같은 창 안에서 같은 몸짓이어야 한다 */
-#cfg-tabs {
+#cfg-tabs,
+#att-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   padding: 10px 14px 2px;
 }
 
-/* ── 출근부. 범위 탭 + 요약 + 방별 표 + 오래 기다린 순간. */
-.att-tabs {
+/* ── 출근부의 구간 고르기.
+   탭 바와 **다른 컨트롤로 보여야 한다.** 같은 모양의 버튼 두 개를 탭 바 아래 줄에 두었을 때는
+   어느 줄이 탭인지 알 수 없었다 — 그래서 이어붙인 토글로 만들고 구간을 적는 문장과 한 줄에 둔다. */
+.att-range-row {
   display: flex;
-  gap: 6px;
-  margin: 12px 0 2px;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 2px;
 }
+.att-range-pick {
+  display: inline-flex;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.att-range-pick button {
+  padding: 3px 11px;
+  border: 0;
+  border-radius: 0;
+  background: #151a22;
+  color: var(--dim);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.att-range-pick button + button {
+  border-left: 1px solid var(--line);
+}
+.att-range-pick button.on {
+  background: #232b3a;
+  color: var(--text);
+}
+.att-range-pick button:hover:not(.on) {
+  color: var(--text);
+}
+
 #cfg-tabs button,
-.att-tabs button {
+#att-tabs button {
   padding: 4px 10px;
   border: 1px solid var(--line);
   border-radius: 5px;
@@ -968,13 +1000,14 @@ b.lv-na {
   cursor: pointer;
 }
 #cfg-tabs button.on,
-.att-tabs button.on {
+#att-tabs button.on {
   border-color: #3d4a5f;
   background: #1d2431;
   color: var(--text);
 }
+/* 구간을 적는 문장. 토글과 한 줄에 서므로 margin 없이 둔다. */
 .att-range {
-  margin: 8px 0 0;
+  margin: 0;
   font-size: 11px;
   color: #5d6779;
   font-variant-numeric: tabular-nums;
@@ -1305,22 +1338,16 @@ input[type='checkbox'] {
   background: transparent;
 }
 
-/* ── Claude Code 자체 기록. 출처가 다른 참고 자료라 접어 둔다 — 출근부의 본론
-   ("내가 얼마나 기다리게 했나")을 밀어내지 않게. */
+/* ── Claude Code 자체 기록. 탭 하나를 통째로 쓴다(#97) — 접기를 두 겹으로 두지 않는다. */
 .att-code {
-  margin: 14px 0 0;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
+  margin: 4px 0 0;
 }
-.att-code summary {
-  cursor: pointer;
+.att-code h3 {
+  margin: 0 0 6px;
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #5d6779;
-}
-.att-code summary:hover {
-  color: var(--text);
 }
 .att-code h4 {
   margin: 14px 0 6px;

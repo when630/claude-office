@@ -50,6 +50,8 @@ shared/lang/*.mjs   언어별 사전 (순수 데이터 — UI 문구 · 방 이�
 tools/make-icons.mjs        캐릭터 픽셀 → PNG (의존성 없이 직접 인코딩) — 맥 메뉴바용 16px 변형도 굽는다
 tools/install-usage-tap.mjs 위 로직의 CLI 껍데기 (npm run usage-tap)
 test/               `npm test` (node --test, 의존성 없음) — 알림 문턱 판정 · attach 명령 조립
+                    · 사전 두 파일의 키 모양 대조(lang.test.mjs — 없는 키는 화면에 키가 적히는
+                    것으로만 드러나 눈으로 볼 때까지 조용하다)
 .github/workflows/release.yml  v* 태그 푸시 → Windows·macOS를 빌드해 Releases 초안 하나에 올린다
 ```
 

@@ -72,6 +72,10 @@
         <h2 data-i18n="att.title"></h2>
         <button id="att-close" type="button" data-i18n="common.close" data-i18n-title="common.close"></button>
       </header>
+      <!-- 내용이 여섯 갈래로 늘어 한 두루마리에 다 세우면 찾는 데 스크롤이 필요하다.
+           탭은 **무엇을 보나**이고 구간(오늘/최근 7일)은 그 안의 토글이다 — 두 축을 한 줄에
+           섞으면 무엇을 고르는 것인지 흐려진다. -->
+      <nav id="att-tabs" role="tablist"></nav>
       <div id="att-body"></div>
     </dialog>
 

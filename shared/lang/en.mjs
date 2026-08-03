@@ -223,6 +223,12 @@ export default {
   // ── Attendance
   att: {
     title: 'Attendance',
+    tab: {
+      att: 'Attendance',
+      trend: 'Trend',
+      mine: 'My asks',
+      code: 'Claude Code',
+    },
     today: 'Today',
     week: 'Last 7 days',
     range: '{from} – {to} · as of {time}',
@@ -250,7 +256,6 @@ export default {
     trend: 'Waiting, last 7 days',
     trendUnseen: 'the app was closed',
     trendHint: 'Yellow is time spent waiting on me. The tallest bar is {max}. <b>A dashed baseline means the app was closed that day</b> — not the same as a zero.',
-    mine: 'What I asked for',
     minePrompts: 'Instructions',
     minePromptsValue: '{n}',
     mineRooms: 'Rooms',
