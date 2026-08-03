@@ -781,29 +781,34 @@ const DESK_NARROW = ['sticky', 'can'];
 // 이름표 밑 얇은 막대 하나로만 보이던 값이라, 사무실을 훑는 것만으로는 어느 자리가 곧
 // 압축될지 안 읽혔다. 막대를 **대체하는 게 아니라 거든다** — 정확한 숫자는 패널이 말한다.
 //
-// 문턱은 막대와 같은 것을 쓴다(60% 노랑 · 85% 빨강). 두 표시가 다른 문턱을 쓰면 막대는
-// 노란데 서류는 안 쌓인 상태가 생겨 서로를 못 믿게 된다.
-const PAPER_STEPS = [40, 60, 85];
-// 한 장마다 위로 2px, 왼쪽으로 1px 어긋나게 쌓는다. 세 장이면 +4px — 모니터 아래턱과
-// 말풍선 사이에 든다(굽어서 확인했다).
+// 문턱은 막대(60% 노랑 · 85% 빨강)보다 **일찍** 잡는다. 30%까지는 사무실이 깨끗하고 그 위로는
+// 급하게 어지러워지는 곡선이라야 "차오르는 중"이 눈에 띈다. 막대보다 늦으면 막대는 노란데
+// 서류는 안 쌓인 상태가 생겨 서로를 못 믿게 되지만, 일찍 잡는 쪽은 그 문제가 없다 —
+// 막대가 색을 바꿀 때는 서류가 이미 쌓여 있다.
+const PAPER_STEPS = [30, 45, 60, 75, 90];
+// 한 장마다 위로 2px, 왼쪽으로 1px 어긋나게 쌓는다. 다섯 장이면 +8px — 상판 윗줄에서
+// 상판 위 빈 공간까지만 쓴다(굽어서 확인했다).
 const PAPER_DX = 1;
 const PAPER_DY = 2;
 
-function paperCount(pct) {
+export function paperCount(pct) {
   return pct == null ? 0 : PAPER_STEPS.filter((step) => pct >= step).length;
 }
 
 // ── 상판이 다 차면 바닥으로 넘친다.
 //
-// 책상은 세 장이 상한이라 그 위로는 더 보여줄 것이 없었다. 컨텍스트가 90%인 자리와 60%인 자리가
+// 책상은 다섯 장이 상한이라 그 위로는 더 보여줄 것이 없다. 컨텍스트가 90%인 자리와 60%인 자리가
 // 상판만 보면 비슷해 보이는데, 정작 급한 것은 그 위쪽 구간이다.
 //
-// **막대가 노랑으로 바뀌는 지점(60%)부터** 바닥이 어지러워지고 5%마다 한 장 늘어난다.
+// **상판 더미와 같은 지점(30%)부터** 바닥도 같이 어지러워지고 4%마다 한 장 늘어난다.
+// 문턱을 상판보다 늦게 두면 30~60% 구간에서 상판만 조금 쌓이고 방은 깨끗해 "차오르는 중"이
+// 안 읽혔다 — 두 표시가 같이 자라야 방을 훑는 것만으로 급한 자리가 튄다.
+//
 // 자리 순서(k)로 위치를 정하므로 **이미 흘린 장은 그 자리에 그대로 있고 새 장만 더해진다** —
 // 프레임마다 다시 뽑으면 종이가 바닥에서 춤을 춘다.
-const FLOOR_FROM = 60;
-const FLOOR_PER = 5;
-const FLOOR_MAX = 9; // 100%에서 상한에 닿는다
+const FLOOR_FROM = 30;
+const FLOOR_PER = 4;
+const FLOOR_MAX = 18; // 98%에서 상한에 닿는다
 
 export function floorSheetCount(pct) {
   if (pct == null || pct < FLOOR_FROM) return 0;
@@ -1038,6 +1043,9 @@ function drawNamePlate(ctx, seat, scale, seated, isSel) {
 // 먼 쪽 절반은 명패(3~11줄)와 게이지(12줄)가 이미 다 쓴다 — 거기에 더미를 얹으면 이름을
 // 5글자로 잘라야 한다. 먼 쪽 자리는 바닥에 흘린 것으로 읽는다.
 const MEET_PAPER_X = 42; // 머그(+34~41) 오른쪽 끝 — 왼쪽으로 어긋나 쌓여도 머그 위로는 안 온다
+// 다섯째 장은 먼 쪽 게이지 줄(MEET_TOP+MEET_RIM+12)까지 올라가 그 막대의 오른쪽 끝을 덮는다.
+// 상판 앞줄부터 그 줄 아래까지 들어가는 만큼만 쌓는다 — 회의실만 한 장 적다.
+const MEET_PAPER_MAX = 4;
 
 function drawPlaceSetting(ctx, seat, blockTop, t) {
   const bottom = blockTop + MEET_NEAR - 1; // 앞면 바로 위
@@ -1048,7 +1056,7 @@ function drawPlaceSetting(ctx, seat, blockTop, t) {
     ctx.fillStyle = '#8fb7d8';
     ctx.fillRect(seat.x + 13 + (Math.floor(t / 300) % 4), bottom - SPR.docs.h - 2, 1, 1);
   }
-  const papers = paperCount(seat.worker.context?.pct);
+  const papers = Math.min(MEET_PAPER_MAX, paperCount(seat.worker.context?.pct));
   if (papers) stackPapers(ctx, seat.x + MEET_PAPER_X, bottom, papers);
 }
 
