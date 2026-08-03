@@ -89,7 +89,11 @@ const defaults = {
   quiet: sanitizeQuiet(), // 방해금지 — 조용한 시간대와 임시 무음(until)
   roomNotify: {}, // 방 이름 → 알림 세기('off' | 'keen'). 보통인 방은 적지 않는다
   // 전역 단축키. 빈 문자열이면 그 자리는 안 잡는다 — 끄는 방법이 곧 비우는 것이다.
-  hotkeys: { toggle: 'CommandOrControl+Alt+O', jump: 'CommandOrControl+Alt+W' },
+  hotkeys: {
+    toggle: 'CommandOrControl+Alt+O',
+    jump: 'CommandOrControl+Alt+W',
+    mini: 'CommandOrControl+Alt+M',
+  },
   // 미니 모드와 두 모습의 창 자리. 다시 켜면 있던 모습으로 그 자리에 뜬다.
   mini: false,
   bounds: { normal: null, mini: null },
@@ -197,7 +201,7 @@ function notifySettings() {
 //
 // 창을 열지 않고도 처리하려는 것이다. 지금은 토스트를 놓치면 창을 열고 → 책상을 찾고 →
 // 클릭하고 → 터미널에서 열기까지 네 걸음인데, terminal.mjs는 id만 있으면 되는 자리다.
-const HOTKEY_ACTIONS = ['toggle', 'jump'];
+const HOTKEY_ACTIONS = ['toggle', 'jump', 'mini'];
 // Accelerator 문법(수식키+키) 중 우리가 받아들이는 모양. 손으로 고친 settings.json이
 // 앱을 못 뜨게 하지 않도록 좁게 받는다 — register()는 이상한 문자열에 예외를 던진다.
 const ACCEL_OK = /^(?:(?:CommandOrControl|Command|Control|Ctrl|Alt|Option|Shift|Super)\+){1,3}[A-Za-z0-9]{1,12}$/;
@@ -221,7 +225,9 @@ let hotkeyFailed = [];
 
 function applyHotkeys({ announce = false } = {}) {
   globalShortcut.unregisterAll();
-  const run = { toggle: toggleWindow, jump: jumpToLongestWait };
+  // 미니는 지금 상태를 뒤집는다 — 곁눈질하려고 내리는 일이 잦은데 그때마다 창을 앞으로
+  // 꺼내 버튼을 찾아야 한다면 곁눈질용이라는 목적과 어긋난다
+  const run = { toggle: toggleWindow, jump: jumpToLongestWait, mini: () => setMini(!settings.mini) };
   const failed = [];
   for (const action of HOTKEY_ACTIONS) {
     const accel = settings.hotkeys[action];
