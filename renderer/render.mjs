@@ -5,7 +5,17 @@
 // 방마다 종류(renderer/themes.mjs)가 배정돼 바닥 무늬·책상 색·비품이 달라진다.
 // 회의실만 예외로 책상 줄이 아니라 테이블 하나를 놓고 양쪽으로 마주 앉는다 (MEET_* 참고).
 import { SPR, drawSprite } from './sprites.mjs';
-import { speechFor, chatLines, reportFor, moveSpeech, fade, hashStr, rnd } from './talk.mjs';
+import {
+  speechFor,
+  chatLines,
+  reportFor,
+  moveSpeech,
+  fade,
+  hashStr,
+  rnd,
+  slotNow,
+  glyphKeyFor,
+} from './talk.mjs';
 import { assignThemes, THEMES } from './themes.mjs';
 
 export const SLOT_W = 52; // 책상 한 자리가 차지하는 폭
@@ -1191,28 +1201,6 @@ function clawdStanding(worker, t, pos, chat) {
   return worker.mood === 'done' ? SPR.armsUp : SPR.stand;
 }
 
-function bubbleFor(worker, chat, phase) {
-  if (chat) return null; // 잡담 중엔 상태 기호를 접어둔다
-  // 막 끝냈다 / 막 시작했다는 표시가 먼저다 — 걸어 나가는 동안에도 계속 붙어 있어야
-  // "다 하고 나가는 것"으로 읽힌다.
-  if (phase?.note === 'done') return SPR.gCheck;
-  if (phase?.note === 'start') return SPR.gSpark;
-  switch (worker.mood) {
-    case 'waiting':
-      return SPR.gBang;
-    case 'stuck':
-      return SPR.gStuck;
-    case 'done':
-      return SPR.gCheck;
-    case 'failed':
-      return SPR.gCross;
-    case 'stopped':
-      return SPR.gZzz;
-    default:
-      return null;
-  }
-}
-
 function drawGlyphBubble(ctx, cx, bottom, glyph) {
   const w = 13;
   const h = 11;
@@ -1602,7 +1590,7 @@ export function render(ctx, view, opts) {
     .map((seat) => ({ seat, pos: posFor(seat, t) }))
     .sort((a, b) => a.pos.y - b.pos.y);
   // 잡담은 **바닥을 어슬렁거리는 놈끼리만** 시킨다.
-  // 나를 기다리는 놈은 짝이 잡히면 bubbleFor가 느낌표를 접고 대사도 잡담으로 바뀌어,
+  // 나를 기다리는 놈은 짝이 잡히면 glyphKeyFor가 느낌표를 접고 대사도 잡담으로 바뀌어,
   // 정작 불러야 할 때 옆자리와 수다를 떠는 꼴이 된다. 자리를 오가는 중인 놈도 마찬가지로
   // 끼우지 않는다 — 다 했다는 표시를 들고 걸어 나가는 길에 붙잡혀 서면 안 된다.
   const chats = findChats(
@@ -1627,7 +1615,11 @@ export function render(ctx, view, opts) {
     const { worker } = seat;
     const cx = seat.actor?.x ?? seat.x + SLOT_W / 2;
     const inTransit = seat.phase && seat.phase.mode !== 'walk' && seat.phase.mode !== 'sit';
-    const glyph = bubbleFor(worker, chat, seat.phase);
+    // 잡담 짝이 **상대의 대답 구간**에 있는가 — 먼저 말한 쪽 머리에 하트를 띄울 조건이다.
+    // 구간 경계(CHAT_B)는 이 파일이 들고 있으므로 판정만 해서 넘긴다.
+    const answering = Boolean(chat) && (pos?.f ?? 0) >= CHAT_B[0] && (pos?.f ?? 0) < CHAT_B[1];
+    const glyph =
+      SPR[glyphKeyFor(worker, { chat, answering, phase: seat.phase, slot: slotNow(), tms: t })] ?? null;
     if (glyph) {
       const float =
         worker.mood === 'waiting' ? Math.round(Math.sin(t / 260) * 1.5) : Math.round(Math.sin(t / 900) * 1);
