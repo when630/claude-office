@@ -495,6 +495,22 @@ function openExternal(url) {
   if (/^https?:\/\//i.test(url)) shell.openExternal(url);
 }
 
+// 승인받은 계획서(.md)를 기본 편집기로 연다.
+//
+// 경로는 우리가 트랜스크립트에서 읽어 렌더러로 보낸 값이지만, **IPC 표면은 아무 문자열이나
+// 받을 수 있으므로 여기서 다시 가둔다** — `~/.claude/plans` 아래의 `.md`만. 그러지 않으면
+// 렌더러가 임의 파일을 열게 하는 통로가 된다(openExternal이 https만 받는 것과 같은 이유다).
+const PLANS_DIR = path.join(CLAUDE_DIR, 'plans');
+
+async function openPlan(file) {
+  const full = path.resolve(String(file ?? ''));
+  const inside = path.relative(PLANS_DIR, full);
+  if (!inside || inside.startsWith('..') || path.isAbsolute(inside)) return { ok: false, reason: 'outside' };
+  if (path.extname(full).toLowerCase() !== '.md') return { ok: false, reason: 'outside' };
+  const err = await shell.openPath(full);
+  return err ? { ok: false, reason: 'missing' } : { ok: true };
+}
+
 // ── 알림
 function notify(title, body, onClick) {
   if (!Notification.isSupported()) return;
@@ -960,6 +976,8 @@ if (!app.requestSingleInstanceLock()) {
       ...langPayload(),
     }));
     ipcMain.on('office:open-external', (_e, url) => openExternal(url));
+    // 승인받은 계획서 열기. 경로 검증은 main에서 한다(openPlan) — 렌더러 값을 그대로 믿지 않는다.
+    ipcMain.handle('office:openPlan', (_e, file) => openPlan(file));
     ipcMain.on('office:copy', (_e, text) => clipboard.writeText(String(text ?? '')));
 
     // 발견한 세션의 터미널을 열어 준다. 렌더러가 만든 명령 문자열은 받지 않는다 —

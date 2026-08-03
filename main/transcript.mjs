@@ -262,6 +262,52 @@ function scanAides(lines) {
 // 줄 단위로 본다. 병렬 호출이면 한 줄에 결과가 여럿 들어오는데, 그 안에 하나라도 성공이
 // 있으면 뭔가는 되고 있다는 뜻이라 연속을 끊는다. JSON 파싱 없이 훑는다 — tool_result 줄이
 // 가장 크고, 여기서 필요한 건 참·거짓 하나뿐이다.
+// 이 세션이 승인받은 계획. 플랜 모드를 빠져나올 때 `ExitPlanMode` tool_use에
+// `{ plan, planFilePath }`가 실려 온다 — **세션과 계획 파일을 잇는 유일한 구조적 단서다.**
+//
+// 실측으로 확인한 것: 계획 경로는 `Write`·`Read`·`Agent` 줄에도 나타나지만 그건 계획을 파일로
+// 쓰거나 읽은 흔적일 뿐 "이 세션이 승인받은 계획"이라는 뜻이 아니다(남의 계획을 읽었을 수도 있다).
+// 그래서 `ExitPlanMode`만 본다.
+//
+// 비서(`scanAides`)와 같은 처지라 **따로 뒤에서 앞으로 훑는다.** 플랜은 세션 앞부분에서 한 번
+// 승인되므로 본문 파싱 루프가 도중에 멈추기 전에 잘려 나간다. 같은 이유로 대화가 아주 바쁘면
+// 꼬리 320KB 밖으로 밀려나 계획이 안 보일 수 있다 — 그건 비서도 같다.
+//
+// 제목은 `plan` 본문 첫 제목 줄에서 뽑는다. 파일이 지워졌어도 트랜스크립트에 본문이 남아 있어
+// 제목만은 나온다.
+export function scanPlan(lines) {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    if (!line || line.length > MAX_LINE) continue;
+    if (!line.includes('"name":"ExitPlanMode"')) continue;
+
+    let o;
+    try {
+      o = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const content = o?.message?.content;
+    if (!Array.isArray(content)) continue;
+    for (const c of content) {
+      if (c?.type !== 'tool_use' || c.name !== 'ExitPlanMode') continue;
+      const file = typeof c.input?.planFilePath === 'string' ? c.input.planFilePath : '';
+      const body = typeof c.input?.plan === 'string' ? c.input.plan : '';
+      // 첫 `#` 제목 줄. 없으면 첫 비어 있지 않은 줄.
+      const head = body
+        .split('\n')
+        .map((l) => l.trim())
+        .find((l) => l.startsWith('#'));
+      const first = body.split('\n').map((l) => l.trim()).find(Boolean) ?? '';
+      const title = flat((head ?? first).replace(/^#+\s*/, ''), 120);
+      if (!file && !title) continue;
+      // 뒤에서 앞으로 훑으니 처음 만난 것이 마지막 승인이다 — 플랜을 두 번 짤 수 있다
+      return { file, title, at: Date.parse(o.timestamp || '') || null };
+    }
+  }
+  return null;
+}
+
 export function scanErrorRun(lines) {
   let run = 0;
   for (let i = lines.length - 1; i >= 0; i--) {
@@ -285,6 +331,7 @@ function parseTail(text) {
     usage: null,
     model: null,
     aides: [],
+    plan: null,
     turns: [],
     errorRun: 0,
   };
@@ -294,6 +341,7 @@ function parseTail(text) {
   // 비서는 따로 훑는다. 아래 루프는 필요한 걸 다 주우면 도중에 멈추는데,
   // 에이전트를 띄운 줄은 몇 분 전 것이라 그 전에 잘려 나가기 때문이다.
   out.aides = scanAides(lines);
+  out.plan = scanPlan(lines);
   out.errorRun = scanErrorRun(lines);
 
   for (let i = lines.length - 1; i >= 0; i--) {
@@ -429,6 +477,7 @@ export async function readTranscript(cwd, sessionId) {
     summary: parsed.summary,
     lastMessage: parsed.lastMessage,
     aides: parsed.aides,
+    plan: parsed.plan,
     mode: parsed.mode,
     links: parsed.links,
     model: parsed.model,

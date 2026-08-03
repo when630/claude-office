@@ -481,6 +481,22 @@ function workerPanel(w) {
         : ''
     }
     ${w.detail ? `<section class="block"><h3>${t('panel.detail')}</h3><p>${esc(w.detail)}</p></section>` : ''}
+    ${
+      // 승인받은 계획. 제목은 트랜스크립트에 실려 온 plan 본문에서 뽑은 것이라 파일이 지워졌어도
+      // 남는다. 그래서 파일이 있을 때만 버튼을 붙이고, 제목만 있으면 제목만 적는다.
+      w.plan?.title || w.plan?.file
+        ? `<section class="block plan">
+            <h3>${t('panel.plan')}</h3>
+            <p>${esc(w.plan.title) || t('panel.planUntitled')}</p>
+            ${
+              w.plan.file
+                ? `<button class="plan-open" type="button" data-plan="${esc(w.plan.file)}">${t('panel.planOpen')}</button>
+                   <p class="hint plan-msg"></p>`
+                : ''
+            }
+          </section>`
+        : ''
+    }
     ${todoBlock(w.tasks)}
     ${
       w.lastPrompt
@@ -531,6 +547,20 @@ function workerPanel(w) {
   `;
 }
 
+// 계획서 열기. 파일이 사라졌을 수 있으므로(계획은 사람이 지운다) 실패를 화면에 적는다 —
+// 눌렀는데 아무 일도 안 일어나는 것이 가장 나쁘다.
+function wirePlan() {
+  const btn = panel.querySelector('.plan-open');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    const msg = panel.querySelector('.plan-msg');
+    btn.disabled = true;
+    const res = await window.office?.openPlan?.(btn.dataset.plan).catch(() => null);
+    btn.disabled = false;
+    if (msg) msg.textContent = res?.ok ? '' : t(res?.reason === 'outside' ? 'panel.planBad' : 'panel.planGone');
+  });
+}
+
 // 터미널을 띄우는 일은 main이 한다(main/terminal.mjs). 여기서는 누구인지만 넘긴다 —
 // 명령 문자열을 넘기면 그게 임의 명령 실행 통로가 되므로 id만 보낸다.
 function wireJump() {
@@ -579,6 +609,7 @@ function drawPanel() {
       if (tag) tag.textContent = t('panel.copy');
     }, 1200);
   });
+  wirePlan();
   wireJump();
   paintBars();
   tickPanel();

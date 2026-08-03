@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('office', {
   copy: (text) => ipcRenderer.send('office:copy', text),
   // 세션의 작업 디렉터리에서 attach 명령을 실행하는 터미널을 띄운다 — id만 넘긴다
   openTerminal: (target) => ipcRenderer.invoke('office:openTerminal', target),
+  // 승인받은 계획서(.md)를 기본 편집기로 — 경로 검증은 main이 한다
+  openPlan: (file) => ipcRenderer.invoke('office:openPlan', file),
   // 출근부 — 오늘·최근 7일 집계 (main/history.mjs)
   history: () => ipcRenderer.invoke('office:history'),
   // 설정 창의 알림 설정 — 종류별 on/off와 방해금지 (트레이 메뉴와 같은 값)
