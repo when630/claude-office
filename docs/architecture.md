@@ -22,10 +22,11 @@ Electron 43 · 런타임 의존성은 자동 업데이트(electron-updater) 하�
 
 ```
 main/index.mjs      앱 수명주기 · 창 · 트레이 · 알림 · 폴링 · 설정(settings.json)
-main/paths.mjs      ~/.claude 위치 (서로 import하지 않게 여기로 뺐다)
+main/paths.mjs      ~/.claude 위치와 cwd→방 이름 셈법 (서로 import하지 않게 여기로 뺐다)
 main/collect.mjs    세션·잡·트랜스크립트·사용량 → 스냅샷 한 장
 main/transcript.mjs 대화 파일 꼬리에서 제목·상황·MR·컨텍스트·비서 캐내기
 main/tasks.mjs      세션이 세운 할 일 목록 (tasks/<sessionId>/<n>.json)
+main/prompts.mjs    내가 친 프롬프트 이력 (~/.claude/history.jsonl) — 읽기만 한다
 main/usage.mjs      office-usage.json → 5시간·주간 사용률
 main/notify.mjs     무엇을 알릴지 — 대기 재알림·컨텍스트·사용량 문턱 판정.
                     Electron을 모르고 `now`를 인자로 받는다(그래서 테스트가 된다)
@@ -80,6 +81,8 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   문턱을 건드렸으면 `npm test`로 확인한다 (시각을 인자로 받으므로 30분을 기다릴 필요가 없다)
 - `main/tasks.mjs` — 패널에 늘어놓을 최대 개수(`MAX_ITEMS`), 캐시 열쇠(`signature` — 디렉터리
   mtime으로는 제자리 덮어쓰기를 못 본다. 주석에 이유가 있다)
+- `main/prompts.mjs` — 읽는 꼬리 길이(`TAIL_BYTES`), 건너뛸 줄 길이(`MAX_LINE`).
+  집계(`summarizePrompts`)에 **문장을 담지 않는다** — 출근부 화면으로 가는 값이다
 - `main/terminal.mjs` — 터미널을 띄우는 방법(`openWindows`·`openMac`), 셸에 넘길 id의 허용 문자(`ID_OK`).
   다른 터미널 앱을 쓰려면 여기에 분기를 넣는다
 - `main/history.mjs` — 무엇을 남길지(`diffEvents`), 시간을 어떻게 셀지(`summarize`·`BUCKET`),
@@ -103,3 +106,14 @@ README의 캡처(`docs/images/en`·`docs/images/ko`)도 그렇게 구운 것이�
 `window.office`를 세워 스냅샷을 밀어 넣고, 화면 밖에 **보이게** 띄운 창을 `capturePage`로 찍는다.
 숨긴 창은 컴포지터가 프레임을 제시하지 않아 애니메이션 순간이 잡히지 않는다.
 두 언어 캡처는 같은 시각(로드 후 경과 ms)에 찍어야 배치가 겹친다.
+
+굽는 스크립트를 새로 짤 때 걸리는 것 넷:
+
+- **최상위에서 `await app.whenReady()`를 하면 교착한다.** ESM 진입점은 모듈 평가가 끝난 뒤에야
+  Electron이 `appCodeLoaded()`를 부르고 그 다음에 `ready`가 뜬다 — 모듈이 ready를 기다리고
+  ready가 모듈을 기다린다. `app.whenReady().then(run)` 안에서 다 해야 한다
+- 화면 밖 창의 `capturePage`가 **`UnknownVizError`로 튕긴다.** `app.disableHardwareAcceleration()`을
+  ready 전에 부르고, 그래도 한 번은 튕기므로 몇 번 다시 부른다
+- **가짜 preload를 쓸 때는 `sandbox: false`가 필요하다.** 샌드박스 preload에는 `fs`도
+  `process.env`도 없어서 미리 정해 둔 응답을 파일에서 읽을 수 없다(진짜 앱은 샌드박스가 켜져 있다)
+- 창이 좁으면 오른쪽 패널이 잘린 채 찍힌다. 패널까지 보려면 1900px쯤 잡는다

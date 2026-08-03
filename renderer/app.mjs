@@ -1091,6 +1091,33 @@ function attSummary(s) {
     </dl>`;
 }
 
+// 내가 시킨 것. 출근부의 다른 숫자는 다 "게가 뭘 했나"인데 이것만 내 쪽이다.
+//
+// 출처가 다르다는 것을 밝혀야 한다 — 이 값은 우리 근태 파일이 아니라 Claude Code가 남기는
+// 프롬프트 이력에서 그때그때 센 것이라 **앱이 꺼져 있던 동안도 셈에 들어간다.** 같은 표에
+// 섞으면 "앱이 돌던 동안만 기록된다"는 다른 숫자들의 단서와 어긋난다.
+const MINE_ROOMS = 6;
+
+function attMine(mine) {
+  if (!mine) return '';
+  const shown = mine.rooms.slice(0, MINE_ROOMS);
+  return `<section class="block">
+    <h3>${t('att.mine')}</h3>
+    <dl class="facts">
+      <div><dt>${t('att.minePrompts')}</dt><dd>${t('att.minePromptsValue', { n: mine.count })}</dd></div>
+      <div><dt>${t('att.mineRooms')}</dt><dd>${t('att.mineRoomsValue', { n: mine.rooms.length })}</dd></div>
+    </dl>
+    ${
+      shown.length
+        ? `<ul class="att-mine">${shown
+            .map((r) => `<li><span title="${esc(r.room)}">${esc(r.room)}</span><b>${r.count}</b></li>`)
+            .join('')}</ul>`
+        : `<p class="dim">${t('att.mineEmpty')}</p>`
+    }
+    <p class="hint">${t('att.mineHint')}</p>
+  </section>`;
+}
+
 function attRooms(s) {
   if (!s.rooms.length) return `<p class="dim">${t('att.empty')}</p>`;
   return `<table class="att-rooms">
@@ -1152,6 +1179,7 @@ function drawAtt() {
     </section>
 
     ${attWaits(s)}
+    ${attMine(attRange === 'week' ? attData.mine?.week : attData.mine?.today)}
 
     ${
       attData.on

@@ -230,6 +230,14 @@ export default {
     offHint:
       '근태 기록이 꺼져 있습니다 — 지금은 아무것도 쌓이지 않습니다. <b>트레이 아이콘 &gt; 근태 기록</b>에서 켤 수 있습니다.',
     offlineHint: '앱이 꺼져 있던 동안은 세지 않습니다. 볼 수 없었던 시간이라 근태로 넣으면 거짓이 됩니다.',
+    mine: '내가 시킨 것',
+    minePrompts: '지시',
+    minePromptsValue: '{n}번',
+    mineRooms: '방',
+    mineRoomsValue: '{n}곳',
+    mineEmpty: '이 구간에 넣은 지시가 없습니다.',
+    mineHint:
+      '이 숫자만 Claude Code가 남기는 프롬프트 이력에서 셉니다 — 위의 다른 숫자와 달리 <b>앱이 꺼져 있던 동안도 셈에 들어갑니다.</b> 지시 내용은 세지도, 남기지도 않습니다.',
     unknownRoom: '(알 수 없음)',
   },
 
