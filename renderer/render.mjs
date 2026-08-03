@@ -489,6 +489,10 @@ function drawRackLeds(ctx, p, t) {
   }
 }
 
+// 프린터 배출 주기와 종이가 자라는 최대 길이
+const PRINT_CYCLE = 5600;
+const PRINT_MAX = 4;
+
 function drawProps(ctx, box, t) {
   for (const p of box.props) {
     drawSprite(ctx, p.spr, p.x, p.y);
@@ -502,6 +506,21 @@ function drawProps(ctx, box, t) {
       // 선풍기 날개가 돌아가는 티만 낸다
       ctx.fillStyle = Math.floor(t / 90) % 2 ? '#d5dce8' : '#98a0af';
       ctx.fillRect(p.x + 3, p.y + 3, 3, 1);
+    }
+    // 프린터가 주기적으로 종이를 뱉는다. 배출구에서 한 장이 자라 나오다 사라진다 —
+    // 시간만으로 도는 것이라 걷는 좌표와 무관하다.
+    if (p.key === 'printer') {
+      const ph = (t % PRINT_CYCLE) / PRINT_CYCLE;
+      if (ph < 0.5) {
+        const grow = Math.round(ph * 2 * PRINT_MAX);
+        if (grow > 0) rect(ctx, p.x + 2, p.y + p.spr.h - 3, p.spr.w - 4, 1, COLORS.board);
+        if (grow > 1) rect(ctx, p.x + 2, p.y + p.spr.h - 2, p.spr.w - 4, grow - 1, '#cdd4e0');
+      }
+    }
+    // 아케이드 화면이 깜빡인다 — 아무도 안 부르는 방에서 혼자 돌아가는 오락기
+    if (p.key === 'arcade') {
+      ctx.fillStyle = Math.floor(t / 420) % 2 ? '#6fd3ee' : '#2b6f88';
+      ctx.fillRect(p.x + 2, p.y + 2, p.spr.w - 4, 1);
     }
   }
 }
@@ -1212,11 +1231,59 @@ function deskBounds(seat) {
 }
 
 // 구간 i가 끝났을 때 서 있을 자리. 시간만으로 정해지므로 상태를 들고 있지 않다.
+// ── 비품 앞에 들르기.
+//
+// 방 비품은 바닥 좌우 끝에 서 있는데(placeProps) 게들은 그 앞을 **그냥 지나쳤다** —
+// 커피머신 램프 말고는 상호작용이 하나도 없었다.
+//
+// 모임(`box.hang`)과 **같은 패턴**이다: 목표 지점만 갈아 끼우고 걷는 방식은 건드리지 않는다.
+// 부드러움은 `walkPos`의 보간이 만들고 목표가 어디인지와 무관하므로 프레임 간 이동량도 그대로다.
+// 목표는 `(seat, i)`만으로 정해지고 늘 자기 구역 안으로 clamp된다 — 두 조건이 점프를 막는다.
+//
+// **자기 구역(bandBounds) 안의 비품만** 들른다. 밖으로 나가면 남의 구역을 밟는다.
+const VISIT_EVERY = 4; // 네 구간에 한 번
+// 들를 만한 것 — 사람이 다가갈 이유가 있는 비품만. 서버 랙·소화기 앞에 설 일은 없다.
+const VISIT_KEYS = ['vending', 'cooler', 'coffee', 'arcade', 'sofa'];
+// 마시는 것 앞에 섰으면 컵을 들고 있다
+const DRINK_KEYS = ['vending', 'cooler', 'coffee'];
+const VISIT_GAP = 10; // 비품 옆에 서는 거리 (겹쳐 서지 않게)
+
+const isVisitSeg = (i) => i % VISIT_EVERY === 0;
+
+function visitable(seat) {
+  const b = bandBounds(seat);
+  return (seat.box.props ?? []).filter((p) => {
+    if (!VISIT_KEYS.includes(p.key)) return false;
+    const cx = p.x + p.spr.w / 2;
+    return cx >= b.x0 && cx <= b.x1;
+  });
+}
+
+// 이 구간에 들를 비품. 없으면 null.
+function visitOf(seat, i) {
+  if (!isVisitSeg(i) || seat.worker.mood === 'waiting') return null;
+  const list = visitable(seat);
+  if (!list.length) return null;
+  return list[Math.floor(rnd(hashStr(seat.worker.key), i * 3 + 7) * list.length)];
+}
+
 function spot(seat, i, t) {
   const seed = hashStr(seat.worker.key);
   if (seat.worker.mood === 'waiting') {
     const b = deskBounds(seat);
     return { x: b.x0 + rnd(seed, i * 2) * (b.x1 - b.x0), y: b.y0 + rnd(seed, i * 2 + 1) * (b.y1 - b.y0) };
+  }
+
+  const prop = visitOf(seat, i);
+  if (prop) {
+    const b = bandBounds(seat);
+    const cx = prop.x + prop.spr.w / 2;
+    // 비품을 밟지 않게 옆에 선다. 구역 안에 남는 쪽을 고른다 — 벽 끝 비품은 안쪽에 선다.
+    const right = clamp(cx + VISIT_GAP, b.x0, b.x1);
+    const left = clamp(cx - VISIT_GAP, b.x0, b.x1);
+    const x = Math.abs(right - cx) >= VISIT_GAP ? right : left;
+    // 비품은 바닥 아래끝에 서 있으므로 그 줄에 맞춰 선다
+    return { x, y: b.y1 };
   }
   if (isHang(i, t)) {
     const full = floorBounds(seat);
@@ -1233,7 +1300,9 @@ function spot(seat, i, t) {
 
 // 구간 경계는 모두가 공유한다 — 그래야 같은 순간에 다 같이 멈춰 서서 떠들 수 있다.
 // 도착 시각(walkPart)만 게마다 흩어 놓아 줄줄이 행진하는 것처럼 보이지 않게 한다.
-function walkPos(seat, t) {
+// 테스트에서 프레임 간 이동량을 재려고 내보낸다 — 이 앱이 앵커를 도입해 가며 없앤 점프가
+// 다시 들어오는지 지키는 자리다(test/walk.test.mjs).
+export function walkPos(seat, t) {
   const seed = hashStr(seat.worker.key);
   const i = Math.floor(t / SEG_MS);
   const f = (t % SEG_MS) / SEG_MS;
@@ -1247,6 +1316,8 @@ function walkPos(seat, t) {
     y: a.y + (c.y - a.y) * k,
     moving: f < part && dist > 4,
     atHang: isHang(i + 1, t) && f >= part,
+    // 도착해서 멈춰 있는 동안에만 "비품 앞"이다 — 걸어가는 중에 컵이 생기면 안 된다
+    atProp: f >= part ? (visitOf(seat, i + 1)?.key ?? null) : null,
     seg: i,
     f,
   };
@@ -1278,6 +1349,8 @@ function clawdStanding(worker, t, pos, chat) {
   // 걷기는 대각선 짝으로 — 두 프레임의 접지선이 같아야 하므로 몸통은 띄우지 않는다
   if (pos.moving) return Math.floor(t / 160) % 2 ? SPR.stepA : SPR.stepB;
   if (chat) return Math.floor(t / 220) % 2 ? SPR.chat : SPR.stand;
+  // 자판기·정수기·커피머신 앞에 섰으면 컵을 들고 있다 — 들렀다는 표시가 이것뿐이다
+  if (DRINK_KEYS.includes(pos.atProp)) return SPR.sip;
   // 모여 있을 때는 절반쯤이 머그를 들고 있다 — 정수기 앞 풍경
   if (pos.atHang && hashStr(worker.key) % 2) return SPR.sip;
   return worker.mood === 'done' ? SPR.armsUp : SPR.stand;
