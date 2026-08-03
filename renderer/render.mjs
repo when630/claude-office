@@ -855,16 +855,32 @@ function drawFloorMess(ctx, box, tint) {
   if (dim !== 1) ctx.restore();
 }
 
-// 자리 모양과 무관하게 **상판 오른쪽 끝**에 쌓는다. 모니터·키보드·플라스크는 다 왼쪽~가운데에
-// 있고 비서는 상판 아래(DY_DESK.aide)에 서므로 이 자리만 비어 있다.
-function drawPaperStack(ctx, seat, surface) {
-  const n = paperCount(seat.worker.context?.pct);
-  if (!n) return 0;
+// 더미를 쌓는 일만 하는 조각 — 맨 아랫장의 왼쪽(x)과 바닥줄(bottom)은 부르는 쪽이 정한다.
+// 회의실은 상판이 자리 것이 아니라 블록 것이라 좌표를 따로 잡아야 해서 갈라 뒀다.
+//
+// 어긋나는 방향은 **늘 왼쪽**이다. 왼쪽 끝에 놓는 자리에서 오른쪽으로 기울여 봤더니 더미가
+// 오른쪽 비품(실험대 플라스크) 쪽으로 자라 하나로 뭉쳐 보였다 — 방향을 자리마다 뒤집는 대신
+// 왼쪽 끝에 놓는 자리는 PAPER_INSET만큼 안쪽에서 시작한다.
+function stackPapers(ctx, x, bottom, n) {
   const spr = SPR.papers;
-  for (let i = 0; i < n; i++) {
-    drawSprite(ctx, spr, seat.x + 47 - spr.w - i * PAPER_DX, surface + 2 - spr.h - i * PAPER_DY);
-  }
-  return n;
+  for (let i = 0; i < n; i++) drawSprite(ctx, spr, x - i * PAPER_DX, bottom - spr.h - i * PAPER_DY);
+}
+
+// 상판에서 서류 더미가 놓일 x (seat.x 기준).
+//
+// 기본은 **상판 오른쪽 끝**이다 — 모니터·키보드는 왼쪽~가운데에 있고 비서는 상판 아래
+// (DY_DESK.aide)에 서므로 이 자리가 비어 있다. 오른쪽 끝이 이미 찬 자리만 왼쪽 끝을 쓴다:
+// 실험대는 시료 랙, 라운지 낮은 테이블은 머그, 제도판은 펜통이 거기 있다.
+//
+// **왼쪽 끝을 쓸 때 게 몸통(seat.x+21~35)을 밟지 않는지 봐야 한다** — 더미는 상판 윗줄보다
+// 위로 자라므로 가운데에 두면 앉은 게를 덮는다. 그래서 실험대 플라스크는 오른쪽으로 비켰다.
+const PAPER_LEFT_STATIONS = new Set(['bench', 'lowtable', 'drafting']);
+// 상판 왼쪽 끝(+4)에서 안쪽으로 들일 폭 — 다 쌓였을 때 맨 윗장이 딱 상판 끝에 걸린다
+const PAPER_INSET = (PAPER_STEPS.length - 1) * PAPER_DX;
+
+function paperX(seat) {
+  const left = PAPER_LEFT_STATIONS.has(seat.box.theme.station);
+  return seat.x + (left ? 4 + PAPER_INSET : 47 - SPR.papers.w);
 }
 
 function drawDeskItems(ctx, seat, surface, stacked) {
@@ -879,6 +895,10 @@ function drawDeskItems(ctx, seat, surface, stacked) {
 }
 
 // 방 종류별 "일하는 도구". 작업 중일 때만 움직인다 — 멈춰 있으면 대기 중임이 한눈에 보인다.
+//
+// 서류 더미는 **자리 모양과 상관없이** 끝에서 한 번 얹는다. 예전에는 자리마다 부르게 두어
+// 콘솔·제도판·평책상 셋에만 붙어 있었고, 연구실·자료실·라운지에서는 컨텍스트가 90%여도
+// 상판이 깨끗했다 — 방 종류에 따라 표시가 있다 없다 하면 그 표시를 못 믿는다.
 function drawGear(ctx, seat, t) {
   const { worker } = seat;
   const { theme } = seat.box;
@@ -888,6 +908,7 @@ function drawGear(ctx, seat, t) {
   // 모니터에 코드가 흐르고 플라스크가 끓는다.
   const busy = worker.mood === 'typing' && sitsNow(seat);
   const seed = hashStr(worker.key);
+  const papers = paperCount(worker.context?.pct);
 
   switch (theme.station) {
     case 'console': {
@@ -899,17 +920,17 @@ function drawGear(ctx, seat, t) {
         const on = rnd(seed, i * 3 + Math.floor(t / 300)) > (busy ? 0.3 : 0.75);
         rect(ctx, seat.x + 34 + i * 2, surface + 3, 1, 1, on ? '#8fd6b4' : '#2b313b');
       }
-      drawPaperStack(ctx, seat, surface); // LED는 상판 아래줄이라 겹치지 않는다
       break;
     }
     case 'bench': {
-      // 플라스크에서 거품이 오른다
-      drawSprite(ctx, SPR.flask, seat.x + 8, surface + 2 - SPR.flask.h);
+      // 플라스크에서 거품이 오른다. 왼쪽 끝(+4~14)은 서류 더미 몫이라 그만큼 비켜 놓는다 —
+      // 오른쪽으로 더 밀면 앉은 게 몸통(+21부터)에 걸린다.
+      drawSprite(ctx, SPR.flask, seat.x + 16, surface + 2 - SPR.flask.h);
       if (busy) {
         ctx.fillStyle = '#8fd6b4';
         for (let i = 0; i < 3; i++) {
           const ph = (t / 260 + i * 0.7) % 1;
-          rect(ctx, seat.x + 9 + i, surface - 5 - Math.round(ph * 5), 1, 1, '#8fd6b4');
+          rect(ctx, seat.x + 17 + i, surface - 5 - Math.round(ph * 5), 1, 1, '#8fd6b4');
         }
       }
       // 시료 랙
@@ -925,7 +946,6 @@ function drawGear(ctx, seat, t) {
       const grow = busy ? (t / 3400) % 1 : 0.62;
       rect(ctx, sheet.x + 2, sheet.y + 1, Math.round((sheet.w - 6) * grow), 1, `hsl(${seat.box.hue} 60% 55%)`);
       rect(ctx, sheet.x + 2, sheet.y + 4, Math.round((sheet.w - 10) * grow), 1, `hsl(${seat.box.hue} 60% 45%)`);
-      drawPaperStack(ctx, seat, surface); // 제도용지는 상판 아래줄이라 겹치지 않는다
       drawSprite(ctx, SPR.pencup, seat.x + 42, surface + 2 - SPR.pencup.h);
       break;
     }
@@ -946,9 +966,12 @@ function drawGear(ctx, seat, t) {
     default: {
       drawMonitor(ctx, seat.x + 5, seat.y + 10, worker, t);
       drawKeyboard(ctx, cx - 3, surface + 1, worker, t);
-      drawDeskItems(ctx, seat, surface, drawPaperStack(ctx, seat, surface));
+      drawDeskItems(ctx, seat, surface, papers);
     }
   }
+
+  // 비품을 다 놓은 뒤에 얹는다 — 더미가 상판 윗줄 위로 자라므로 먼저 그리면 비품에 깎인다
+  if (papers) stackPapers(ctx, paperX(seat), surface + 2, papers);
 }
 
 // ── 회의 테이블. 자리마다 상판을 그리면 "책상을 이어붙인 줄"로 보인다 —
@@ -1009,6 +1032,13 @@ function drawNamePlate(ctx, seat, scale, seated, isSel) {
 }
 
 // 가까운 쪽 자리 앞에 놓인 자료와 머그. 상판 앞쪽(게 머리 위)이라 게보다 먼저 그린다.
+//
+// 컨텍스트 서류 더미도 여기서 얹는다 — 회의실은 상판이 자리 것이 아니라 블록 것이라
+// drawGear를 거치지 않는다. **가까운 쪽에만** 쌓는다: 24px 상판을 마주 앉은 두 줄이 나눠 쓰고
+// 먼 쪽 절반은 명패(3~11줄)와 게이지(12줄)가 이미 다 쓴다 — 거기에 더미를 얹으면 이름을
+// 5글자로 잘라야 한다. 먼 쪽 자리는 바닥에 흘린 것으로 읽는다.
+const MEET_PAPER_X = 42; // 머그(+34~41) 오른쪽 끝 — 왼쪽으로 어긋나 쌓여도 머그 위로는 안 온다
+
 function drawPlaceSetting(ctx, seat, blockTop, t) {
   const bottom = blockTop + MEET_NEAR - 1; // 앞면 바로 위
   drawSprite(ctx, SPR.docs, seat.x + 12, bottom - SPR.docs.h);
@@ -1018,6 +1048,8 @@ function drawPlaceSetting(ctx, seat, blockTop, t) {
     ctx.fillStyle = '#8fb7d8';
     ctx.fillRect(seat.x + 13 + (Math.floor(t / 300) % 4), bottom - SPR.docs.h - 2, 1, 1);
   }
+  const papers = paperCount(seat.worker.context?.pct);
+  if (papers) stackPapers(ctx, seat.x + MEET_PAPER_X, bottom, papers);
 }
 
 // ── 비서. 서브에이전트가 돌고 있는 동안 자리 옆에 서서 진행 상황을 보고한다.
