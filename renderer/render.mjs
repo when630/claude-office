@@ -769,7 +769,11 @@ function drawMonitor(ctx, left, top, worker, t, w = 13, h = 11) {
 
 // 책상 위 잡동사니. 자리마다 다르게 보이되 새로 고쳐도 그대로여야 하므로 해시로 고른다.
 // 넓은 오른쪽 칸(7~8px)과 좁은 왼쪽 칸(5px)에 각각 하나까지.
-const DESK_WIDE = ['mug', 'snack', 'papers', 'phone', 'headset', 'mug'];
+//
+// **여기에 `papers`를 두지 않는다.** 상판 더미와 바닥에 흘린 것이 둘 다 컨텍스트를 말하게 된
+// 뒤로는, 컨텍스트가 낮은데 우연히 서류가 놓인 자리가 그 뜻을 흐린다 —
+// 이제 **서류가 보이면 컨텍스트**다.
+const DESK_WIDE = ['mug', 'snack', 'phone', 'headset', 'mug'];
 const DESK_NARROW = ['sticky', 'can'];
 
 // ── 컨텍스트가 차면 책상에 서류가 쌓인다.
