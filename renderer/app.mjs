@@ -872,13 +872,15 @@ function noIpc() {
 // 접혀 버리면 읽던 문장이 손가락 밑에서 사라진다.
 const openHints = new Set();
 
-function hint(key) {
+// `?` 하나와 그 아래 접힌 설명. 두 창이 함께 쓴다 — 그래서 제목 문구도 공용(`common`)이다.
+// `params`는 `{days}`처럼 문구에 채울 값이다.
+function hint(key, params) {
   const on = openHints.has(key);
   return `<p class="hint-line">
       <button type="button" class="hint-btn${on ? ' on' : ''}" data-hint="${esc(key)}"
-        aria-expanded="${on}" title="${t('cfg.hintTitle')}">?</button>
+        aria-expanded="${on}" title="${t('common.hintTitle')}">?</button>
     </p>
-    <p class="hint" ${on ? '' : 'hidden'}>${t(key)}</p>`;
+    <p class="hint" ${on ? '' : 'hidden'}>${t(key, params)}</p>`;
 }
 
 function hotkeyBlock() {
@@ -1171,19 +1173,25 @@ cfgBody.addEventListener('change', (e) => {
   saveView({ roomAlias: next });
 });
 
+// ? 캡션 여닫기. 설정 창과 출근부가 함께 쓴다.
+//
+// **다시 그리지 않고 그 자리에서 여닫는다** — 값은 하나도 안 바뀌었으므로 판을 다시 짜면
+// 스크롤 위치가 튀고, 출근부 쪽은 막대 폭을 다시 칠해야 한다.
+function toggleHint(btn) {
+  const key = btn?.dataset?.hint;
+  if (!key) return false;
+  if (openHints.has(key)) openHints.delete(key);
+  else openHints.add(key);
+  const on = openHints.has(key);
+  btn.classList.toggle('on', on);
+  btn.setAttribute('aria-expanded', String(on));
+  const body = btn.closest('.hint-line')?.nextElementSibling;
+  if (body?.classList.contains('hint')) body.hidden = !on;
+  return true;
+}
+
 cfgBody.addEventListener('click', (e) => {
-  const hintKey = e.target?.dataset?.hint;
-  if (hintKey) {
-    // 다시 그리지 않고 그 자리에서 여닫는다 — 값은 하나도 안 바뀌었으므로
-    if (openHints.has(hintKey)) openHints.delete(hintKey);
-    else openHints.add(hintKey);
-    const on = openHints.has(hintKey);
-    e.target.classList.toggle('on', on);
-    e.target.setAttribute('aria-expanded', String(on));
-    const body = e.target.closest('.hint-line')?.nextElementSibling;
-    if (body?.classList.contains('hint')) body.hidden = !on;
-    return;
-  }
+  if (toggleHint(e.target)) return;
   if (e.target.classList?.contains('cfg-reset')) {
     saveView({ roomThemes: {} }).then(drawCfg);
     return;
@@ -1267,7 +1275,7 @@ function attMine(mine) {
             .join('')}</ul>`
         : `<p class="dim">${t('att.mineEmpty')}</p>`
     }
-    <p class="hint">${t('att.mineHint')}</p>
+    ${hint('att.mineHint')}
   </section>`;
 }
 
@@ -1291,7 +1299,7 @@ function attTrend(trend) {
       )
       .join('')}</ul>
     <ul class="spark-axis">${trend.map((d) => `<li>${fmtDay(d.at)}</li>`).join('')}</ul>
-    <p class="hint">${t('att.trendHint', { max: fmtSpan(max) })}</p>
+    ${hint('att.trendHint', { max: fmtSpan(max) })}
   </section>`;
 }
 
@@ -1308,13 +1316,24 @@ function attCodeStats(c) {
   const maxHour = Math.max(...c.hours, 1);
   const busiest = c.days.reduce((a, d) => (d.messages > a.messages ? d : a), c.days[0]);
   const peakHour = c.hours.indexOf(maxHour);
+  // 보이는 자리에는 **무엇인가**를 적는다 — 어디까지의 기록인지. "왜 그런가"(통계 화면을 열 때만
+  // 다시 계산된다)는 `?`로 접는다. 처음에는 그 설명이 첫 줄이었는데, 정작 알고 싶은 것이
+  // 문장 속에 묻혀 있었다.
   return `<section class="att-code">
     <h3>${t('att.code')}</h3>
-    <p class="hint">${
-      c.staleDays
-        ? t('att.codeStale', { to: c.computedTo ?? '—', n: c.staleDays })
-        : t('att.codeFresh', { to: c.computedTo ?? '—' })
-    }</p>
+    <dl class="facts">
+      <div class="wide">
+        <dt>${t('att.codeRange')}</dt>
+        <dd>${esc(c.firstDate ?? '—')} ~ ${esc(c.computedTo ?? '—')}${
+          c.staleDays ? ` <b class="lv-mid">${t('att.codeMissing', { n: c.staleDays })}</b>` : ''
+        }</dd>
+      </div>
+    </dl>
+    ${
+      // `?`는 설명이 필요한 자리 바로 아래에 둔다 — 물음이 생기는 곳이 "왜 뒤가 비었나"인
+      // 기록 범위 줄이다. 판 맨 아래에 두면 무엇에 대한 설명인지 알 수 없다.
+      hint('att.codeHint')
+    }
     <dl class="facts">
       <div><dt>${t('att.codeSessions')}</dt><dd>${t('att.sessionsValue', { n: c.totalSessions })}</dd></div>
       <div><dt>${t('att.codeMessages')}</dt><dd>${c.totalMessages.toLocaleString()}</dd></div>
@@ -1424,11 +1443,11 @@ function attPane() {
     </section>
     ${attWaits(s)}
     ${
-      attData.on
-        ? `<p class="hint">${t('att.onHint', { days: attData.retainDays })}</p>`
-        : `<p class="hint warn">${t('att.offHint')}</p>`
+      // **기록이 꺼져 있다는 경고는 접지 않는다.** 설명이 아니라 "지금 아무것도 안 쌓이고 있다"는
+      // 상태고, 접으면 모르고 지나간다.
+      attData.on ? '' : `<p class="hint warn">${t('att.offHint')}</p>`
     }
-    <p class="hint">${t('att.offlineHint')}</p>
+    ${hint('att.attHint', { days: attData.retainDays })}
   `;
 }
 
@@ -1509,6 +1528,7 @@ attTabsEl.addEventListener('click', (e) => {
 });
 
 attBody.addEventListener('click', (e) => {
+  if (toggleHint(e.target)) return;
   const range = e.target?.dataset?.range;
   if (!range || range === attRange) return;
   attRange = range;

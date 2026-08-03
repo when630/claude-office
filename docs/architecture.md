@@ -110,7 +110,8 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
 - `main/files.mjs` — 캐시 열쇠(디렉터리 mtime + 엔트리 수). 파일 **이름**은 해시라서 못 얻는다 —
   경로가 필요하면 트랜스크립트의 `Edit`/`Write`에서 가져와야 한다
 - `main/stats.mjs` — 화면에 늘어놓을 일수(`DAYS`)·모델 수(`MODELS`), 낡음 판정(`staleDays` —
-  오늘은 빠진 날로 세지 않는다. 캐시가 설계상 어제까지만 담기 때문이다)
+  오늘은 빠진 날로 세지 않는다. 캐시가 설계상 어제까지만 담기 때문이다),
+  날짜 꼴(`isoDay`·`firstDate` — `computedTo`와 짝을 맞춰야 하므로 형식을 여기서 정한다)
 - `main/terminal.mjs` — 터미널을 띄우는 방법(`openWindows`·`openMac`), 셸에 넘길 id의 허용 문자(`ID_OK`).
   다른 터미널 앱을 쓰려면 여기에 분기를 넣는다
 - `main/history.mjs` — 무엇을 남길지(`diffEvents`), 시간을 어떻게 셀지(`summarize`·`BUCKET`),
