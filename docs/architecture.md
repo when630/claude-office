@@ -61,8 +61,10 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   `drawSurface`·`drawGear`·`clawdSeated`에 분기를 추가한다
 - `shared/lang/en.mjs`·`ko.mjs` — 문장은 전부 여기 있다(UI 문구 · 방 이름 · 캐릭터 대사).
   두 파일의 키 모양이 같아야 하고, `en`이 없는 키의 대체값이다
-- `renderer/talk.mjs` — **언제 무엇을 고르는지**만 정한다(문장은 사전에 있다). 시간대 구간(`TIME_SLOTS`),
-  주기(`CYCLE`·`SHOW`·`AIDE_CYCLE`). 문장을 고를 때 `kind`를 실어 보내면 말풍선 색이 그에 따라 갈린다
+- `renderer/talk.mjs` — **언제 무엇을 고르는지**만 정한다(문장은 사전에 있다). 시간대 구간(`TIME_SLOTS`
+  — 밖에서는 `slotNow()`로 이름으로 묻는다), 주기(`CYCLE`·`SHOW`·`AIDE_CYCLE`·`HUM_CYCLE`),
+  머리 옆 기호(`glyphKeyFor` — 스프라이트가 아니라 키를 돌려주므로 node로 테스트된다).
+  문장을 고를 때 `kind`를 실어 보내면 말풍선 색이 그에 따라 갈린다
 - `renderer/render.mjs` — 방 크기(`SLOT_W`·`SLOT_H`·`FLOOR_BASE`). `layout()`은 두 걸음이다 —
   크기를 재고 줄을 나눈 뒤, **줄마다 가장 높은 방에 맞춰** 나머지 방의 바닥을 늘린다
   (회의실은 테이블 때문에 자리 줄 높이가 달라 그대로 두면 줄이 어긋난다), 자리 배치(`DY_DESK` 주석에 y좌표 정리 · 그리는 곳은 `drawSurface`·`drawGear`·`clawdSeated`),
@@ -70,7 +72,8 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   말풍선 색(`BUBBLE_STYLE`), 방 색상 `HUES`
 - `main/collect.mjs` — `moodOf`(상태 판정), `RECENT_DONE_MS`(퇴근 목록 유지 기간),
   `isSpare`(빈 예비 슬롯 판정), 헤매는 세션 문턱(`STUCK_ERRORS`·`STUCK_QUIET_MS` — 무진전 쪽은
-  긴 빌드가 정상적으로 조용하다는 이유로 넉넉히 잡혀 있다)
+  긴 빌드가 정상적으로 조용하다는 이유로 넉넉히 잡혀 있다),
+  헤매기 직전(`isSlowing`·`SLOWING_QUIET_MS` — 새 상태가 아니라 표시용 신호다)
 - `main/transcript.mjs` — `TAIL_BYTES`(읽는 꼬리 길이), `CONTEXT_LIMITS`(모델별 컨텍스트 창),
   `scanAides`(비서 찾기)·`AIDE_MAX_AGE_MS`(알림 없이 남은 호출을 유령으로 볼 기준),
   `scanErrorRun`(연달아 실패한 도구 호출 — 헤매는 세션 판정에 쓴다),

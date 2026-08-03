@@ -136,6 +136,22 @@ export function isStuck(tr, now = Date.now()) {
   return tr.at != null && now - tr.at >= STUCK_QUIET_MS;
 }
 
+// 헤매기 **직전**. 대화 파일이 조용해지기 시작했지만 아직 stuck 문턱에 못 닿은 구간이다.
+//
+// 새 상태를 만드는 것이 아니다 — mood는 그대로 `typing`이고 화면에 표시(말줄임)만 얹는다.
+// 문턱이 넉넉해서(10분) 그 전까지는 열심히 타자 치는 모습과 구분이 안 됐던 구간을,
+// "헤맨다"고 부르기 전에 사람 눈에 먼저 보이게 하는 것이다.
+//
+// 판정을 여기서 하는 이유: 문턱을 아는 곳이 한 군데여야 한다. 렌더러에 ms를 넘기면
+// 그쪽도 문턱을 들고 있게 되고, 그러면 한쪽만 고치는 일이 생긴다.
+export const SLOWING_QUIET_MS = STUCK_QUIET_MS / 2;
+
+export function isSlowing(tr, mood, now = Date.now()) {
+  if (mood !== 'typing' || tr?.at == null) return false;
+  const quiet = now - tr.at;
+  return quiet >= SLOWING_QUIET_MS && quiet < STUCK_QUIET_MS;
+}
+
 // status(실시간) → needs → state(스냅샷) 순으로 캐릭터의 기분을 정한다.
 //
 // `status: "waiting"`은 Claude Code가 **사용자 답을 기다리는 동안** 직접 넣어 주는 값이다 —
@@ -288,6 +304,7 @@ export async function collect() {
     if (job) seenJobs.add(job.id);
     const st = job?.state ?? {};
     const tr = scripts[i];
+    const mood = moodOf(s, job, tr, now);
 
     workers.push({
       key: job ? `job:${job.id}` : `pid:${s.pid}`,
@@ -300,7 +317,9 @@ export async function collect() {
       room: roomKeyOf(s.cwd),
       kind: s.kind === 'bg' ? 'bg' : 'interactive',
       status: s.status ?? 'idle',
-      mood: moodOf(s, job, tr, now),
+      mood,
+      // 헤매기 직전인가 — mood는 그대로 typing이고 화면에 말줄임만 얹는다
+      slowing: isSlowing(tr, mood, now),
       // 잡은 state.json의 detail이 가장 최신. 터미널 세션은 그런 파일이 없으니
       // 자리를 비운 사용자에게 남긴 요약(away_summary) → 마지막으로 한 말 순으로 대신한다.
       detail: trimText(st.detail || tr?.summary || tr?.lastMessage || ''),

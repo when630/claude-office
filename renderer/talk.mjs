@@ -47,10 +47,64 @@ const TIME_SLOTS = [
   { from: 22, to: 24, key: 'night' },
 ];
 
-function timeLines(now = new Date()) {
+// 지금이 어느 시간대인가. 경계는 TIME_SLOTS 하나로 두고 밖에서는 **이름으로** 묻는다 —
+// 렌더러가 숫자를 따로 들고 있으면 한쪽만 고치는 일이 생긴다.
+export function slotNow(now = new Date()) {
   const h = now.getHours();
-  const slot = TIME_SLOTS.find((s) => h >= s.from && h < s.to);
-  return slot ? t(`talk.time.${slot.key}`) : [];
+  return TIME_SLOTS.find((s) => h >= s.from && h < s.to)?.key ?? '';
+}
+
+function timeLines(now = new Date()) {
+  const slot = slotNow(now);
+  return slot ? t(`talk.time.${slot}`) : [];
+}
+
+// ── 머리 옆에 띄울 기호. **키만 돌려준다** — 그림은 렌더러가 SPR에서 찾아 붙인다.
+//
+// 시간대(slot)와 시각(tms)을 인자로 받으므로 새벽까지 기다리지 않고 테스트할 수 있다.
+// 잡담 짝의 대답 구간 판정(answering)은 구간 경계를 들고 있는 render.mjs가 해서 넘긴다.
+
+// 심야에 할 일 없이 어슬렁거리면 콧노래. 늘 띄우면 장식이 되므로 주기를 두고, 위상은
+// 키 해시로 흩어 다 같이 동시에 흥얼거리지 않게 한다.
+const HUM_CYCLE = 4200;
+
+function humming(key, tms) {
+  return Math.floor((tms + (hashStr(key) % HUM_CYCLE)) / HUM_CYCLE) % 3 === 0;
+}
+
+export function glyphKeyFor(worker, { chat = null, answering = false, phase = null, slot = '', tms = 0 } = {}) {
+  // 잡담 중엔 상태 기호를 접는다. 예외는 하나 — **상대가 답하는 동안** 먼저 말한 쪽 머리에
+  // 하트를 띄운다("들었다"는 표시). 그때는 이쪽 말풍선이 이미 걷혀 있어 겹치지 않고,
+  // 한 구간의 19%(≈1초)라 장식이 아니라 지나가는 순간으로 남는다.
+  if (chat) return chat.role === 0 && answering ? 'gHeart' : null;
+
+  // 막 끝냈다 / 막 시작했다는 표시가 먼저다 — 걸어 나가는 동안에도 계속 붙어 있어야
+  // "다 하고 나가는 것"으로 읽힌다.
+  if (phase?.note === 'done') return 'gCheck';
+  if (phase?.note === 'start') return 'gSpark';
+
+  switch (worker.mood) {
+    case 'waiting':
+      return 'gBang';
+    case 'stuck':
+      return 'gStuck';
+    case 'done':
+      return 'gCheck';
+    case 'failed':
+      return 'gCross';
+    case 'stopped':
+      return 'gZzz';
+    case 'typing':
+      // 헤매기 **직전**. 판정은 main이 한다(collect.mjs의 isSlowing) — mood는 그대로
+      // typing이고 여기서는 표시만 얹는다. 문턱이 10분이라 그 전까지는 열심히 타자 치는
+      // 모습과 구분이 안 됐던 구간이다.
+      return worker.slowing ? 'gDots' : null;
+    case 'idle':
+      // 새벽에 남아 있는 놈은 티가 나야 한다.
+      return slot === 'lateNight' && humming(worker.key, tms) ? 'gNote' : null;
+    default:
+      return null;
+  }
 }
 
 // 둘이 마주쳤을 때 주고받는 대화 — [먼저 말하는 쪽, 대답하는 쪽]
