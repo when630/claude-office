@@ -166,10 +166,16 @@ export default {
   // ── Settings dialog
   cfg: {
     title: 'Settings',
-    notifySection: 'Notifications',
-    hotkeySection: 'Shortcuts',
+    tab: {
+      general: 'General',
+      notify: 'Notifications',
+      rooms: 'Rooms',
+      keys: 'Shortcuts',
+    },
+    quietSection: 'Do not disturb',
     hotkeyToggle: 'Show or hide the window',
     hotkeyJump: 'Open the longest wait',
+    hotkeyMini: 'Toggle the mini window',
     hotkeyNone: 'None',
     hotkeyPress: 'Press a combination…',
     hotkeyTaken: 'Another app has it',
@@ -188,7 +194,7 @@ export default {
     namesNote: 'Name used on desk tags and as the panel heading',
     namesHint:
       'Masking calls them <code>Clawd 1, 2…</code>. Use it when showing your screen to someone — the working directory path still shows in the panel.',
-    roomsSection: 'Rooms — type and alerts',
+    roomTheme: 'Room type',
     roomNotify: 'Alert level',
     roomPin: 'Pin to the front',
     roomCollapse: 'Collapse in the office',

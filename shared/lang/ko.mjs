@@ -163,10 +163,16 @@ export default {
   // ── 설정 창
   cfg: {
     title: '설정',
-    notifySection: '알림',
-    hotkeySection: '단축키',
+    tab: {
+      general: '일반',
+      notify: '알림',
+      rooms: '방',
+      keys: '단축키',
+    },
+    quietSection: '방해금지',
     hotkeyToggle: '창 열고 닫기',
     hotkeyJump: '가장 오래 기다린 세션 열기',
+    hotkeyMini: '작게 띄우기 켜고 끄기',
     hotkeyNone: '없음',
     hotkeyPress: '조합을 누르세요…',
     hotkeyTaken: '다른 앱이 쓰고 있습니다',
@@ -185,7 +191,7 @@ export default {
     namesNote: '사무실 이름표와 패널 제목에 쓰는 이름',
     namesHint:
       '가리면 <code>클로드 1, 2…</code>로 부릅니다. 화면을 남에게 보일 때 쓰세요 — 작업 디렉터리 경로는 패널에 그대로 남습니다.',
-    roomsSection: '방 종류와 알림',
+    roomTheme: '방 종류',
     roomNotify: '알림 세기',
     roomPin: '맨 앞에 고정',
     roomCollapse: '사무실에서 접기',

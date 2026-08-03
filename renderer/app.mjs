@@ -32,6 +32,7 @@ const shownBtn = document.getElementById('room-shown');
 const stageEmpty = document.getElementById('stage-empty');
 const cfgDialog = document.getElementById('cfg');
 const cfgBody = document.getElementById('cfg-body');
+const cfgTabsEl = document.getElementById('cfg-tabs');
 const attDialog = document.getElementById('att');
 const attBody = document.getElementById('att-body');
 
@@ -676,7 +677,9 @@ function options(entries, picked) {
 let hotkeyCfg = null;
 let capturing = null; // 지금 조합을 받고 있는 자리 (toggle | jump)
 
-const HOTKEY_LABEL = { toggle: 'cfg.hotkeyToggle', jump: 'cfg.hotkeyJump' };
+// 자리 목록은 main이 들고 있다(`hotkeys`의 키) — 여기서는 라벨만 붙인다.
+// 목록을 양쪽에 두면 하나를 늘릴 때마다 두 군데를 고쳐야 한다.
+const HOTKEY_LABEL = { toggle: 'cfg.hotkeyToggle', jump: 'cfg.hotkeyJump', mini: 'cfg.hotkeyMini' };
 
 // 눌린 키를 Electron Accelerator로. 수식키만 눌린 동안에는 아직 조합이 아니다.
 function accelOf(e) {
@@ -702,8 +705,13 @@ function accelLabel(accel) {
   return accel.replace('CommandOrControl', /Mac/i.test(navigator.userAgent) ? 'Cmd' : 'Ctrl');
 }
 
+// main이 없으면(브라우저로 직접 연 경우) 이 탭들은 채울 값이 없다 — 빈 화면 대신 이유를 적는다
+function noIpc() {
+  return `<p class="dim">${t('idle.notElectron')}</p>`;
+}
+
 function hotkeyBlock() {
-  if (!hotkeyCfg) return '';
+  if (!hotkeyCfg) return noIpc();
   const row = (action) => {
     const accel = hotkeyCfg.hotkeys[action] ?? '';
     const bad = accel && hotkeyCfg.failed?.includes(accel);
@@ -716,14 +724,14 @@ function hotkeyBlock() {
   };
   return `
     <section class="block">
-      <h3>${t('cfg.hotkeySection')}</h3>
-      ${HOTKEY_ACTIONS.map(row).join('')}
+      ${Object.keys(hotkeyCfg.hotkeys)
+        .filter((a) => HOTKEY_LABEL[a])
+        .map(row)
+        .join('')}
       <p class="hint">${t('cfg.hotkeyHint')}</p>
     </section>
   `;
 }
-
-const HOTKEY_ACTIONS = ['toggle', 'jump'];
 
 async function saveHotkeys(patch) {
   const next = await window.office?.setHotkeys?.(patch).catch(() => null);
@@ -735,12 +743,11 @@ async function saveHotkeys(patch) {
 // 알림 섹션. 트레이 메뉴에도 같은 항목이 있지만 시각을 고르는 일은 메뉴로 못 하고,
 // 종류가 다섯이라 한자리에 펼쳐 보이는 편이 켜고 끄기 쉽다.
 function notifyBlock() {
-  if (!notifyCfg) return '';
+  if (!notifyCfg) return noIpc();
   const q = notifyCfg.quiet;
   const label = (k) => (k === 'done' ? t(KIND_LABEL[k], { d: fmtDur(notifyCfg.doneAfterMs) }) : t(KIND_LABEL[k]));
   return `
     <section class="block">
-      <h3>${t('cfg.notifySection')}</h3>
       ${notifyCfg.kinds
         .filter((k) => KIND_LABEL[k])
         .map(
@@ -750,6 +757,10 @@ function notifyBlock() {
           </label>`,
         )
         .join('')}
+    </section>
+
+    <section class="block">
+      <h3>${t('cfg.quietSection')}</h3>
       <label class="cfg-check">
         <input type="checkbox" id="cfg-quiet-on"${q.hours ? ' checked' : ''}>
         <span>${t('cfg.quiet')}</span>
@@ -765,16 +776,9 @@ function notifyBlock() {
   `;
 }
 
-function drawCfg() {
-  const rooms = state.rooms ?? [];
-  const picked = Object.keys(cfg.roomThemes).length;
-  cfgRooms = roomSig();
-
-  cfgBody.innerHTML = `
-    ${notifyBlock()}
-
-    ${hotkeyBlock()}
-
+// 언어와 이름표 — 화면에 무엇이 어떤 말로 적히는지.
+function generalPane() {
+  return `
     <section class="block">
       <h3>${t('cfg.langSection')}</h3>
       <div class="cfg-row">
@@ -799,9 +803,15 @@ function drawCfg() {
       </div>
       <p class="hint">${t('cfg.namesHint')}</p>
     </section>
+  `;
+}
 
+// 방마다 한 줄 — 종류 · 알림 세기 · 고정 · 접기. 탭 하나를 통째로 쓰므로 제목은 없다.
+function roomsPane() {
+  const rooms = state.rooms ?? [];
+  const picked = Object.keys(cfg.roomThemes).length;
+  return `
     <section class="block">
-      <h3>${t('cfg.roomsSection')}</h3>
       ${
         rooms.length
           ? rooms
@@ -818,7 +828,7 @@ function drawCfg() {
                         }</button>
                     </span>
                   </label>
-                  <select id="cfg-room-${i}" data-room="${esc(r.key)}" aria-label="${t('cfg.roomsSection')}">${options(
+                  <select id="cfg-room-${i}" data-room="${esc(r.key)}" aria-label="${t('cfg.roomTheme')}">${options(
                     [['', t('common.auto')], ...THEMES.map((theme) => [theme.key, theme.label])],
                     cfg.roomThemes[r.key] ?? '',
                   )}</select>
@@ -839,6 +849,28 @@ function drawCfg() {
       <p class="hint">${t('cfg.roomsHint')}</p>
     </section>
   `;
+}
+
+// 탭. 설정이 다섯 갈래로 늘어 한 두루마리에 다 세우면 찾는 데 스크롤이 필요하다.
+// 탭 하나에 한 주제만 담아 이름과 내용이 어긋나지 않게 한다.
+const CFG_TABS = [
+  ['general', generalPane],
+  ['notify', notifyBlock],
+  ['rooms', roomsPane],
+  ['keys', hotkeyBlock],
+];
+// 창을 닫았다 다시 열면 보던 탭이 그대로다. 앱을 껐다 켜면 처음으로 — 저장까지 할 값은 아니다.
+let cfgTab = 'general';
+
+function drawCfg() {
+  cfgRooms = roomSig();
+  const pane = CFG_TABS.find(([k]) => k === cfgTab) ?? CFG_TABS[0];
+
+  cfgTabsEl.innerHTML = CFG_TABS.map(
+    ([k]) => `<button type="button" role="tab" aria-selected="${k === pane[0]}"
+      class="${k === pane[0] ? 'on' : ''}" data-cfg-tab="${k}">${t(`cfg.tab.${k}`)}</button>`,
+  ).join('');
+  cfgBody.innerHTML = pane[1]();
 }
 
 // 화면을 먼저 바꾸고 저장은 뒤따른다 — IPC 응답을 기다리면 select만 움직이고 사무실은 멈춰 있다.
@@ -863,6 +895,14 @@ document.getElementById('cfg-open').addEventListener('click', async () => {
   cfgDialog.showModal();
 });
 document.getElementById('cfg-close').addEventListener('click', () => cfgDialog.close());
+
+cfgTabsEl.addEventListener('click', (e) => {
+  const tab = e.target?.dataset?.cfgTab;
+  if (!tab || tab === cfgTab) return;
+  cfgTab = tab;
+  capturing = null; // 탭을 옮기면 받던 조합은 없던 일이 된다
+  drawCfg();
+});
 
 // 조합을 받는 동안은 창의 다른 단축키(닫기 등)보다 먼저 가로챈다.
 cfgDialog.addEventListener('keydown', (e) => {
