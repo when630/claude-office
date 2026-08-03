@@ -10,6 +10,7 @@ import { CLAUDE_DIR } from './paths.mjs';
 import { readTranscript } from './transcript.mjs';
 import { readUsage } from './usage.mjs';
 import { readNotes, noteNeeds } from './notify-tap.mjs';
+import { readTasks } from './tasks.mjs';
 
 export { CLAUDE_DIR };
 
@@ -241,6 +242,7 @@ function isSpare(w) {
     !w.tokens &&
     !w.context &&
     !w.aides.length &&
+    !w.tasks &&
     !w.timeline.length
   );
 }
@@ -257,6 +259,14 @@ export async function collect() {
     alive.map((s) => {
       const job = s.jobId ? jobs.get(s.jobId) : null;
       return readTranscript(job?.state?.cwd || s.cwd, sessionIdOf(s, job)).catch(() => null);
+    }),
+  );
+
+  // 세션이 세운 할 일 목록(main/tasks.mjs). 대부분 세션은 안 써서 대개 null이다.
+  const todos = await Promise.all(
+    alive.map((s) => {
+      const job = s.jobId ? jobs.get(s.jobId) : null;
+      return readTasks(sessionIdOf(s, job)).catch(() => null);
     }),
   );
 
@@ -296,6 +306,8 @@ export async function collect() {
       intent: trimText(st.intent || '', 160),
       lastPrompt: trimText(tr?.lastPrompt || '', 200),
       aides: aidesOf(st, tr),
+      // 세션이 세운 할 일. 안 쓰는 세션이 대부분이라 null이 기본이다.
+      tasks: todos[i] ?? null,
       mode: tr?.mode || null,
       model: tr?.model || null,
       context: tr?.context ?? null,

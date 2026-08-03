@@ -95,9 +95,22 @@ function trim(s, n) {
   return flat.length > n ? flat.slice(0, n - 1) + '…' : flat;
 }
 
-// 상투구 대신 내보낼 "진짜" 한마디
-function realLine(worker) {
+// 상투구 대신 내보낼 "진짜" 한마디.
+//
+// `i`는 대사 주기 번호다. 후보가 둘이면 번갈아 띄우기 위해 받는다 — 한쪽만 계속 나오면
+// 나머지는 영원히 안 보인다.
+function realLine(worker, i = 0) {
   if (worker.mood === 'waiting' && worker.needs) return trim(worker.needs, 52);
+
+  // 세션이 스스로 "지금 이걸 하는 중"이라고 적은 말(할 일의 activeForm)이 가장 구체적이다.
+  // `내려받은 설정 병합 중`은 우리가 요약한 상황보다 정확하다 — 그 세션이 쓴 문장이다.
+  const active = (worker.tasks?.active ?? []).filter((a) => a.activeForm);
+  if (active.length) {
+    // real은 두 주기마다 한 번만 나오므로(아래 `i % 2`) 그 순번으로 센다
+    const turn = Math.floor(i / 2);
+    if (!worker.detail || turn % 2 === 0) return trim(active[turn % active.length].activeForm, 52);
+  }
+
   if (worker.detail) return trim(worker.detail, 52);
   if (worker.mood === 'typing' && (worker.lastPrompt || worker.intent))
     return trim(worker.lastPrompt || worker.intent, 52);
@@ -152,7 +165,7 @@ export function speechFor(worker, tms, extra = []) {
   const waited = waitedLine(worker);
   if (waited && i % 3 === 1) return { text: waited, alpha: fade(f), kind: 'real' };
 
-  const real = realLine(worker);
+  const real = realLine(worker, i);
   const base = t(`talk.lines.${worker.mood}`);
   // 일하는 중이 아니면 방 분위기와 시간대 얘기도 한다
   // 일하는 중(헤매는 것도 일하는 중이다)이나 기다리는 중에는 방 분위기 얘기를 섞지 않는다

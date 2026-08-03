@@ -497,6 +497,65 @@ b.lv-na {
   display: none;
 }
 
+/* ── 세션이 세운 할 일 목록. 진행 막대 + 아직 안 끝난 항목. */
+.block h3 .todo-count {
+  margin-left: 6px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+/* 다 찬 것이 좋은 막대라서 문턱 색(lv-*)을 쓰지 않고 초록 한 색으로 둔다 */
+.bar.todo i {
+  background: var(--green);
+}
+.todos {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.todos li {
+  display: grid;
+  grid-template-columns: 9px 1fr;
+  gap: 8px;
+  align-items: baseline;
+}
+.todos p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+/* 진행 중인 항목만 또렷하다 — 목록에서 눈이 먼저 가야 하는 한 줄이다 */
+.todos li.in_progress p {
+  color: var(--text);
+}
+.todos .mark {
+  width: 7px;
+  height: 7px;
+  border: 1px solid #3d4553;
+  border-radius: 2px;
+  transform: translateY(-1px);
+}
+.todos li.in_progress .mark {
+  border-color: var(--blue);
+  background: var(--blue);
+}
+/* 막힌 항목은 **빨강으로 칠하지 않는다.** 이 앱에서 빨강은 실패·위험이고(실패 점, 컨텍스트 85%),
+   순서를 기다리는 항목은 잘못된 게 아니라 아직 차례가 아닌 것이다. 목록에서 또렷해야 하는 것은
+   진행 중인 한 줄뿐이므로 나머지는 다 가라앉혀 둔다. */
+.todos li.blocked .mark {
+  border-style: dashed;
+}
+.todos em {
+  margin-left: 6px;
+  color: #5d6779;
+  font-size: 11px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
 /* ── 도움말. 우측 하단 물음표를 누르면 캡션처럼 떠오른다.
    패널이 스크롤돼도 자리가 고정이어야 하므로 fixed로 띄운다. */
 #help-open {
