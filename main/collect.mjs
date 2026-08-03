@@ -309,6 +309,8 @@ export async function collect() {
       aides: aidesOf(st, tr),
       // 세션이 세운 할 일. 안 쓰는 세션이 대부분이라 null이 기본이다.
       tasks: todos[i] ?? null,
+      // 플랜 모드로 승인받은 계획 (ExitPlanMode의 planFilePath). 꼬리 밖으로 밀려나면 null.
+      plan: tr?.plan ?? null,
       mode: tr?.mode || null,
       model: tr?.model || null,
       context: tr?.context ?? null,

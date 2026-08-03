@@ -497,6 +497,32 @@ b.lv-na {
   display: none;
 }
 
+/* ── 승인받은 계획. 제목 한 줄 + 파일 열기. */
+.block.plan p:first-of-type {
+  font-size: 12px;
+}
+.plan-open {
+  margin-top: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #151a22;
+  color: var(--blue);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.plan-open:hover:not(:disabled) {
+  border-color: var(--blue);
+}
+.plan-open:disabled {
+  opacity: 0.5;
+}
+/* 실패했을 때만 글자가 들어온다 — 빈 동안은 여백째로 접어 둔다 */
+.plan-msg:empty {
+  display: none;
+}
+
 /* ── 세션이 세운 할 일 목록. 진행 막대 + 아직 안 끝난 항목. */
 .block h3 .todo-count {
   margin-left: 6px;
