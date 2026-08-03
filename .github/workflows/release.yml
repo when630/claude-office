@@ -9,7 +9,7 @@
 #
 # 그래서 각 잡은 굽기만 하고(`--publish never`) 결과를 artifact로 올린다. 둘 다 끝난 뒤
 # 마지막 잡 하나가 그것을 받아 draft를 **한 번에** 만든다. 릴리스 노트를 쓰고 Publish하는 것은
-# 지금처럼 사람이 한다.
+# 지금처럼 사람이 한다 — draft에는 머지된 PR 목록과 "아직 초안"이라는 표시만 채워 둔다(#105).
 #
 # 코드 서명은 아직 없다 — 맥 잡의 CSC_IDENTITY_AUTO_DISCOVERY=false가 키체인 탐색을 꺼서
 # 서명 없이 빌드를 통과시킨다. 서명을 넣을 때 CSC_LINK 등 시크릿과 함께 이 줄을 지운다.
@@ -102,9 +102,36 @@ jobs:
           done
           [ "$bad" = 0 ]
 
+      # 노트를 `--notes ""`로 비워 두던 것을 그만뒀다. 0.5.0이 **본문 0자로 Publish됐다** —
+      # 화면에서 draft는 자산이 다 붙어 있고 제목도 있어 완성돼 보이므로, 비어 있는 것이
+      # 본문뿐이면 Publish 버튼까지 가는 데 걸리는 것이 없다(#105).
+      #
+      # `--generate-notes`가 머지된 PR 목록을 채우고, `--notes`가 그 **위에** 초안 표시를 붙인다
+      # (gh가 "Additional release notes can be prepended to automatically generated notes"라고
+      # 밝히는 동작이다). 제목은 `--title`을 명시해 자동 생성 제목이 이기지 않게 둔다.
+      #
+      # **자동 생성으로 사람 노트를 대체하려는 게 아니다.** 이 저장소 노트는 커밋 제목이 아니라
+      # 쓰는 사람 말로 다시 쓴다(0.4.0·0.5.0 참고) — 자동 생성은 초안 자리를 채워 두고 안 고쳤으면
+      # 그게 보이게 하는 몫이다. 그래서 표시를 눈에 걸리는 경고 블록으로 둔다.
+      #
+      # Release Notes API가 실패하면 릴리스도 실패한다. 조용히 빈 노트로 떨어지게 하지 않는다 —
+      # 자산은 artifact에 남아 있으니 이 잡만 다시 돌리면 된다.
+      #
+      # 초안 표시는 heredoc이 아니라 env로 넘긴다. `run: |` 안에서 heredoc을 쓰면 종료자를
+      # 블록 들여쓰기에 맞춰야 하는데, 그러면 그 들여쓰기가 노트 본문에 그대로 섞여
+      # 마크다운이 코드 블록으로 읽힌다. YAML 블록 스칼라는 들여쓰기를 벗겨 주므로 이쪽이 깨끗하다.
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
+          DRAFT_HEADER: |
+            > [!IMPORTANT]
+            > **아직 초안입니다.** 아래 목록은 머지된 PR에서 자동으로 뽑은 원재료입니다.
+            > 릴리스 노트는 쓰는 사람 말로 갈래를 짜서 다시 씁니다 — 이 블록을 지우고
+            > 다시 쓴 뒤 Publish하세요. 지난 노트가 본보기입니다.
         run: |
-          gh release create "$TAG" --draft --title "Claude Office ${TAG#v}" --notes "" dist/*
+          gh release create "$TAG" --draft \
+            --title "Claude Office ${TAG#v}" \
+            --generate-notes \
+            --notes "$DRAFT_HEADER" \
+            dist/*
