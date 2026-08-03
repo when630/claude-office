@@ -27,6 +27,7 @@ main/collect.mjs    세션·잡·트랜스크립트·사용량 → 스냅샷 한
 main/transcript.mjs 대화 파일 꼬리에서 제목·상황·MR·컨텍스트·비서 캐내기
 main/tasks.mjs      세션이 세운 할 일 목록 (tasks/<sessionId>/<n>.json)
 main/prompts.mjs    내가 친 프롬프트 이력 (~/.claude/history.jsonl) — 읽기만 한다
+main/files.mjs      만진 파일 수·편집 횟수 (file-history/) — 이름만 읽고 내용은 안 본다
 main/usage.mjs      office-usage.json → 5시간·주간 사용률
 main/notify.mjs     무엇을 알릴지 — 대기 재알림·컨텍스트·사용량 문턱 판정.
                     Electron을 모르고 `now`를 인자로 받는다(그래서 테스트가 된다)
@@ -84,6 +85,8 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   mtime으로는 제자리 덮어쓰기를 못 본다. 주석에 이유가 있다)
 - `main/prompts.mjs` — 읽는 꼬리 길이(`TAIL_BYTES`), 건너뛸 줄 길이(`MAX_LINE`).
   집계(`summarizePrompts`)에 **문장을 담지 않는다** — 출근부 화면으로 가는 값이다
+- `main/files.mjs` — 캐시 열쇠(디렉터리 mtime + 엔트리 수). 파일 **이름**은 해시라서 못 얻는다 —
+  경로가 필요하면 트랜스크립트의 `Edit`/`Write`에서 가져와야 한다
 - `main/terminal.mjs` — 터미널을 띄우는 방법(`openWindows`·`openMac`), 셸에 넘길 id의 허용 문자(`ID_OK`).
   다른 터미널 앱을 쓰려면 여기에 분기를 넣는다
 - `main/history.mjs` — 무엇을 남길지(`diffEvents`), 시간을 어떻게 셀지(`summarize`·`BUCKET`),

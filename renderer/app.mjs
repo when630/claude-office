@@ -453,6 +453,14 @@ function workerPanel(w) {
       ${u ? `<div><dt>${t('panel.effort')}</dt><dd>${esc(u.effort ?? '—')}</dd></div>` : ''}
       ${u ? `<div><dt>${t('panel.fast')}</dt><dd>${t(u.fastMode ? 'common.on' : 'common.off')}</dd></div>` : ''}
       <div><dt>${t('panel.tokens')}</dt><dd>${fmtTokens(w.tokens)}</dd></div>
+      ${
+        // 만진 파일 수·편집 횟수. 파일 **이름**은 얻을 수 없다 — 엔트리 이름이 경로의 해시다
+        // (main/files.mjs). 아무것도 안 고친 세션에는 칸을 만들지 않는다.
+        w.files
+          ? `<div><dt>${t('panel.touched')}</dt><dd>${t('panel.touchedValue', { n: w.files.files })}</dd></div>
+             <div><dt>${t('panel.edits')}</dt><dd>${t('panel.editsValue', { n: w.files.edits })}</dd></div>`
+          : ''
+      }
       <div><dt>${t('panel.pid')}</dt><dd>${w.pid}</dd></div>
       ${w.mode ? `<div><dt>${t('panel.mode')}</dt><dd>${esc(t(`mode.${w.mode}`))}</dd></div>` : ''}
       <div><dt>${t('panel.updated')}</dt><dd>${fmtAgo(w.updatedAt ? Date.now() - w.updatedAt : null)}</dd></div>

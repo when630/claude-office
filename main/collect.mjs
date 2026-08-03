@@ -12,6 +12,7 @@ import { readUsage } from './usage.mjs';
 import { readNotes, noteNeeds } from './notify-tap.mjs';
 import { readTasks } from './tasks.mjs';
 import { readPromptLog, lastPromptFor } from './prompts.mjs';
+import { readTouchedFiles } from './files.mjs';
 
 export { CLAUDE_DIR };
 
@@ -238,6 +239,7 @@ function isSpare(w) {
     !w.context &&
     !w.aides.length &&
     !w.tasks &&
+    !w.files &&
     !w.timeline.length
   );
 }
@@ -262,6 +264,14 @@ export async function collect() {
     alive.map((s) => {
       const job = s.jobId ? jobs.get(s.jobId) : null;
       return readTasks(sessionIdOf(s, job)).catch(() => null);
+    }),
+  );
+
+  // 이 세션이 만진 파일 수·편집 횟수(main/files.mjs). 디렉터리 이름만 읽어 내용은 안 본다.
+  const touched = await Promise.all(
+    alive.map((s) => {
+      const job = s.jobId ? jobs.get(s.jobId) : null;
+      return readTouchedFiles(sessionIdOf(s, job)).catch(() => null);
     }),
   );
 
@@ -311,6 +321,8 @@ export async function collect() {
       tasks: todos[i] ?? null,
       // 플랜 모드로 승인받은 계획 (ExitPlanMode의 planFilePath). 꼬리 밖으로 밀려나면 null.
       plan: tr?.plan ?? null,
+      // 만진 파일 수·편집 횟수. 파일 **이름**은 해시라서 얻을 수 없다(main/files.mjs).
+      files: touched[i] ?? null,
       mode: tr?.mode || null,
       model: tr?.model || null,
       context: tr?.context ?? null,
