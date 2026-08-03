@@ -251,6 +251,20 @@ export default {
     mineEmpty: 'No instructions in this range.',
     mineHint:
       'This one number is counted from the prompt history Claude Code keeps — unlike everything above it, <b>time while the app was closed still counts.</b> What you typed is neither counted nor kept.',
+    code: "Claude Code's own record",
+    codeFresh: 'Covers up to {to}. Claude Code computes this itself, so <b>days the app was closed are in there too.</b>',
+    codeStale:
+      'Covers up to {to}, and <b>{n} days after that are missing.</b> This tally is only recomputed when you open Claude Code’s own stats screen — the data is not gone, it just has not been counted yet.',
+    codeSessions: 'Sessions all time',
+    codeMessages: 'Messages all time',
+    codeLongest: 'Longest session',
+    codePeak: 'Busiest hour',
+    codePeakValue: '{h}:00',
+    codeDays: 'Messages, last {n} days',
+    codeBusiest: 'Busiest day was {date} ({n})',
+    codeHours: 'By hour (0–23)',
+    codeHourSuffix: ':00',
+    codeModels: 'Tokens by model',
     unknownRoom: '(unknown)',
   },
 

@@ -1285,3 +1285,63 @@ input[type='checkbox'] {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* ── Claude Code 자체 기록. 출처가 다른 참고 자료라 접어 둔다 — 출근부의 본론
+   ("내가 얼마나 기다리게 했나")을 밀어내지 않게. */
+.att-code {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.att-code summary {
+  cursor: pointer;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5d6779;
+}
+.att-code summary:hover {
+  color: var(--text);
+}
+.att-code h4 {
+  margin: 14px 0 6px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #5d6779;
+}
+
+/* 막대 그래프. 패널의 .bar는 가로로 차지만 이쪽은 세로로 자란다 — 높이는 app.mjs의
+   paintSparks가 CSSOM으로 넣는다(인라인 style 속성은 CSP가 막는다). */
+.spark {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 44px;
+}
+.spark li {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+.spark i {
+  width: 100%;
+  background: var(--blue);
+  border-radius: 1px;
+  opacity: 0.75;
+}
+.spark li:hover i {
+  opacity: 1;
+}
+/* 시간대는 24칸이라 더 촘촘하다 */
+.spark.hours {
+  height: 34px;
+  gap: 1px;
+}
+.spark.hours i {
+  background: #6b7688;
+}

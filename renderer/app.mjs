@@ -140,6 +140,14 @@ function paintBars() {
   }
 }
 
+// 출근부의 막대 그래프. CSSOM 직접 조작은 CSP 대상이 아니다(인라인 style 속성은 막혀 있다).
+// 가로 막대인 패널과 달리 세로로 자라므로 height를 쓴다.
+function paintSparks() {
+  for (const el of attBody.querySelectorAll('.spark i[data-pct]')) {
+    el.style.height = `${Math.max(2, Number(el.dataset.pct))}%`;
+  }
+}
+
 function gauge({ label, pct, right, note, id }) {
   return `<div class="gauge">
     <div class="gauge-head"><span>${esc(label)}</span><b class="lv-${pct == null ? 'na' : level(pct)}">${
@@ -1157,6 +1165,60 @@ function attMine(mine) {
   </section>`;
 }
 
+// Claude Code 자신의 집계(main/stats.mjs). 출근부의 다른 숫자와 **출처가 다르다** —
+// 우리가 센 것이 아니라 Claude Code가 스스로 계산해 둔 것이고, 그래서 앱이 꺼져 있던 날도 들어 있다.
+//
+// 접어 둔다(`<details>`). 출근부의 본론은 "내가 얼마나 기다리게 했나"인데 이건 참고 자료라
+// 펼쳐 두면 본론을 밀어낸다. 설정 창의 설명을 `?`로 접은 것과 같은 판단이다.
+//
+// 막대는 최대값 기준 상대 높이다. 절대 수치는 축이 없으면 못 읽으므로 숫자를 함께 적는다.
+function attCodeStats(c) {
+  if (!c?.days?.length) return '';
+  const maxMsg = Math.max(...c.days.map((d) => d.messages), 1);
+  const maxHour = Math.max(...c.hours, 1);
+  const busiest = c.days.reduce((a, d) => (d.messages > a.messages ? d : a), c.days[0]);
+  const peakHour = c.hours.indexOf(maxHour);
+  return `<details class="att-code">
+    <summary>${t('att.code')}</summary>
+    <p class="hint">${
+      c.staleDays
+        ? t('att.codeStale', { to: c.computedTo ?? '—', n: c.staleDays })
+        : t('att.codeFresh', { to: c.computedTo ?? '—' })
+    }</p>
+    <dl class="facts">
+      <div><dt>${t('att.codeSessions')}</dt><dd>${t('att.sessionsValue', { n: c.totalSessions })}</dd></div>
+      <div><dt>${t('att.codeMessages')}</dt><dd>${c.totalMessages.toLocaleString()}</dd></div>
+      <div><dt>${t('att.codeLongest')}</dt><dd>${c.longestSessionMs ? fmtSpan(c.longestSessionMs) : '—'}</dd></div>
+      <div><dt>${t('att.codePeak')}</dt><dd>${t('att.codePeakValue', { h: peakHour })}</dd></div>
+    </dl>
+    <h4>${t('att.codeDays', { n: c.days.length })}</h4>
+    <ul class="spark">${c.days
+      .map(
+        (d) =>
+          `<li title="${esc(d.date)} · ${d.messages}"><i data-pct="${Math.round(
+            (d.messages / maxMsg) * 100,
+          )}"></i></li>`,
+      )
+      .join('')}</ul>
+    <p class="hint">${t('att.codeBusiest', { date: busiest.date, n: busiest.messages })}</p>
+    <h4>${t('att.codeHours')}</h4>
+    <ul class="spark hours">${c.hours
+      .map(
+        (n, h) =>
+          `<li title="${h}${t('att.codeHourSuffix')} · ${n}"><i data-pct="${Math.round((n / maxHour) * 100)}"></i></li>`,
+      )
+      .join('')}</ul>
+    ${
+      c.models.length
+        ? `<h4>${t('att.codeModels')}</h4>
+           <ul class="att-mine">${c.models
+             .map((m) => `<li><span title="${esc(m.model)}">${esc(m.model)}</span><b>${fmtTokens(m.tokens)}</b></li>`)
+             .join('')}</ul>`
+        : ''
+    }
+  </details>`;
+}
+
 function attRooms(s) {
   if (!s.rooms.length) return `<p class="dim">${t('att.empty')}</p>`;
   return `<table class="att-rooms">
@@ -1219,6 +1281,7 @@ function drawAtt() {
 
     ${attWaits(s)}
     ${attMine(attRange === 'week' ? attData.mine?.week : attData.mine?.today)}
+    ${attCodeStats(attData.code)}
 
     ${
       attData.on
@@ -1227,6 +1290,7 @@ function drawAtt() {
     }
     <p class="hint">${t('att.offlineHint')}</p>
   `;
+  paintSparks();
 }
 
 async function openAtt() {
