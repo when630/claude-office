@@ -78,9 +78,12 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   목표만 갈아 끼우고 보간은 안 건드린다. `test/walk.test.mjs`가 점프를 지킨다),
   말풍선 색(`BUBBLE_STYLE`), 방 색상 `HUES`,
   심야 조명(`nightTint`·`NIGHT_L`·`NIGHT_S` — 명도를 내린 만큼 채도를 올려 방 색 구분을 남긴다),
-  컨텍스트 서류(`PAPER_STEPS`·`drawPaperStack` — 문턱은 이름표 밑 막대(`level`)와 같은 값이어야 한다),
-  바닥에 널브러진 것(`FLOOR_FROM`·`FLOOR_PER`·`FLOOR_MAX`·`drawFloorMess` — 위치와 모양을
-  장 번호로 정해야 이미 흘린 것이 안 움직인다. `LITTER_PAPER`·`LITTER_TRASH`·`TRASH_FROM`),
+  컨텍스트 서류(`PAPER_STEPS`·`stackPapers`·`paperX` — 문턱은 이름표 밑 막대(`level`)보다
+  **일찍** 잡는다. 늦게 잡으면 막대는 노란데 서류는 없는 구간이 생긴다. 자리 모양마다 비어 있는
+  끝이 달라 `PAPER_LEFT_STATIONS`로 갈린다 — 회의실만 `drawPlaceSetting`이 따로 얹는다),
+  바닥에 널브러진 것(`FLOOR_FROM`·`FLOOR_PER`·`FLOOR_MAX`·`drawFloorMess` — 상판 더미와 **같은
+  지점에서 같이** 자라야 한다. 위치와 모양을 장 번호로 정해야 이미 흘린 것이 안 움직인다.
+  `LITTER_PAPER`·`LITTER_TRASH`·`TRASH_FROM`),
   방 상태(`roomDone`·`roomTint`·`DONE_L`), 입주 박스(`MOVEIN_MS`·`drawMoveIn` —
   "새로 뜬 방"을 정하는 곳은 `app.mjs`의 `markMoveIn`이다)
 - `main/rooms.mjs` — 묶음 판정(`groupOf` — 가장 깊이 맞는 부모가 이기고 경계를 구분자로 끊는다),
