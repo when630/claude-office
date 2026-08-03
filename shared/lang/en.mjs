@@ -27,6 +27,7 @@ export default {
     off: 'off',
     auto: 'Auto',
     langAuto: 'Auto (system)',
+    hintTitle: 'What is this',
   },
 
   // ── Top bar
@@ -187,7 +188,6 @@ export default {
       keys: 'Shortcuts',
     },
     quietSection: 'Do not disturb',
-    hintTitle: 'What is this',
     hotkeyToggle: 'Show or hide the window',
     hotkeyJump: 'Open the longest wait',
     hotkeyMini: 'Toggle the mini window',
@@ -247,12 +247,10 @@ export default {
     empty: 'Nothing recorded in this range.',
     loading: 'Loading…',
     loadFailed: 'Could not read the attendance log.',
-    onHint:
-      'Only {days} days are kept; older entries are dropped when the app starts. Room names (working directories) are kept — session names and instructions are not. Turn it off or clear it from <b>tray icon &gt; Attendance log</b>.',
+    attHint:
+      'Only {days} days are kept; older entries are dropped when the app starts. Room names (working directories) are kept — session names and instructions are not. <b>Time while the app was closed is not counted</b> — it could not be observed, so counting it would be a lie. Turn it off or clear it from <b>tray icon &gt; Attendance log</b>.',
     offHint:
       'The attendance log is off — nothing is being recorded. Turn it on from <b>tray icon &gt; Attendance log</b>.',
-    offlineHint:
-      'Time while the app was closed is not counted. It could not be observed, so counting it would be a lie.',
     trend: 'Waiting, last 7 days',
     trendUnseen: 'the app was closed',
     trendHint: 'Yellow is time spent waiting on me. The tallest bar is {max}. <b>A dashed baseline means the app was closed that day</b> — not the same as a zero.',
@@ -264,9 +262,10 @@ export default {
     mineHint:
       'This one number is counted from the prompt history Claude Code keeps — unlike everything above it, <b>time while the app was closed still counts.</b> What you typed is neither counted nor kept.',
     code: "Claude Code's own record",
-    codeFresh: 'Covers up to {to}. Claude Code computes this itself, so <b>days the app was closed are in there too.</b>',
-    codeStale:
-      'Covers up to {to}, and <b>{n} days after that are missing.</b> This tally is only recomputed when you open Claude Code’s own stats screen — the data is not gone, it just has not been counted yet.',
+    codeRange: 'Covers',
+    codeMissing: '{n} days missing',
+    codeHint:
+      'Claude Code computes this itself, so <b>days the app was closed are in there too.</b> In exchange it is <b>only recomputed when you open that tool’s own stats screen</b> — a gap after the range means the data is not gone, it just has not been counted yet. This app only reads it, and the tally has no per-room breakdown, so it cannot sit next to the table above.',
     codeSessions: 'Sessions all time',
     codeMessages: 'Messages all time',
     codeLongest: 'Longest session',

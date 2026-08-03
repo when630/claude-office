@@ -109,3 +109,21 @@ test('모양이 다르거나 없으면 null이다', async () => {
   fs.rmSync(FILE);
   assert.equal(await readCodeStats(), null);
 });
+
+// 기록 범위를 화면에 적을 꼴 (#99). computedTo가 `YYYY-MM-DD`라 시작일도 같은 꼴이어야
+// 짝이 맞는다 — 처음엔 한쪽만 `1/27`로 나와 형식이 어긋났다.
+test('시작일을 computedTo와 같은 꼴로 준다', async () => {
+  fs.writeFileSync(FILE, JSON.stringify(CACHE), 'utf8');
+  const got = await readCodeStats();
+  assert.match(got.firstDate, /^\d{4}-\d{2}-\d{2}$/);
+  // 로컬 날짜로 만든다 — UTC 문자열을 자르면 자정 근처에서 하루가 밀린다
+  const d = new Date(got.firstAt);
+  const pad = (n) => String(n).padStart(2, '0');
+  assert.equal(got.firstDate, `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+});
+
+test('시작일이 없으면 null이다', async () => {
+  fs.writeFileSync(FILE, JSON.stringify({ ...CACHE, firstSessionDate: null }), 'utf8');
+  const got = await readCodeStats();
+  assert.equal(got.firstDate, null);
+});

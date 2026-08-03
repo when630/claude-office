@@ -988,8 +988,10 @@ b.lv-na {
   color: var(--text);
 }
 
-#cfg-tabs button,
-#att-tabs button {
+/* `:not(.hint-btn)`가 중요하다. 이 규칙이 ?에도 걸려 padding 4px 10px·radius 5px·font 12px가
+   먹으면 15px 원이 22px 뭉툭한 사각이 된다 — 탭 바 안의 ?가 깨져 보였던 원인이다. */
+#cfg-tabs button:not(.hint-btn),
+#att-tabs button:not(.hint-btn) {
   padding: 4px 10px;
   border: 1px solid var(--line);
   border-radius: 5px;
@@ -999,8 +1001,8 @@ b.lv-na {
   font-size: 12px;
   cursor: pointer;
 }
-#cfg-tabs button.on,
-#att-tabs button.on {
+#cfg-tabs button.on:not(.hint-btn),
+#att-tabs button.on:not(.hint-btn) {
   border-color: #3d4a5f;
   background: #1d2431;
   color: var(--text);
@@ -1279,21 +1281,51 @@ input[type='checkbox'] {
 }
 
 /* 설명 접기. 우측 하단 물음표(#help-open)와 같은 모양이라 몸짓이 이어진다 */
-.hint-line {
-  margin: 10px 0 0;
-}
+/* ── `?` 설명. 자기가 설명하는 것 **옆에** 붙는다 — 제목 안이거나 탭 바 끝이다.
+   눌러도 아래 내용이 밀리지 않는다(아코디언이 아니라 떠오르는 캡션이다). */
 .hint-btn {
-  width: 20px;
-  height: 20px;
+  width: 15px;
+  height: 15px;
+  margin-left: 6px;
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: #1b2029;
   color: #5d6779;
   font: inherit;
-  font-size: 11px;
+  font-size: 9px;
   line-height: 1;
+  vertical-align: middle;
   cursor: pointer;
+}
+/* 탭 바의 ?는 탭과 **같은 줄** 오른쪽 끝에 붙는다 — 그 판 전체에 관한 설명이다.
+   자리가 모자라면 `flex-wrap: wrap`이 알아서 다음 줄로 내린다. */
+#cfg-tabs .hint-btn,
+#att-tabs .hint-btn {
+  margin-left: auto;
+  align-self: center;
+}
+/* 떠오르는 캡션. 기본 화면 우측 하단 물음표(#help)와 같은 모양으로 둔다. */
+.caption {
+  position: fixed;
+  z-index: 30;
+  width: min(300px, calc(100vw - 28px));
+  padding: 10px 12px;
+  border: 1px solid #39414f;
+  border-radius: 8px;
+  background: #171c25;
+  box-shadow: 0 8px 24px rgba(4, 6, 10, 0.55);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--dim);
+}
+.caption code {
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 11px;
+  color: #8f9bb0;
+}
+.caption b {
+  color: var(--text);
 }
 .hint-btn:hover,
 .hint-btn.on {
@@ -1302,9 +1334,7 @@ input[type='checkbox'] {
   color: var(--text);
 }
 /* 버튼 바로 아래 붙는 설명이라 위 여백은 버튼이 만든다 */
-.hint-line + .hint {
-  margin-top: 7px;
-}
+
 
 .cfg-reset {
   margin-top: 12px;

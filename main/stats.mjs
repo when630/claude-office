@@ -43,6 +43,17 @@ function num(v) {
   return typeof v === 'number' && Number.isFinite(v) ? v : 0;
 }
 
+// 로컬 날짜를 `YYYY-MM-DD`로. `computedTo`가 그 꼴이라 화면에서 짝을 맞추려면 같은 꼴이어야
+// 한다 — 형식을 정하는 곳을 한 군데로 모아 두는 것이다. UTC 문자열을 잘라 쓰면 자정 근처에서
+// 하루가 밀린다.
+function isoDay(ms) {
+  if (ms == null) return null;
+  const d = new Date(ms);
+  if (Number.isNaN(+d)) return null;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 // `YYYY-MM-DD` → 로컬 자정. 날짜 문자열을 그대로 Date에 넣으면 UTC로 해석돼 하루가 밀린다.
 function dayMs(s) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s ?? ''));
@@ -111,6 +122,8 @@ export async function readCodeStats() {
     totalMessages: num(j.totalMessages),
     longestSessionMs: num(j.longestSession?.duration),
     firstAt: j.firstSessionDate ? Date.parse(j.firstSessionDate) || null : null,
+    // 화면의 "기록 범위"는 이 값과 computedTo를 나란히 적는다 — 같은 꼴이어야 짝이 맞는다
+    firstDate: isoDay(j.firstSessionDate ? Date.parse(j.firstSessionDate) || null : null),
   };
 
   cache = { size: st.size, mtimeMs: st.mtimeMs, value };

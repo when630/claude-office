@@ -110,7 +110,8 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
 - `main/files.mjs` — 캐시 열쇠(디렉터리 mtime + 엔트리 수). 파일 **이름**은 해시라서 못 얻는다 —
   경로가 필요하면 트랜스크립트의 `Edit`/`Write`에서 가져와야 한다
 - `main/stats.mjs` — 화면에 늘어놓을 일수(`DAYS`)·모델 수(`MODELS`), 낡음 판정(`staleDays` —
-  오늘은 빠진 날로 세지 않는다. 캐시가 설계상 어제까지만 담기 때문이다)
+  오늘은 빠진 날로 세지 않는다. 캐시가 설계상 어제까지만 담기 때문이다),
+  날짜 꼴(`isoDay`·`firstDate` — `computedTo`와 짝을 맞춰야 하므로 형식을 여기서 정한다)
 - `main/terminal.mjs` — 터미널을 띄우는 방법(`openWindows`·`openMac`), 셸에 넘길 id의 허용 문자(`ID_OK`).
   다른 터미널 앱을 쓰려면 여기에 분기를 넣는다
 - `main/history.mjs` — 무엇을 남길지(`diffEvents`), 시간을 어떻게 셀지(`summarize`·`BUCKET`),
@@ -146,6 +147,11 @@ README의 캡처(`docs/images/en`·`docs/images/ko`)도 그렇게 구운 것이�
 - **가짜 preload를 쓸 때는 `sandbox: false`가 필요하다.** 샌드박스 preload에는 `fs`도
   `process.env`도 없어서 미리 정해 둔 응답을 파일에서 읽을 수 없다(진짜 앱은 샌드박스가 켜져 있다)
 - 창이 좁으면 오른쪽 패널이 잘린 채 찍힌다. 패널까지 보려면 1900px쯤 잡는다
+- **`?` 캡션처럼 방금 뜬 것이 있으면 캡처가 특히 잘 어긋난다.** 창이 통째로 빠진 그림이
+  반복되면 코드를 의심하기 전에 `executeJavaScript`로 **좌표를 직접 재는** 편이 빠르고 정확하다
+  (`getBoundingClientRect`) — 실제로 그렇게 재서 캡처만 문제였음을 확인했다
+- **첫 `capturePage`는 버리고 두 번째를 쓴다.** 방금 뜬 것(창·캡션)이 커밋되기 전 프레임이
+  잡히는 일이 잦다 — 창이 통째로 빠진 그림이 나오면 코드를 의심하기 전에 이것부터 본다
 - **시간대 연출은 페이지의 `Date`를 갈아 끼워 확인한다.** `executeJavaScript`로 `window.Date`를
   시각을 옮긴 것으로 바꾸면 렌더러가 부르는 `new Date()`·`Date.now()`가 다 따라온다 —
   새벽까지 기다리거나 OS 시계를 만질 필요가 없다

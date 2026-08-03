@@ -870,15 +870,61 @@ function noIpc() {
 //
 // 펼친 것은 기억해 둔다. 설정 창은 값이 바뀔 때마다 통째로 다시 그리는데, 그때마다
 // 접혀 버리면 읽던 문장이 손가락 밑에서 사라진다.
-const openHints = new Set();
 
-function hint(key) {
-  const on = openHints.has(key);
-  return `<p class="hint-line">
-      <button type="button" class="hint-btn${on ? ' on' : ''}" data-hint="${esc(key)}"
-        aria-expanded="${on}" title="${t('cfg.hintTitle')}">?</button>
-    </p>
-    <p class="hint" ${on ? '' : 'hidden'}>${t(key)}</p>`;
+// ── `?` 캡션.
+//
+// **설명은 자기가 설명하는 것 옆에 붙는다** — 제목이 있으면 그 제목 안에, 판 전체를 설명하는
+// 것이면 탭 바 끝에. 처음에는 `?`를 제 줄에 두고 아래로 펼쳤는데(아코디언) 두 가지가 걸렸다:
+// 무엇에 대한 설명인지 알기 어렵고, 펼칠 때 아래 내용이 밀려 방금 보던 자리가 움직인다.
+//
+// 그래서 **떠오르는 캡션**으로 바꿨다(기본 화면 우측 하단 물음표와 같은 방식).
+// 창마다 캡션 하나를 두고 눌린 버튼 자리에서 띄운다 — 내용이 밀리지 않는다.
+//
+// 문구는 그릴 때 미리 만들어 둔다. `{days}` 같은 값을 채운 결과를 눌렀을 때 다시 만들려면
+// 그 값을 어딘가 실어 보내야 하는데, HTML이 섞인 문구를 속성에 담는 것보다 이쪽이 안전하다.
+const hintText = new Map();
+
+function hintBtn(key, params) {
+  hintText.set(key, t(key, params));
+  return `<button type="button" class="hint-btn" data-hint="${esc(key)}"
+    aria-label="${t('common.hintTitle')}" title="${t('common.hintTitle')}">?</button>`;
+}
+
+// 지금 떠 있는 캡션과 그것을 띄운 버튼. 같은 버튼을 다시 누르면 닫는다.
+let captionOn = null;
+
+function closeCaption() {
+  if (!captionOn) return;
+  captionOn.btn.classList.remove('on');
+  captionOn.el.hidden = true;
+  captionOn = null;
+}
+
+// 캡션은 창(`<dialog>`)의 자식이고 `position: fixed`다 — dialog는 top layer라 그 안의 고정
+// 요소도 위에 그려지고, 스크롤되는 몸통(`#cfg-body`) 밖이라 잘리지 않는다.
+function openCaption(btn) {
+  const key = btn.dataset.hint;
+  const dialog = btn.closest('dialog');
+  const el = dialog?.querySelector('.caption');
+  if (!key || !el) return;
+  if (captionOn?.btn === btn) return closeCaption();
+  closeCaption();
+
+  el.innerHTML = hintText.get(key) ?? '';
+  el.hidden = false;
+  btn.classList.add('on');
+  captionOn = { btn, el };
+
+  // 버튼 아래에 붙이고, 창 밖으로 넘치면 안으로 당긴다.
+  const b = btn.getBoundingClientRect();
+  const d = dialog.getBoundingClientRect();
+  const w = el.offsetWidth;
+  const left = Math.min(Math.max(d.left + 8, b.left - 8), d.right - w - 8);
+  const below = b.bottom + 6;
+  // 아래로 넘치면 위로 뒤집는다
+  const flip = below + el.offsetHeight > window.innerHeight - 8;
+  el.style.left = `${Math.round(left)}px`;
+  el.style.top = `${Math.round(flip ? b.top - el.offsetHeight - 6 : below)}px`;
 }
 
 function hotkeyBlock() {
@@ -899,7 +945,6 @@ function hotkeyBlock() {
         .filter((a) => HOTKEY_LABEL[a])
         .map(row)
         .join('')}
-      ${hint('cfg.hotkeyHint')}
     </section>
   `;
 }
@@ -931,7 +976,7 @@ function notifyBlock() {
     </section>
 
     <section class="block">
-      <h3>${t('cfg.quietSection')}</h3>
+      <h3>${t('cfg.quietSection')}${hintBtn('cfg.quietHint')}</h3>
       <label class="cfg-check">
         <input type="checkbox" id="cfg-quiet-on"${q.hours ? ' checked' : ''}>
         <span>${t('cfg.quiet')}</span>
@@ -942,7 +987,6 @@ function notifyBlock() {
         <span class="cfg-sep">~</span>
         <input type="time" id="cfg-quiet-to" value="${esc(q.to)}">
       </div>
-      ${hint('cfg.quietHint')}
     </section>
   `;
 }
@@ -951,7 +995,7 @@ function notifyBlock() {
 function generalPane() {
   return `
     <section class="block">
-      <h3>${t('cfg.langSection')}</h3>
+      <h3>${t('cfg.langSection')}${hintBtn('cfg.langHint')}</h3>
       <div class="cfg-row">
         <label for="cfg-lang"><b>${t('cfg.lang')}</b></label>
         <select id="cfg-lang">${options(
@@ -960,11 +1004,10 @@ function generalPane() {
           langPref,
         )}</select>
       </div>
-      ${hint('cfg.langHint')}
     </section>
 
     <section class="block">
-      <h3>${t('cfg.namesSection')}</h3>
+      <h3>${t('cfg.namesSection')}${hintBtn('cfg.namesHint')}</h3>
       <div class="cfg-row">
         <label for="cfg-names"><b>${t('cfg.names')}</b></label>
         <select id="cfg-names">${options(
@@ -972,7 +1015,6 @@ function generalPane() {
           cfg.names,
         )}</select>
       </div>
-      ${hint('cfg.namesHint')}
     </section>
   `;
 }
@@ -1031,7 +1073,6 @@ function roomsPane() {
           : `<p class="dim">${t('cfg.roomsEmpty')}</p>`
       }
       <button class="cfg-reset" type="button"${picked ? '' : ' disabled'}>${t('cfg.roomsReset')}</button>
-      ${hint('cfg.roomsHint')}
     </section>
   `;
 }
@@ -1048,13 +1089,19 @@ const CFG_TABS = [
 let cfgTab = 'general';
 
 function drawCfg() {
+  // 판을 다시 그리면 캡션을 띄운 버튼이 사라진다 — 허공에 떠 있지 않게 같이 닫는다
+  closeCaption();
   cfgRooms = roomSig();
   const pane = CFG_TABS.find(([k]) => k === cfgTab) ?? CFG_TABS[0];
 
-  cfgTabsEl.innerHTML = CFG_TABS.map(
-    ([k]) => `<button type="button" role="tab" aria-selected="${k === pane[0]}"
+  // 판 전체를 설명하는 것은 제목에 붙일 자리가 없다 — 탭 바 끝에 둔다.
+  // "이 탭에 관한 설명"으로 읽히고, 제목이 있는 절은 그 제목 안에 따로 붙는다.
+  const TAB_HINT = { keys: 'cfg.hotkeyHint', rooms: 'cfg.roomsHint' };
+  cfgTabsEl.innerHTML =
+    CFG_TABS.map(
+      ([k]) => `<button type="button" role="tab" aria-selected="${k === pane[0]}"
       class="${k === pane[0] ? 'on' : ''}" data-cfg-tab="${k}">${t(`cfg.tab.${k}`)}</button>`,
-  ).join('');
+    ).join('') + (TAB_HINT[pane[0]] ? hintBtn(TAB_HINT[pane[0]]) : '');
   cfgBody.innerHTML = pane[1]();
 }
 
@@ -1082,6 +1129,7 @@ document.getElementById('cfg-open').addEventListener('click', async () => {
 document.getElementById('cfg-close').addEventListener('click', () => cfgDialog.close());
 
 cfgTabsEl.addEventListener('click', (e) => {
+  if (handleHintClick(e.target)) return;
   const tab = e.target?.dataset?.cfgTab;
   if (!tab || tab === cfgTab) return;
   cfgTab = tab;
@@ -1171,19 +1219,19 @@ cfgBody.addEventListener('change', (e) => {
   saveView({ roomAlias: next });
 });
 
-cfgBody.addEventListener('click', (e) => {
-  const hintKey = e.target?.dataset?.hint;
-  if (hintKey) {
-    // 다시 그리지 않고 그 자리에서 여닫는다 — 값은 하나도 안 바뀌었으므로
-    if (openHints.has(hintKey)) openHints.delete(hintKey);
-    else openHints.add(hintKey);
-    const on = openHints.has(hintKey);
-    e.target.classList.toggle('on', on);
-    e.target.setAttribute('aria-expanded', String(on));
-    const body = e.target.closest('.hint-line')?.nextElementSibling;
-    if (body?.classList.contains('hint')) body.hidden = !on;
-    return;
+// 창 안의 클릭을 받는다. `?`면 캡션을 여닫고, 그 밖이면 떠 있던 캡션을 닫는다.
+function handleHintClick(target) {
+  const btn = target?.closest?.('.hint-btn');
+  if (btn) {
+    openCaption(btn);
+    return true;
   }
+  closeCaption();
+  return false;
+}
+
+cfgBody.addEventListener('click', (e) => {
+  if (handleHintClick(e.target)) return;
   if (e.target.classList?.contains('cfg-reset')) {
     saveView({ roomThemes: {} }).then(drawCfg);
     return;
@@ -1267,7 +1315,6 @@ function attMine(mine) {
             .join('')}</ul>`
         : `<p class="dim">${t('att.mineEmpty')}</p>`
     }
-    <p class="hint">${t('att.mineHint')}</p>
   </section>`;
 }
 
@@ -1280,7 +1327,7 @@ function attTrend(trend) {
   if (!trend?.length) return '';
   const max = Math.max(...trend.map((d) => d.waitMs), 1);
   return `<section class="block">
-    <h3>${t('att.trend')}</h3>
+    <h3>${t('att.trend')}${hintBtn('att.trendHint', { max: fmtSpan(max) })}</h3>
     <ul class="spark trend">${trend
       .map((d) =>
         d.observed
@@ -1291,7 +1338,6 @@ function attTrend(trend) {
       )
       .join('')}</ul>
     <ul class="spark-axis">${trend.map((d) => `<li>${fmtDay(d.at)}</li>`).join('')}</ul>
-    <p class="hint">${t('att.trendHint', { max: fmtSpan(max) })}</p>
   </section>`;
 }
 
@@ -1308,13 +1354,19 @@ function attCodeStats(c) {
   const maxHour = Math.max(...c.hours, 1);
   const busiest = c.days.reduce((a, d) => (d.messages > a.messages ? d : a), c.days[0]);
   const peakHour = c.hours.indexOf(maxHour);
+  // 보이는 자리에는 **무엇인가**를 적는다 — 어디까지의 기록인지. "왜 그런가"(통계 화면을 열 때만
+  // 다시 계산된다)는 `?`로 접는다. 처음에는 그 설명이 첫 줄이었는데, 정작 알고 싶은 것이
+  // 문장 속에 묻혀 있었다.
   return `<section class="att-code">
-    <h3>${t('att.code')}</h3>
-    <p class="hint">${
-      c.staleDays
-        ? t('att.codeStale', { to: c.computedTo ?? '—', n: c.staleDays })
-        : t('att.codeFresh', { to: c.computedTo ?? '—' })
-    }</p>
+    <h3>${t('att.code')}${hintBtn('att.codeHint')}</h3>
+    <dl class="facts">
+      <div class="wide">
+        <dt>${t('att.codeRange')}</dt>
+        <dd>${esc(c.firstDate ?? '—')} ~ ${esc(c.computedTo ?? '—')}${
+          c.staleDays ? ` <b class="lv-mid">${t('att.codeMissing', { n: c.staleDays })}</b>` : ''
+        }</dd>
+      </div>
+    </dl>
     <dl class="facts">
       <div><dt>${t('att.codeSessions')}</dt><dd>${t('att.sessionsValue', { n: c.totalSessions })}</dd></div>
       <div><dt>${t('att.codeMessages')}</dt><dd>${c.totalMessages.toLocaleString()}</dd></div>
@@ -1424,11 +1476,10 @@ function attPane() {
     </section>
     ${attWaits(s)}
     ${
-      attData.on
-        ? `<p class="hint">${t('att.onHint', { days: attData.retainDays })}</p>`
-        : `<p class="hint warn">${t('att.offHint')}</p>`
+      // **기록이 꺼져 있다는 경고는 접지 않는다.** 설명이 아니라 "지금 아무것도 안 쌓이고 있다"는
+      // 상태고, 접으면 모르고 지나간다.
+      attData.on ? '' : `<p class="hint warn">${t('att.offHint')}</p>`
     }
-    <p class="hint">${t('att.offlineHint')}</p>
   `;
 }
 
@@ -1459,16 +1510,20 @@ const ATT_TABS = [
 let attTab = 'att';
 
 function drawAtt() {
+  closeCaption();
   if (!attData) {
     attTabsEl.innerHTML = '';
     attBody.innerHTML = `<p class="dim">${t('att.loadFailed')}</p>`;
     return;
   }
   const pane = ATT_TABS.find(([k]) => k === attTab) ?? ATT_TABS[0];
-  attTabsEl.innerHTML = ATT_TABS.map(
-    ([k]) => `<button type="button" role="tab" aria-selected="${k === pane[0]}"
+  const TAB_HINT = { att: 'att.attHint', mine: 'att.mineHint' };
+  attTabsEl.innerHTML =
+    ATT_TABS.map(
+      ([k]) => `<button type="button" role="tab" aria-selected="${k === pane[0]}"
       class="${k === pane[0] ? 'on' : ''}" data-att-tab="${k}">${t(`att.tab.${k}`)}</button>`,
-  ).join('');
+    ).join('') +
+    (TAB_HINT[pane[0]] ? hintBtn(TAB_HINT[pane[0]], { days: attData.retainDays }) : '');
   attBody.innerHTML = pane[1]();
   // 막대 폭은 CSSOM으로 넣는다 — 판을 갈아 끼울 때마다 다시 불러야 한다
   paintSparks();
@@ -1501,7 +1556,14 @@ document.getElementById('mini-grow').addEventListener('click', () => window.offi
 
 document.getElementById('att-open').addEventListener('click', openAtt);
 document.getElementById('att-close').addEventListener('click', () => attDialog.close());
+
+// 캡션은 눌린 버튼 자리에 고정돼 있으므로, 그 자리가 움직이면 닫는다 —
+// 창을 닫을 때(Esc·바깥 클릭 포함), 몸통이 스크롤될 때, 창 크기가 바뀔 때.
+for (const el of [cfgDialog, attDialog]) el.addEventListener('close', closeCaption);
+for (const el of [cfgBody, attBody]) el.addEventListener('scroll', closeCaption, { passive: true });
+window.addEventListener('resize', closeCaption);
 attTabsEl.addEventListener('click', (e) => {
+  if (handleHintClick(e.target)) return;
   const tab = e.target?.dataset?.attTab;
   if (!tab || tab === attTab) return;
   attTab = tab;
@@ -1509,6 +1571,7 @@ attTabsEl.addEventListener('click', (e) => {
 });
 
 attBody.addEventListener('click', (e) => {
+  if (handleHintClick(e.target)) return;
   const range = e.target?.dataset?.range;
   if (!range || range === attRange) return;
   attRange = range;
