@@ -282,6 +282,7 @@ export default {
     waitingList: '기다리는 세션',
     waitingNone: '기다리는 세션이 없습니다',
     notify: '알림',
+    notifySound: '소리도 내기 (재알림은 제외)',
     notifyWaiting: '입력 대기',
     notifyEscalate: '대기가 길어지면 다시 (5 · 15 · 30 · 60분)',
     notifyContext: '컨텍스트 임박 (85 · 95%)',

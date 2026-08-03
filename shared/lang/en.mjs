@@ -286,6 +286,7 @@ export default {
     waitingList: 'Waiting on you',
     waitingNone: 'Nothing waiting on you',
     notify: 'Notifications',
+    notifySound: 'Play a sound too (not on repeats)',
     notifyWaiting: 'Waiting on you',
     notifyEscalate: 'Nudge again while waiting (5 · 15 · 30 · 60 min)',
     notifyContext: 'Context running out (85 · 95%)',

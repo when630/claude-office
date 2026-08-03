@@ -78,6 +78,25 @@ export function sanitizeNotify(v) {
   return out;
 }
 
+// ── 소리
+//
+// 놓치지 않게 하는 것이 이 앱의 본론인데 수단이 토스트와 트레이 깜빡임뿐이었다 —
+// 전체화면으로 다른 일을 하고 있으면 둘 다 안 보인다.
+//
+// **재알림에는 소리를 내지 않는다.** 5·15·30·60분마다 소리가 나면 그건 고문이고, 사람은
+// 알림을 통째로 꺼 버리고 다시 안 켠다 — 방해금지를 넣은 것과 같은 이유다. 그래서 첫 부름
+// (`waiting`)에는 내고 재알림(`escalate`)에는 내지 않는다.
+//
+// 방해금지와 방별 세기는 저절로 걸린다. 조용한 동안에는 토스트 자체가 안 뜨고(index.mjs),
+// 끈 방의 알림은 판정 끝에서 걸러진다(decideNotifications) — 없는 토스트는 소리도 안 낸다.
+const SOUND_SILENT_KINDS = ['escalate'];
+
+// 이 종류에 소리를 낼까. Electron의 Notification은 `silent`로 **끄는** 쪽을 받으므로
+// 부르는 쪽에서 뒤집어 쓴다.
+export function soundFor(kind, on) {
+  return Boolean(on) && !SOUND_SILENT_KINDS.includes(kind);
+}
+
 // ── 방해금지
 //
 // 재알림이 5·15·30·60분에 계속 오고 5분을 넘기면 트레이가 깜빡인다. 회의 중이든 새벽이든

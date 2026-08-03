@@ -159,6 +159,9 @@ Automatic installation is blocked for unsigned macOS builds, so there a new vers
   memory; the usage one only appears when the statusline tap is in place. Work finished is off by
   default and only fires for jobs over **three minutes** — it carries how long it took and where
   the session left off
+- **Play a sound too** adds an audible alert to the toast. It is off by default, and it **never
+  fires on a repeat nudge** (a sound every 5 · 15 · 30 · 60 minutes is torture). Quiet hours and
+  rooms you muted stay silent for free — there is no toast to make a sound for
 - **Looks stuck** is off by default too. It fires when a session is busy but going nowhere — tools
   failing three times in a row, or ten minutes without a single line written to its transcript.
   Long builds are legitimately quiet, which is exactly why the threshold sits where it does

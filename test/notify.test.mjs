@@ -16,6 +16,8 @@ import {
   inQuietHours,
   minutesOf,
   midnightAfter,
+  soundFor,
+  NOTIFY_KINDS,
 } from '../main/notify.mjs';
 import { fmtDur, setLang } from '../shared/i18n.mjs';
 
@@ -412,4 +414,24 @@ test('사용량 문구도 언어를 따라간다', () => {
   assert.deepEqual(kinds(out), ['usage']);
   assert.match(out[0].title, /Session usage/);
   assert.match(out[0].body, /resets in 1h 30m/);
+});
+
+// ── 소리 (#68)
+//
+// 소리는 토스트보다 방해가 크다. 켰을 때도 **재알림에는 내지 않는 것**이 이 판정의 요점이다 —
+// 5·15·30·60분마다 소리가 나면 사람은 알림을 통째로 꺼 버린다.
+test('소리는 기본이 꺼짐이다', () => {
+  for (const kind of NOTIFY_KINDS) assert.equal(soundFor(kind, false), false);
+  assert.equal(soundFor('waiting', undefined), false);
+});
+
+test('켜도 재알림에는 소리를 내지 않는다', () => {
+  assert.equal(soundFor('waiting', true), true);
+  assert.equal(soundFor('escalate', true), false);
+});
+
+test('나머지 종류는 켜면 다 소리를 낸다', () => {
+  for (const kind of NOTIFY_KINDS.filter((k) => k !== 'escalate')) {
+    assert.equal(soundFor(kind, true), true, kind);
+  }
 });
