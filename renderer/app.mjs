@@ -205,13 +205,48 @@ function roomsToDraw() {
     .map((x) => x.r);
 }
 
+// ── 입주. 방을 **처음 본 시각**을 기억해 이삿짐 박스를 잠깐 놓아 준다.
+//
+// 앱을 켠 직후의 첫 스냅샷은 채우지 않는다 — 안 그러면 켤 때마다 온 사무실이 이사판이 된다
+// (자리 전환의 앵커가 비어 있을 때 전환 없이 나타나는 것과 같은 판단이다).
+//
+// 방 이름은 사라졌다 다시 뜰 수 있으므로(그 폴더에서 세션을 다시 띄우면) 오래된 것은 잊는다 —
+// 다시 뜨면 그때가 새 입주다.
+const MOVEIN_KEEP_MS = 60_000;
+// 방 이름 → { at: 처음 본 시각, announce: 입주 연출을 할 방인가 }
+//
+// `announce`를 따로 들고 있어야 한다. 처음 본 시각만 기억하면 **첫 스냅샷에 있던 방도**
+// 다음 레이아웃에서 그 시각을 받아 입주 연출이 붙는다 — 창 크기가 바뀌거나 다시 그릴 때마다
+// relayout이 도는데, 그때 "첫 스냅샷이었는지"는 이미 알 수 없다.
+const seenRooms = new Map();
+let seenAnyState = false;
+
+function markMoveIn(rooms) {
+  const now = Date.now();
+  const live = new Set(rooms.map((r) => r.key));
+  for (const [key, seen] of seenRooms) {
+    if (!live.has(key) && now - seen.at > MOVEIN_KEEP_MS) seenRooms.delete(key);
+  }
+  for (const room of rooms) {
+    // 첫 스냅샷에 있던 방은 "새로 뜬 방"이 아니다 — 켤 때마다 온 사무실이 이사판이 된다
+    if (!seenRooms.has(room.key)) seenRooms.set(room.key, { at: now, announce: seenAnyState });
+    const seen = seenRooms.get(room.key);
+    if (seen.announce) room.movedInAt = seen.at;
+  }
+  // **방이 하나라도 있는 화면을 본 뒤부터** 입주로 센다. relayout은 스냅샷이 오기 전에도
+  // (로드 직후·창 크기 변경) 도는데, 그 빈 화면을 "본 것"으로 세면 첫 스냅샷의 방들이 전부
+  // 새로 뜬 방이 되어 켤 때마다 온 사무실이 이사판이 된다.
+  if (rooms.length) seenAnyState = true;
+  return rooms;
+}
+
 function relayout() {
   // clientWidth는 padding을 포함한다 — 빼지 않으면 가로 스크롤바가 생기고
   // 그게 세로 공간을 잠식해 세로 스크롤바까지 딸려 나온다
   const avail = Math.max(120, (stage.clientWidth || 800) - STAGE_PAD);
   scale = pickScale(avail);
   const logicalW = Math.max(120, Math.floor(avail / scale));
-  const rooms = roomsToDraw();
+  const rooms = markMoveIn(roomsToDraw());
   view = layout(rooms, logicalW, { themes: cfg.roomThemes, nameOf: canvasName });
 
   // 방이 적어도 바닥은 화면을 채운다 — 빈 캔버스가 잘려 보이지 않게

@@ -33,6 +33,9 @@ a clipboard and reports progress. The bar under the name tag is that session's *
 (60% yellow · 85% red). As the context fills, **paper piles up on the desk** so you can spot it
 by glancing at the office rather than reading the bar.
 
+A room that just appeared gets a **stack of moving boxes** for a few seconds, and a room whose
+work is all finished has **its lights turned down.**
+
 **After 22:00 the office dims.** Room colours still tell the rooms apart, and whoever is still
 around in the small hours hums to itself with a ♪.
 

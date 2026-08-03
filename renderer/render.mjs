@@ -128,6 +128,27 @@ export function nightTint(slot) {
   return NIGHT_SLOTS.includes(slot) ? { l: NIGHT_L, s: NIGHT_S } : { l: 1, s: 1 };
 }
 
+// 방의 일이 다 끝났으면 불을 낮춘다.
+//
+// 방은 마지막 세션이 사라지는 순간 화면에서 **툭 없어진다.** 자리와 바닥 사이는 전환을 넣어
+// 순간이동을 없앴는데(docs/characters.md) 방 단위에는 그게 없었다. 사라지는 것을 늦추면
+// `layout()`이 줄을 다시 나누는 타이밍까지 건드려야 하고 그러면 **다른 방들이 옆으로 튄다** —
+// 그래서 사라지는 시점은 그대로 두고, 그 전에 "끝났다"는 것만 보이게 한다.
+//
+// 판정은 세션 상태만 본다: 남은 세션이 전부 done·stopped·failed면 그 방은 퇴근한 방이다.
+const DONE_L = 0.6;
+const LIVE_MOODS = ['typing', 'waiting', 'stuck', 'idle'];
+
+export function roomDone(room) {
+  const workers = room?.workers ?? [];
+  return workers.length > 0 && !workers.some((w) => LIVE_MOODS.includes(w.mood));
+}
+
+// 방 하나에 적용할 톤 — 심야 조명에 퇴근 여부를 곱한다.
+export function roomTint(room, base) {
+  return roomDone(room) ? { l: base.l * DONE_L, s: base.s } : base;
+}
+
 // hsl 한 벌을 배율에 맞춰 다시 쓴다. 반올림해 두면 같은 값이 문자열로도 같아 브라우저가
 // 파싱을 재사용한다.
 function hsl(hue, sat, light, tint) {
@@ -493,7 +514,26 @@ function drawRackLeds(ctx, p, t) {
 const PRINT_CYCLE = 5600;
 const PRINT_MAX = 4;
 
+// 새로 뜬 방에는 이삿짐 박스가 잠깐 놓인다. `movedInAt`은 app.mjs가 "이 방을 처음 본 시각"으로
+// 채워 준다 — 앱을 켠 직후에 뜬 방들은 안 채우므로 처음부터 온 사무실이 이사판이 되지 않는다.
+const MOVEIN_MS = 9000;
+
+function drawMoveIn(ctx, box, t) {
+  const at = box.room?.movedInAt;
+  if (!at) return;
+  const age = Date.now() - at;
+  if (age < 0 || age > MOVEIN_MS) return;
+  const spr = SPR.boxes;
+  if (!spr) return;
+  // 바닥 가운데 아래 — 러그와 비품 사이의 빈 자리다. 마지막 1초는 위로 빠지며 사라진다.
+  const out = Math.max(0, age - (MOVEIN_MS - 1000)) / 1000;
+  const x = box.floor.x + Math.floor(box.floor.w / 2) - spr.w - 6;
+  const y = box.floor.y + box.floor.h - spr.h - Math.round(out * 6);
+  if (out < 1) drawSprite(ctx, spr, x, y);
+}
+
 function drawProps(ctx, box, t) {
+  drawMoveIn(ctx, box, t);
   for (const p of box.props) {
     drawSprite(ctx, p.spr, p.x, p.y);
     if (p.key === 'rack') drawRackLeds(ctx, p, t);
@@ -1727,7 +1767,8 @@ export function render(ctx, view, opts) {
   // 시간대가 바뀌면 다음 프레임부터 반영된다.
   const tint = nightTint(slotNow());
   view.tint = tint;
-  for (const box of view.boxes) box.tint = tint;
+  // 방마다 다르다 — 퇴근한 방은 그 위에 한 번 더 어두워진다
+  for (const box of view.boxes) box.tint = roomTint(box.room, tint);
 
   ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
   ctx.imageSmoothingEnabled = false;
