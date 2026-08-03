@@ -35,6 +35,7 @@ const cfgBody = document.getElementById('cfg-body');
 const cfgTabsEl = document.getElementById('cfg-tabs');
 const attDialog = document.getElementById('att');
 const attBody = document.getElementById('att-body');
+const attTabsEl = document.getElementById('att-tabs');
 
 // 미니 모드는 **같은 페이지를 다른 창에서** 여는 것이다(main/index.mjs의 createMini).
 // 프레임 유무는 창을 만들 때 정해지고 나중에 못 바꾸므로 창을 갈아 끼우는 쪽을 골랐고,
@@ -1253,8 +1254,8 @@ const MINE_ROOMS = 6;
 function attMine(mine) {
   if (!mine) return '';
   const shown = mine.rooms.slice(0, MINE_ROOMS);
+  // 제목을 안 붙인다 — 탭이 이미 "내가 시킨 것"이라고 말한다(#97).
   return `<section class="block">
-    <h3>${t('att.mine')}</h3>
     <dl class="facts">
       <div><dt>${t('att.minePrompts')}</dt><dd>${t('att.minePromptsValue', { n: mine.count })}</dd></div>
       <div><dt>${t('att.mineRooms')}</dt><dd>${t('att.mineRoomsValue', { n: mine.rooms.length })}</dd></div>
@@ -1307,8 +1308,8 @@ function attCodeStats(c) {
   const maxHour = Math.max(...c.hours, 1);
   const busiest = c.days.reduce((a, d) => (d.messages > a.messages ? d : a), c.days[0]);
   const peakHour = c.hours.indexOf(maxHour);
-  return `<details class="att-code">
-    <summary>${t('att.code')}</summary>
+  return `<section class="att-code">
+    <h3>${t('att.code')}</h3>
     <p class="hint">${
       c.staleDays
         ? t('att.codeStale', { to: c.computedTo ?? '—', n: c.staleDays })
@@ -1345,7 +1346,7 @@ function attCodeStats(c) {
              .join('')}</ul>`
         : ''
     }
-  </details>`;
+  </section>`;
 }
 
 function attRooms(s) {
@@ -1384,35 +1385,44 @@ function attWaits(s) {
   </section>`;
 }
 
-function drawAtt() {
-  if (!attData) {
-    attBody.innerHTML = `<p class="dim">${t('att.loadFailed')}</p>`;
-    return;
-  }
-  const s = attRange === 'week' ? attData.week : attData.today;
-  attBody.innerHTML = `
-    <div class="att-tabs">
+// ── 구간 고르기. **탭이 아니다** — 탭은 "무엇을 보나"이고 이건 "언제"다.
+//
+// 처음에 탭과 같은 모양의 버튼 두 개를 탭 바 아래 줄에 뒀는데, 굽어 보니 **두 줄이 똑같이
+// 생겨 무엇이 탭인지 알 수 없었다.** 그래서 둘을 갈랐다 —
+//  - 이어붙인 토글(`.att-range-pick`)로 만들어 "한 컨트롤의 두 상태"로 보이게 하고
+//  - 구간을 적는 문장과 **한 줄에** 놓아 그 줄이 "언제"에 관한 줄임을 스스로 밝히게 한다
+//
+// 쓰는 탭이 둘(근태·내가 시킨 것)이라 판마다 그리지만 상태는 하나다.
+function rangeRow(s) {
+  return `<div class="att-range-row">
+    <div class="att-range-pick">
       <button type="button" data-range="today"${attRange === 'today' ? ' class="on"' : ''}>${t('att.today')}</button>
       <button type="button" data-range="week"${attRange === 'week' ? ' class="on"' : ''}>${t('att.week')}</button>
     </div>
-    <p class="att-range">${t('att.range', {
-      from: fmtDay(s.from),
-      to: fmtDay(s.to),
-      time: fmtTime(s.to),
-    })}</p>
+    ${
+      s
+        ? `<span class="att-range">${t('att.range', {
+            from: fmtDay(s.from),
+            to: fmtDay(s.to),
+            time: fmtTime(s.to),
+          })}</span>`
+        : ''
+    }
+  </div>`;
+}
 
+// 근태 — 이 화면의 본론. 요약·방별 표·오래 기다리게 한 순간.
+// 기록 안내는 여기 있는 숫자에만 걸리는 단서라 이 판에 둔다.
+function attPane() {
+  const s = attRange === 'week' ? attData.week : attData.today;
+  return `
+    ${rangeRow(s)}
     ${attSummary(s)}
-
     <section class="block">
       <h3>${t('att.byRoom')}</h3>
       ${attRooms(s)}
     </section>
-
     ${attWaits(s)}
-    ${attTrend(attData.trend)}
-    ${attMine(attRange === 'week' ? attData.mine?.week : attData.mine?.today)}
-    ${attCodeStats(attData.code)}
-
     ${
       attData.on
         ? `<p class="hint">${t('att.onHint', { days: attData.retainDays })}</p>`
@@ -1420,6 +1430,47 @@ function drawAtt() {
     }
     <p class="hint">${t('att.offlineHint')}</p>
   `;
+}
+
+// 추이는 7일 고정이라 구간 토글이 뜻이 없다 — 안 그린다.
+function trendPane() {
+  return attTrend(attData.trend) || `<p class="dim">${t('att.empty')}</p>`;
+}
+
+function minePane() {
+  return `
+    ${rangeRow(attRange === 'week' ? attData.week : attData.today)}
+    ${attMine(attRange === 'week' ? attData.mine?.week : attData.mine?.today) || `<p class="dim">${t('att.empty')}</p>`}
+  `;
+}
+
+// Claude Code 자체 집계는 기간이 제 것이라(28일) 구간 토글이 없다.
+function codePane() {
+  return attCodeStats(attData.code) || `<p class="dim">${t('att.empty')}</p>`;
+}
+
+const ATT_TABS = [
+  ['att', attPane],
+  ['trend', trendPane],
+  ['mine', minePane],
+  ['code', codePane],
+];
+// 창을 닫았다 열면 보던 탭이 그대로다. 앱을 껐다 켜면 처음으로 — 저장까지 할 값은 아니다.
+let attTab = 'att';
+
+function drawAtt() {
+  if (!attData) {
+    attTabsEl.innerHTML = '';
+    attBody.innerHTML = `<p class="dim">${t('att.loadFailed')}</p>`;
+    return;
+  }
+  const pane = ATT_TABS.find(([k]) => k === attTab) ?? ATT_TABS[0];
+  attTabsEl.innerHTML = ATT_TABS.map(
+    ([k]) => `<button type="button" role="tab" aria-selected="${k === pane[0]}"
+      class="${k === pane[0] ? 'on' : ''}" data-att-tab="${k}">${t(`att.tab.${k}`)}</button>`,
+  ).join('');
+  attBody.innerHTML = pane[1]();
+  // 막대 폭은 CSSOM으로 넣는다 — 판을 갈아 끼울 때마다 다시 불러야 한다
   paintSparks();
 }
 
@@ -1450,6 +1501,13 @@ document.getElementById('mini-grow').addEventListener('click', () => window.offi
 
 document.getElementById('att-open').addEventListener('click', openAtt);
 document.getElementById('att-close').addEventListener('click', () => attDialog.close());
+attTabsEl.addEventListener('click', (e) => {
+  const tab = e.target?.dataset?.attTab;
+  if (!tab || tab === attTab) return;
+  attTab = tab;
+  drawAtt();
+});
+
 attBody.addEventListener('click', (e) => {
   const range = e.target?.dataset?.range;
   if (!range || range === attRange) return;
