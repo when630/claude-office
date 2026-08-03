@@ -53,6 +53,7 @@ import {
   dayStart,
   RETAIN_MS,
 } from './history.mjs';
+import { readPromptLog, summarizePrompts } from './prompts.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -974,14 +975,21 @@ if (!app.requestSingleInstanceLock()) {
 
     // 출근부. 오늘과 최근 7일을 한 번에 넘긴다 — 창을 열 때 한 번만 읽으면 되고,
     // 파일이 커도 보존 기간(14일)만큼이라 한 번에 읽어 집계해도 부담이 없다.
-    ipcMain.handle('office:history', () => {
+    ipcMain.handle('office:history', async () => {
       const events = readEvents(historyPath());
       const now = Date.now();
+      // 내가 시킨 횟수는 우리 기록이 아니라 Claude Code의 프롬프트 이력에서 그때그때 센다
+      // (main/prompts.mjs). 그래서 **근태 기록을 꺼 뒀거나 앱이 꺼져 있던 날도 셈이 맞는다.**
+      const prompts = await readPromptLog().catch(() => []);
       return {
         on: settings.history,
         retainDays: Math.round(RETAIN_MS / 86_400_000),
         today: summarize(events, { from: dayStart(now), to: now }),
         week: summarize(events, { from: dayStart(now, 6), to: now }),
+        mine: {
+          today: summarizePrompts(prompts, { from: dayStart(now), to: now }),
+          week: summarizePrompts(prompts, { from: dayStart(now, 6), to: now }),
+        },
       };
     });
 

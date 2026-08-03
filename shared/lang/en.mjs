@@ -234,6 +234,14 @@ export default {
       'The attendance log is off — nothing is being recorded. Turn it on from <b>tray icon &gt; Attendance log</b>.',
     offlineHint:
       'Time while the app was closed is not counted. It could not be observed, so counting it would be a lie.',
+    mine: 'What I asked for',
+    minePrompts: 'Instructions',
+    minePromptsValue: '{n}',
+    mineRooms: 'Rooms',
+    mineRoomsValue: '{n}',
+    mineEmpty: 'No instructions in this range.',
+    mineHint:
+      'This one number is counted from the prompt history Claude Code keeps — unlike everything above it, <b>time while the app was closed still counts.</b> What you typed is neither counted nor kept.',
     unknownRoom: '(unknown)',
   },
 

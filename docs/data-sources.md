@@ -16,6 +16,7 @@
 | `~/.claude/jobs/<id>/timeline.jsonl` | 상태 전이 이력 (마지막 12건) — 백그라운드 잡만 |
 | `~/.claude/projects/<cwd>/<sessionId>.jsonl` | **모든 세션**의 제목·최근 지시·진행 요약·MR·컨텍스트 사용량·타임라인 |
 | `~/.claude/tasks/<sessionId>/<n>.json` | 세션이 스스로 세운 **할 일 목록** (아래 참고) |
+| `~/.claude/history.jsonl` | 내가 친 **프롬프트 이력** — 출근부의 "내가 시킨 것", 그리고 꼬리 밖으로 밀려난 마지막 지시 (아래 참고) |
 | `~/.claude/office-usage.json` | 계정 사용량 — statusline이 떨어뜨려 준 payload ([사용량 tap](panel.md#사용량은-왜-tap이-필요한가) 참고) |
 | `~/.claude/office-notify/<sessionId>.json` | 지금 무엇을 기다리는지 — Notification 훅이 떨어뜨려 준 payload ([훅 tap](notify-hook.md) 참고) |
 
@@ -95,3 +96,20 @@ id로 떠서 정체를 알 수 없다(name도 intent도 없어 id가 그대로 �
 파일을 덮어써도 디렉터리 mtime을 안 바꾸는데, 할 일의 status가 바뀌는 것은 항목이 추가되는 게
 아니라 `<n>.json`을 제자리에서 다시 쓰는 일이다. 디렉터리만 보면 `pending`에서 `completed`로
 넘어간 것을 영원히 못 본다(`test/tasks.test.mjs`가 이걸 붙잡는다).
+
+## 내가 친 프롬프트 (`main/prompts.mjs`)
+
+줄 하나가 프롬프트 하나다 — `{ display, pastedContents, timestamp, project, sessionId }`.
+**우리 근태 파일과 이름만 같고 다른 파일이다**(그쪽은 `userData/history.jsonl`, 앱이 쓴다).
+이쪽은 Claude Code가 쓰고 우리는 **읽기만** 한다.
+
+메우는 구멍이 둘이다.
+
+- **근태에 없던 축** — 출근부는 게가 얼마나 일했는지만 셌다. `project`·`timestamp`가 박혀 있어
+  방별로 셀 수 있다 ([출근부](attendance.md#내가-시킨-것--여기만-출처가-다르다) 참고)
+- **꼬리 밖으로 밀려난 마지막 지시** — 트랜스크립트에서 캐내는 `lastPrompt`는 뒤쪽 320KB 안에
+  있어야 잡히고, 도구 결과가 그 안을 꽉 채우면 사라진다. 그때만 이쪽으로 떨어진다
+  (트랜스크립트 쪽이 우선이다 — 그 세션이 직접 남긴 기록이다)
+
+파일이 끝없이 자라므로(Claude Code가 덜어내지 않는다) 뒤쪽 1MB만 읽는다 — 실측 816KB에 반년치가
+들어 있었다. 이 파일은 **내가 프롬프트를 넣을 때만** 자라서 크기·mtime 캐시가 거의 항상 맞는다.

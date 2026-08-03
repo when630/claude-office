@@ -999,6 +999,40 @@ b.lv-na {
   color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
+
+/* 내가 시킨 것 — 방별 횟수. 대기 목록과 같은 꼴이지만 왼쪽 띠를 파랑으로 둔다.
+   노랑은 "나를 기다린다"는 뜻이고 이건 내가 한 일이라 다른 축이다. */
+.att-mine {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.att-mine li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--blue);
+  border-radius: 4px;
+  background: #151a22;
+  font-size: 12px;
+}
+.att-mine span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.att-mine b {
+  flex: none;
+  color: var(--blue);
+  font-variant-numeric: tabular-nums;
+}
 .att-waits span {
   flex: 1;
   min-width: 0;

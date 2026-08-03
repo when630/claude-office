@@ -6,11 +6,12 @@
 // 진행 요약·연결된 MR·컨텍스트 사용량을 채운다.
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { CLAUDE_DIR } from './paths.mjs';
+import { CLAUDE_DIR, roomKeyOf } from './paths.mjs';
 import { readTranscript } from './transcript.mjs';
 import { readUsage } from './usage.mjs';
 import { readNotes, noteNeeds } from './notify-tap.mjs';
 import { readTasks } from './tasks.mjs';
+import { readPromptLog, lastPromptFor } from './prompts.mjs';
 
 export { CLAUDE_DIR };
 
@@ -77,12 +78,6 @@ function trimText(s, n = 240) {
   if (typeof s !== 'string') return '';
   const flat = s.replace(/\s+/g, ' ').trim();
   return flat.length > n ? flat.slice(0, n) + '…' : flat;
-}
-
-function roomKeyOf(cwd) {
-  if (!cwd) return 'unknown';
-  const norm = cwd.replace(/[\\/]+$/, '');
-  return norm.split(/[\\/]/).pop() || norm;
 }
 
 async function collectJobs() {
@@ -270,6 +265,10 @@ export async function collect() {
     }),
   );
 
+  // 내가 친 프롬프트 이력(main/prompts.mjs). 트랜스크립트 꼬리에서 마지막 지시가 밀려났을 때
+  // 대신 쓴다 — 파일 하나라 세션 수와 무관하게 한 번만 읽는다.
+  const promptLog = await readPromptLog().catch(() => []);
+
   // Notification 훅을 심어 뒀다면 지금 무엇을 묻고 있는지가 들어온다(main/notify-tap.mjs).
   // 안 심었으면 빈 Map이고 아래는 예전처럼 돈다.
   const notes = readNotes(now);
@@ -304,7 +303,9 @@ export async function collect() {
       tokens: Number(st.tokens || 0) || Number(tr?.context?.tokens || 0),
       links: mergeLinks(st.children, tr?.links),
       intent: trimText(st.intent || '', 160),
-      lastPrompt: trimText(tr?.lastPrompt || '', 200),
+      // 트랜스크립트 쪽이 우선이다 — 그 세션이 직접 남긴 기록이다. 다만 한 턴이 길면 지시가
+      // 꼬리 320KB 밖으로 밀려나 사라지므로, 그때는 프롬프트 이력에서 같은 세션의 마지막 줄을 쓴다.
+      lastPrompt: trimText(tr?.lastPrompt || lastPromptFor(promptLog, sessionIdOf(s, job)), 200),
       aides: aidesOf(st, tr),
       // 세션이 세운 할 일. 안 쓰는 세션이 대부분이라 null이 기본이다.
       tasks: todos[i] ?? null,
