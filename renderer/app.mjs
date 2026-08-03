@@ -491,7 +491,12 @@ function workerPanel(w) {
             <p class="waited" id="w-waited"></p>
             <p>${esc(w.needs) || t('panel.needFallback')}</p>${
               w.suggestedReply
-                ? `<p class="reply">${t('panel.suggested', { reply: esc(w.suggestedReply) })}</p>`
+                ? // 읽을 수만 있고 쓸 수는 없어 손으로 다시 타야 했다. 클립보드까지가 끝이고
+                  // 붙여넣기는 사람이 한다 — 세션에 답을 써 넣지는 않는다.
+                  `<p class="reply">${t('panel.suggested', { reply: esc(w.suggestedReply) })}</p>
+                   <button class="copy reply-copy" data-cmd="${esc(w.suggestedReply)}">
+                     <span>${t('panel.copyReply')}</span>
+                   </button>`
                 : ''
             }</section>`
         : ''
@@ -613,18 +618,21 @@ function drawPanel() {
   panel.classList.toggle('idle', !w);
   panel.innerHTML = w ? workerPanel(w) : idlePanel();
 
-  panel.querySelector('.copy')?.addEventListener('click', (e) => {
-    const btn = e.currentTarget;
-    window.office.copy(btn.dataset.cmd);
-    const tag = btn.querySelector('span');
-    btn.classList.add('done');
-    // 글자를 갈아 끼운다 — CSS로 "됨"을 덧붙이는 방식은 한국어에서만 문장이 된다
-    if (tag) tag.textContent = t('panel.copied');
-    setTimeout(() => {
-      btn.classList.remove('done');
-      if (tag) tag.textContent = t('panel.copy');
-    }, 1200);
-  });
+  // **querySelectorAll이어야 한다.** 복사 버튼이 둘(재접속 명령 · 추천 답)이 되면서
+  // querySelector 하나만 잡던 코드는 둘째 버튼을 죽은 버튼으로 만들었다.
+  for (const btn of panel.querySelectorAll('.copy')) {
+    btn.addEventListener('click', () => {
+      window.office.copy(btn.dataset.cmd);
+      const tag = btn.querySelector('span');
+      btn.classList.add('done');
+      // 글자를 갈아 끼운다 — CSS로 "됨"을 덧붙이는 방식은 한국어에서만 문장이 된다
+      if (tag) tag.textContent = t('panel.copied');
+      setTimeout(() => {
+        btn.classList.remove('done');
+        if (tag) tag.textContent = t('panel.copy');
+      }, 1200);
+    });
+  }
   wirePlan();
   wireJump();
   paintBars();

@@ -42,6 +42,8 @@ your answer** —
 ![Waiting on you — up from the desk, holding an exclamation mark](docs/images/en/waiting.png)
 
 - The crab steps out in front of its desk holding a ❗ and says what it is waiting for
+- If a background job left a suggested reply, the panel gives you a one-click **copy** for it
+  (you still paste it yourself)
 - A **yellow dot** goes on the tray icon and an **OS notification** fires (Windows toast · macOS
   notification) — clicking it opens the window with that desk selected
 - The top bar keeps a running count like `1 waiting on you · longest 3m`

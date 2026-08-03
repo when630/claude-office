@@ -860,6 +860,25 @@ b.lv-na {
 .copy.done span {
   color: var(--green);
 }
+/* 추천 답 복사는 "나를 기다리는 중" 블록 안에 들어간다 — 그 블록의 노란 톤을 따르고,
+   재접속 명령 버튼처럼 폭을 다 쓰지 않는다(주 동작이 아니다). */
+.block.need .reply-copy {
+  width: auto;
+  margin-top: 8px;
+  padding: 4px 10px;
+  border-color: #4a3c15;
+  background: #191507;
+  justify-content: center;
+}
+.block.need .reply-copy span {
+  color: var(--accent);
+}
+.block.need .reply-copy:hover {
+  border-color: var(--accent);
+}
+.block.need .reply-copy.done span {
+  color: var(--green);
+}
 
 /* ── 설정 창·출근부. 방이 많으면 목록만 길어지므로 창 높이를 묶고 안에서 스크롤한다. */
 #cfg,

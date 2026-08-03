@@ -170,6 +170,7 @@ export default {
     opened: '열었습니다',
     copy: '복사',
     copied: '복사됨',
+    copyReply: '추천 답 복사',
     copiedCmd: '명령을 클립보드에 복사했습니다.',
   },
 
