@@ -600,6 +600,10 @@ export const STICKY = ['yyyy.', 'yyyy.', '.eeee', '.eeee'];
 
 export const PAPERS = ['..wwwww', '.wwwwww', 'wwwwwww', 'zzzzzzz'];
 
+// 바닥에 흘린 낱장. 책상 위 PAPERS는 쌓인 더미라 네 줄인데, 이건 **한 장이 펼쳐진** 것이라
+// 두 줄로 눕힌다 — 아랫줄을 회색으로 두면 바닥에 닿은 그림자로 읽힌다.
+export const SHEET = ['.wwww.', 'zzzzzz'];
+
 export const PHONE = ['.ddddd.', 'ddddddd', 'dSSSSSd', 'ddddddd', '.d...d.'];
 
 export const CAN = ['zzzz', 'iiii', 'iyyi', 'iiii', 'iiii', 'zzzz'];

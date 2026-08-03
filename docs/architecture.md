@@ -77,6 +77,8 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   말풍선 색(`BUBBLE_STYLE`), 방 색상 `HUES`,
   심야 조명(`nightTint`·`NIGHT_L`·`NIGHT_S` — 명도를 내린 만큼 채도를 올려 방 색 구분을 남긴다),
   컨텍스트 서류(`PAPER_STEPS`·`drawPaperStack` — 문턱은 이름표 밑 막대(`level`)와 같은 값이어야 한다),
+  바닥에 흘린 서류(`FLOOR_FROM`·`FLOOR_PER`·`FLOOR_MAX`·`drawFloorMess` — 위치를 장 번호로
+  정해야 이미 흘린 장이 안 움직인다),
   방 상태(`roomDone`·`roomTint`·`DONE_L`), 입주 박스(`MOVEIN_MS`·`drawMoveIn` —
   "새로 뜬 방"을 정하는 곳은 `app.mjs`의 `markMoveIn`이다)
 - `main/rooms.mjs` — 묶음 판정(`groupOf` — 가장 깊이 맞는 부모가 이기고 경계를 구분자로 끊는다),
