@@ -376,6 +376,42 @@ function usageOfSession(w) {
   return u;
 }
 
+// 세션이 세운 할 일 목록(main/tasks.mjs). 안 쓰는 세션이 대부분이라 없으면 아무것도 안 그린다 —
+// 빈 제목만 남는 자리를 만들지 않는다.
+//
+// 다 끝난 항목까지 늘어놓으면 열여덟 줄이 그대로 쌓여 아래 블록을 밀어낸다. 그래서 목록에는
+// **아직 안 끝난 것만** 적고 끝낸 것은 머릿수로 접는다 — 지금 무엇을 하는지가 보여야 하는 자리다.
+const TODO_SHOW = 12;
+
+function todoBlock(tasks) {
+  if (!tasks?.total) return '';
+  const left = tasks.items.filter((i) => i.status !== 'completed');
+  const shown = left.slice(0, TODO_SHOW);
+  const rest = left.length - shown.length;
+  return `<section class="block">
+    <h3>${t('panel.todos')}<span class="todo-count">${tasks.done}/${tasks.total}</span></h3>
+    ${
+      // 진행 막대는 `bar()`를 안 쓴다. 그쪽은 컨텍스트용이라 60·85%에서 노랑·빨강으로 물드는데,
+      // 여기서는 많이 찬 것이 **좋은 것**이다 — 다 끝나가는 목록이 빨갛게 보이면 안 된다.
+      `<div class="bar todo"><i data-pct="${Math.round((tasks.done / tasks.total) * 100)}"></i></div>`
+    }
+    <ul class="todos">${shown
+      .map(
+        (i) =>
+          `<li class="${esc(i.status)}${i.blockedBy.length ? ' blocked' : ''}"><span class="mark"></span><p>${esc(
+            i.subject,
+          )}${
+            i.blockedBy.length
+              ? `<em>${t('panel.todoBlocked', { ids: i.blockedBy.map((id) => `#${id}`).join(' ') })}</em>`
+              : ''
+          }</p></li>`,
+      )
+      .join('')}</ul>
+    ${rest > 0 ? `<p class="dim">${t('panel.todoMore', { n: rest })}</p>` : ''}
+    ${left.length === 0 ? `<p class="dim">${t('panel.todoAllDone')}</p>` : ''}
+  </section>`;
+}
+
 function workerPanel(w) {
   const cmd = attachCmd(w);
   const c = w.context;
@@ -445,6 +481,7 @@ function workerPanel(w) {
         : ''
     }
     ${w.detail ? `<section class="block"><h3>${t('panel.detail')}</h3><p>${esc(w.detail)}</p></section>` : ''}
+    ${todoBlock(w.tasks)}
     ${
       w.lastPrompt
         ? `<section class="block"><h3>${t('panel.lastPrompt')}</h3><p class="dim">${esc(w.lastPrompt)}</p></section>`
