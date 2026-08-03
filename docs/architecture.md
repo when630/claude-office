@@ -96,7 +96,8 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
 - `main/terminal.mjs` — 터미널을 띄우는 방법(`openWindows`·`openMac`), 셸에 넘길 id의 허용 문자(`ID_OK`).
   다른 터미널 앱을 쓰려면 여기에 분기를 넣는다
 - `main/history.mjs` — 무엇을 남길지(`diffEvents`), 시간을 어떻게 셀지(`summarize`·`BUCKET`),
-  보존 기간(`RETAIN_MS`), 대기 목록에 올릴 최소 길이(`WAIT_WORTH_MS`).
+  보존 기간(`RETAIN_MS`), 대기 목록에 올릴 최소 길이(`WAIT_WORTH_MS`),
+  하루 단위 추이(`dailyTrend` — `observed`가 "앱이 켜져 있었는가"다. 안 켠 날을 0으로 그리면 거짓말이 된다).
   시각을 인자로 받으므로 하루를 기다리지 않고 `test/history.test.mjs`가 확인한다
 - `main/notify-tap.mjs` — 훅이 돌릴 스크립트(`scriptSource` — `.mjs`라 ESM이다),
   받은 문구를 쓸지 정하는 규칙(`noteNeeds`·`NOTE_SLACK_MS`), 남은 파일을 버릴 기준(`NOTE_MAX_AGE_MS`)
