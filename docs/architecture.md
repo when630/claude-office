@@ -63,13 +63,16 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   두 파일의 키 모양이 같아야 하고, `en`이 없는 키의 대체값이다
 - `renderer/talk.mjs` — **언제 무엇을 고르는지**만 정한다(문장은 사전에 있다). 시간대 구간(`TIME_SLOTS`
   — 밖에서는 `slotNow()`로 이름으로 묻는다), 주기(`CYCLE`·`SHOW`·`AIDE_CYCLE`·`HUM_CYCLE`),
-  머리 옆 기호(`glyphKeyFor` — 스프라이트가 아니라 키를 돌려주므로 node로 테스트된다).
+  머리 옆 기호(`glyphKeyFor` — 스프라이트가 아니라 키를 돌려주므로 node로 테스트된다),
+  모이는 주기(`slotOfSeg`·`hangEveryAt` — 구간 번호에서 시각을 유도한다. "지금"으로 판단하면
+  경계에서 걷고 있던 구간의 출발점이 바뀌어 게가 튄다).
   문장을 고를 때 `kind`를 실어 보내면 말풍선 색이 그에 따라 갈린다
 - `renderer/render.mjs` — 방 크기(`SLOT_W`·`SLOT_H`·`FLOOR_BASE`). `layout()`은 두 걸음이다 —
   크기를 재고 줄을 나눈 뒤, **줄마다 가장 높은 방에 맞춰** 나머지 방의 바닥을 늘린다
   (회의실은 테이블 때문에 자리 줄 높이가 달라 그대로 두면 줄이 어긋난다), 자리 배치(`DY_DESK` 주석에 y좌표 정리 · 그리는 곳은 `drawSurface`·`drawGear`·`clawdSeated`),
-  돌아다니는 범위·속도(`bandBounds`·`SEG_MS`), 모이는 주기(`HANG_EVERY`), 잡담 거리(`CHAT_NEAR_X`),
-  말풍선 색(`BUBBLE_STYLE`), 방 색상 `HUES`
+  돌아다니는 범위·속도(`bandBounds`·`SEG_MS`), 모이는 주기(`HANG_EVERY`·`HANG_EVERY_LUNCH`),
+  잡담 거리(`CHAT_NEAR_X`), 말풍선 색(`BUBBLE_STYLE`), 방 색상 `HUES`,
+  심야 조명(`nightTint`·`NIGHT_L`·`NIGHT_S` — 명도를 내린 만큼 채도를 올려 방 색 구분을 남긴다)
 - `main/collect.mjs` — `moodOf`(상태 판정), `RECENT_DONE_MS`(퇴근 목록 유지 기간),
   `isSpare`(빈 예비 슬롯 판정), 헤매는 세션 문턱(`STUCK_ERRORS`·`STUCK_QUIET_MS` — 무진전 쪽은
   긴 빌드가 정상적으로 조용하다는 이유로 넉넉히 잡혀 있다),
@@ -128,3 +131,6 @@ README의 캡처(`docs/images/en`·`docs/images/ko`)도 그렇게 구운 것이�
 - **가짜 preload를 쓸 때는 `sandbox: false`가 필요하다.** 샌드박스 preload에는 `fs`도
   `process.env`도 없어서 미리 정해 둔 응답을 파일에서 읽을 수 없다(진짜 앱은 샌드박스가 켜져 있다)
 - 창이 좁으면 오른쪽 패널이 잘린 채 찍힌다. 패널까지 보려면 1900px쯤 잡는다
+- **시간대 연출은 페이지의 `Date`를 갈아 끼워 확인한다.** `executeJavaScript`로 `window.Date`를
+  시각을 옮긴 것으로 바꾸면 렌더러가 부르는 `new Date()`·`Date.now()`가 다 따라온다 —
+  새벽까지 기다리거나 OS 시계를 만질 필요가 없다

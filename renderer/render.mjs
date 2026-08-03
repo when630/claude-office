@@ -15,6 +15,7 @@ import {
   rnd,
   slotNow,
   glyphKeyFor,
+  hangEveryAt,
 } from './talk.mjs';
 import { assignThemes, THEMES } from './themes.mjs';
 
@@ -112,16 +113,37 @@ function assignHues(rooms) {
   return out;
 }
 
-function carpetColor(hue) {
+// ── 심야엔 사무실을 어둡게 한다. 새벽 세 시가 오후 두 시와 똑같이 환한 것이 이상했다.
+//
+// **방 색 구분이 죽으면 실패다.** 명도만 낮추면 어두운 쪽에서 색이 서로 몰려 방을 가르는
+// 수단이 사라진다 — 그래서 낮춘 만큼 **채도를 올려** 색상 차이를 남긴다.
+//
+// 시간대 구간은 talk.mjs의 TIME_SLOTS 하나가 들고 있고 여기서는 이름으로 묻는다.
+// `night`(22~24시)와 `lateNight`(0~5시) 둘 다 어둡게 한다.
+const NIGHT_L = 0.72; // 명도 배율
+const NIGHT_S = 1.3; // 채도 배율
+const NIGHT_SLOTS = ['night', 'lateNight'];
+
+export function nightTint(slot) {
+  return NIGHT_SLOTS.includes(slot) ? { l: NIGHT_L, s: NIGHT_S } : { l: 1, s: 1 };
+}
+
+// hsl 한 벌을 배율에 맞춰 다시 쓴다. 반올림해 두면 같은 값이 문자열로도 같아 브라우저가
+// 파싱을 재사용한다.
+function hsl(hue, sat, light, tint) {
+  return `hsl(${hue} ${Math.round(Math.min(100, sat * tint.s))}% ${Math.round(light * tint.l)}%)`;
+}
+
+function carpetColor(hue, tint = { l: 1, s: 1 }) {
   return {
-    base: `hsl(${hue} 24% 15%)`,
-    edge: `hsl(${hue} 28% 23%)`,
-    rug: `hsl(${hue} 30% 22%)`,
-    rugMid: `hsl(${hue} 34% 27%)`,
-    rugEdge: `hsl(${hue} 40% 34%)`,
-    tile: `hsl(${hue} 20% 17%)`,
-    seam: `hsl(${hue} 22% 12%)`,
-    fleck: `hsl(${hue} 24% 22%)`,
+    base: hsl(hue, 24, 15, tint),
+    edge: hsl(hue, 28, 23, tint),
+    rug: hsl(hue, 30, 22, tint),
+    rugMid: hsl(hue, 34, 27, tint),
+    rugEdge: hsl(hue, 40, 34, tint),
+    tile: hsl(hue, 20, 17, tint),
+    seam: hsl(hue, 22, 12, tint),
+    fleck: hsl(hue, 24, 22, tint),
   };
 }
 
@@ -322,6 +344,22 @@ export function pickAt(view, lx, ly) {
 }
 
 // ── 프리미티브
+// #rrggbb 를 배율만큼 어둡게. 회색 계열(벽·바닥)은 hsl로 다시 쓸 것이 없어 이쪽으로 처리한다.
+// 배율이 1이면 원래 문자열을 그대로 돌려준다 — 낮에는 아무 계산도 하지 않는다.
+const shadeCache = new Map();
+
+function shade(hex, mul) {
+  if (mul === 1) return hex;
+  const key = `${hex}@${mul}`;
+  const hit = shadeCache.get(key);
+  if (hit) return hit;
+  const n = parseInt(hex.slice(1), 16);
+  const ch = (shift) => Math.max(0, Math.min(255, Math.round(((n >> shift) & 255) * mul)));
+  const out = `#${[ch(16), ch(8), ch(0)].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+  shadeCache.set(key, out);
+  return out;
+}
+
 function rect(ctx, x, y, w, h, color) {
   ctx.fillStyle = color;
   ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
@@ -351,9 +389,11 @@ export function clearTextCache() {
   fitCache.clear();
 }
 
-function drawFloor(ctx, w, h) {
-  rect(ctx, 0, 0, w, h, COLORS.floor);
-  ctx.fillStyle = COLORS.floorLine;
+function drawFloor(ctx, w, h, tint = { l: 1, s: 1 }) {
+  // 방만 어둡게 하면 바깥 바닥이 떠 보인다 — 같은 배율로 함께 내린다.
+  // 회색(채도 0)이라 채도 배율은 뜻이 없어 명도만 쓴다.
+  rect(ctx, 0, 0, w, h, shade(COLORS.floor, tint.l));
+  ctx.fillStyle = shade(COLORS.floorLine, tint.l);
   for (let gx = 0; gx < w; gx += 8) ctx.fillRect(gx, 0, 1, h);
   for (let gy = 0; gy < h; gy += 8) ctx.fillRect(0, gy, w, 1);
 }
@@ -468,10 +508,11 @@ function drawProps(ctx, box, t) {
 
 function drawRoom(ctx, box, labels, t) {
   const { x, y, w, h, room, theme } = box;
-  const c = carpetColor(box.hue);
+  const c = carpetColor(box.hue, box.tint ?? { l: 1, s: 1 });
   drawRoomFloor(ctx, box, c);
-  rect(ctx, x, y, w, ROOM_HEAD, COLORS.wall);
-  rect(ctx, x, y, w, 3, COLORS.wallTop);
+  const tint = box.tint ?? { l: 1, s: 1 };
+  rect(ctx, x, y, w, ROOM_HEAD, shade(COLORS.wall, tint.l));
+  rect(ctx, x, y, w, 3, shade(COLORS.wallTop, tint.l));
   ctx.strokeStyle = c.edge;
   ctx.lineWidth = 1;
   ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
@@ -1081,7 +1122,14 @@ function posFor(seat, t) {
 
 const SEG_MS = 5200; // 한 구간 = 걷기 → 멈춰서 두리번
 const HANG_EVERY = 3; // 세 구간마다 한 번은 다 같이 가운데로 모인다
-const isHang = (i) => i % HANG_EVERY === HANG_EVERY - 1;
+const HANG_EVERY_LUNCH = 2; // 점심(12~14시)엔 더 자주 모인다
+
+// 모이는 주기는 talk.mjs가 정한다 — 점심엔 더 자주 모인다. "지금이 점심인가"로 판단하면
+// 12시 경계에서 이미 걷고 있던 구간의 출발점(spot(i))이 바뀌어 게가 방 폭만큼 튀기 때문에,
+// 구간 번호에서 시각을 유도해 한 번 정해진 구간은 다시 바뀌지 않게 해 두었다.
+const hangEvery = (i, t) => hangEveryAt(i, t, SEG_MS, HANG_EVERY, HANG_EVERY_LUNCH);
+
+const isHang = (i, t) => i % hangEvery(i, t) === hangEvery(i, t) - 1;
 
 // 잡담 창 — 구간 후반(둘 다 멈춰 있는 동안)에 한 번씩 주고받는다
 const CHAT_A = [0.6, 0.79];
@@ -1130,13 +1178,13 @@ function deskBounds(seat) {
 }
 
 // 구간 i가 끝났을 때 서 있을 자리. 시간만으로 정해지므로 상태를 들고 있지 않다.
-function spot(seat, i) {
+function spot(seat, i, t) {
   const seed = hashStr(seat.worker.key);
   if (seat.worker.mood === 'waiting') {
     const b = deskBounds(seat);
     return { x: b.x0 + rnd(seed, i * 2) * (b.x1 - b.x0), y: b.y0 + rnd(seed, i * 2 + 1) * (b.y1 - b.y0) };
   }
-  if (isHang(i)) {
+  if (isHang(i, t)) {
     const full = floorBounds(seat);
     const n = Math.max(1, seat.count);
     const h = seat.box.hang;
@@ -1156,15 +1204,15 @@ function walkPos(seat, t) {
   const i = Math.floor(t / SEG_MS);
   const f = (t % SEG_MS) / SEG_MS;
   const part = 0.44 + rnd(seed, 91) * 0.14;
-  const a = spot(seat, i);
-  const c = spot(seat, i + 1);
+  const a = spot(seat, i, t);
+  const c = spot(seat, i + 1, t);
   const k = f >= part ? 1 : smooth(f / part);
   const dist = Math.abs(c.x - a.x) + Math.abs(c.y - a.y);
   return {
     x: a.x + (c.x - a.x) * k,
     y: a.y + (c.y - a.y) * k,
     moving: f < part && dist > 4,
-    atHang: isHang(i + 1) && f >= part,
+    atHang: isHang(i + 1, t) && f >= part,
     seg: i,
     f,
   };
@@ -1568,9 +1616,15 @@ export function render(ctx, view, opts) {
     if (seat.phase.mode === 'sit') a.last = deskFront(seat);
   }
 
+  // 심야 조명. 레이아웃이 아니라 **그리는 순간**에 정하므로 창 크기를 다시 재지 않아도
+  // 시간대가 바뀌면 다음 프레임부터 반영된다.
+  const tint = nightTint(slotNow());
+  view.tint = tint;
+  for (const box of view.boxes) box.tint = tint;
+
   ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
   ctx.imageSmoothingEnabled = false;
-  drawFloor(ctx, view.width, view.height);
+  drawFloor(ctx, view.width, view.height, tint);
   for (const box of view.boxes) drawRoom(ctx, box, labels, t);
 
   // 자리 줄 먼저, 그다음 바닥의 게들을 y 순으로 — 앞에 선 게가 뒤를 가린다.
