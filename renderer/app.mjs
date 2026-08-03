@@ -710,6 +710,22 @@ function noIpc() {
   return `<p class="dim">${t('idle.notElectron')}</p>`;
 }
 
+// 설명은 대부분 **한 번 읽으면 되는 것**인데 늘 자리를 차지하고, 정작 고치러 온 값이
+// 그 사이에 묻힌다. 그래서 `?` 뒤로 접는다 — 우측 하단 물음표와 같은 몸짓이다.
+//
+// 펼친 것은 기억해 둔다. 설정 창은 값이 바뀔 때마다 통째로 다시 그리는데, 그때마다
+// 접혀 버리면 읽던 문장이 손가락 밑에서 사라진다.
+const openHints = new Set();
+
+function hint(key) {
+  const on = openHints.has(key);
+  return `<p class="hint-line">
+      <button type="button" class="hint-btn${on ? ' on' : ''}" data-hint="${esc(key)}"
+        aria-expanded="${on}" title="${t('cfg.hintTitle')}">?</button>
+    </p>
+    <p class="hint" ${on ? '' : 'hidden'}>${t(key)}</p>`;
+}
+
 function hotkeyBlock() {
   if (!hotkeyCfg) return noIpc();
   const row = (action) => {
@@ -728,7 +744,7 @@ function hotkeyBlock() {
         .filter((a) => HOTKEY_LABEL[a])
         .map(row)
         .join('')}
-      <p class="hint">${t('cfg.hotkeyHint')}</p>
+      ${hint('cfg.hotkeyHint')}
     </section>
   `;
 }
@@ -771,7 +787,7 @@ function notifyBlock() {
         <span class="cfg-sep">~</span>
         <input type="time" id="cfg-quiet-to" value="${esc(q.to)}">
       </div>
-      <p class="hint">${t('cfg.quietHint')}</p>
+      ${hint('cfg.quietHint')}
     </section>
   `;
 }
@@ -782,26 +798,26 @@ function generalPane() {
     <section class="block">
       <h3>${t('cfg.langSection')}</h3>
       <div class="cfg-row">
-        <label for="cfg-lang"><b>${t('cfg.lang')}</b><small>${t('cfg.langNote')}</small></label>
+        <label for="cfg-lang"><b>${t('cfg.lang')}</b></label>
         <select id="cfg-lang">${options(
           // 언어 이름은 그 언어로 적는다 — 읽을 수 없는 언어로 적힌 항목은 고를 수가 없다
           [['auto', t('common.langAuto')], ...LANGS.map((l) => [l, LANG_NAMES[l]])],
           langPref,
         )}</select>
       </div>
-      <p class="hint">${t('cfg.langHint')}</p>
+      ${hint('cfg.langHint')}
     </section>
 
     <section class="block">
       <h3>${t('cfg.namesSection')}</h3>
       <div class="cfg-row">
-        <label for="cfg-names"><b>${t('cfg.names')}</b><small>${t('cfg.namesNote')}</small></label>
+        <label for="cfg-names"><b>${t('cfg.names')}</b></label>
         <select id="cfg-names">${options(
           NAME_MODES.map((m) => [m, t(`names.${m}`)]),
           cfg.names,
         )}</select>
       </div>
-      <p class="hint">${t('cfg.namesHint')}</p>
+      ${hint('cfg.namesHint')}
     </section>
   `;
 }
@@ -846,7 +862,7 @@ function roomsPane() {
           : `<p class="dim">${t('cfg.roomsEmpty')}</p>`
       }
       <button class="cfg-reset" type="button"${picked ? '' : ' disabled'}>${t('cfg.roomsReset')}</button>
-      <p class="hint">${t('cfg.roomsHint')}</p>
+      ${hint('cfg.roomsHint')}
     </section>
   `;
 }
@@ -975,6 +991,18 @@ cfgBody.addEventListener('change', (e) => {
 });
 
 cfgBody.addEventListener('click', (e) => {
+  const hintKey = e.target?.dataset?.hint;
+  if (hintKey) {
+    // 다시 그리지 않고 그 자리에서 여닫는다 — 값은 하나도 안 바뀌었으므로
+    if (openHints.has(hintKey)) openHints.delete(hintKey);
+    else openHints.add(hintKey);
+    const on = openHints.has(hintKey);
+    e.target.classList.toggle('on', on);
+    e.target.setAttribute('aria-expanded', String(on));
+    const body = e.target.closest('.hint-line')?.nextElementSibling;
+    if (body?.classList.contains('hint')) body.hidden = !on;
+    return;
+  }
   if (e.target.classList?.contains('cfg-reset')) {
     saveView({ roomThemes: {} }).then(drawCfg);
     return;

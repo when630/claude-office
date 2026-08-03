@@ -1107,6 +1107,34 @@ input[type='checkbox'] {
   color: #f18a72;
 }
 
+/* 설명 접기. 우측 하단 물음표(#help-open)와 같은 모양이라 몸짓이 이어진다 */
+.hint-line {
+  margin: 10px 0 0;
+}
+.hint-btn {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #1b2029;
+  color: #5d6779;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+.hint-btn:hover,
+.hint-btn.on {
+  border-color: #39414f;
+  background: #232936;
+  color: var(--text);
+}
+/* 버튼 바로 아래 붙는 설명이라 위 여백은 버튼이 만든다 */
+.hint-line + .hint {
+  margin-top: 7px;
+}
+
 .cfg-reset {
   margin-top: 12px;
   padding: 5px 10px;
