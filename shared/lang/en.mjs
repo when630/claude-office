@@ -47,6 +47,8 @@ export default {
     longest: 'longest {d}',
     tokens: '{n} tok',
     waitChipTitle: 'Jump to the one waiting longest',
+    railToggle: 'Show or hide the session list',
+    panelToggle: 'Show or hide the panel',
   },
 
   // ── The question mark in the bottom right
@@ -102,6 +104,12 @@ export default {
   },
 
   // ── Default view (nothing selected)
+  rail: {
+    rest: 'Resting',
+    empty: 'No sessions in view',
+    emptyHint: 'Clear the name box in the top bar, or un-collapse a room, to see them again.',
+  },
+
   idle: {
     office: 'Office',
     in: 'In office',

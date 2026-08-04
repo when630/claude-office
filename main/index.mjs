@@ -109,7 +109,18 @@ const defaults = {
   bounds: { normal: null, mini: null },
   history: true,
   trayHintShown: false,
-  view: { names: 'show', roomThemes: {}, pinned: [], collapsed: [], roomGroups: [], roomAlias: {} },
+  // railOpen·panelOpen은 **접었는지**가 아니라 **열렸는지**다 — 기본이 열림이라
+  // 값이 없는 옛 설정 파일이 그대로 열린 채로 뜬다.
+  view: {
+    names: 'show',
+    roomThemes: {},
+    pinned: [],
+    collapsed: [],
+    roomGroups: [],
+    roomAlias: {},
+    railOpen: true,
+    panelOpen: true,
+  },
 };
 const NAME_MODES = ['show', 'mask', 'hide'];
 const LANG_PREFS = ['auto', ...LANGS];
@@ -302,6 +313,9 @@ function sanitizeView(v) {
     // 방 묶기·별칭 (main/rooms.mjs). 묶기는 부모 경로 목록이고 별칭은 방 이름 → 부를 이름이다.
     roomGroups: sanitizeGroups(v?.roomGroups),
     roomAlias: sanitizeAlias(v?.roomAlias),
+    // 접은 채로 껐다 켜면 그대로여야 한다. `!== false`라서 값이 없으면 열림이다.
+    railOpen: v?.railOpen !== false,
+    panelOpen: v?.panelOpen !== false,
   };
 }
 
