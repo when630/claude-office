@@ -40,6 +40,7 @@ import {
   NOTIFY_KINDS,
   ROOM_LEVELS,
   soundFor,
+  nameOf,
 } from './notify.mjs';
 import { openTerminal, reasonText as terminalReason } from './terminal.mjs';
 import { t, fmtDur, fmtWhen, setLang, resolveLang, LANGS, LANG_NAMES } from '../shared/i18n.mjs';
@@ -282,7 +283,7 @@ function jumpToLongestWait() {
     showWindow();
     return;
   }
-  openTerminalFor(first);
+  openTerminalFor(first.w);
 }
 
 // 렌더러가 보낸 값도, 손으로 고친 settings.json도 같은 문을 지난다 — 모르는 키·엉뚱한 타입은
@@ -748,19 +749,24 @@ function langMenu() {
   }));
 }
 
-// 지금 기다리고 있는 자리들 — 오래 기다린 순서.
+// 지금 기다리고 있는 자리들 — 오래 기다린 순서. **방을 달고 나온다** — 트레이에 적을 이름이
+// 방 별칭에 달려 있다(notify.mjs의 nameOf). 대기 목록과 토스트가 같은 이름을 불러야 한다.
 function waitingWorkers() {
   const out = [];
   for (const room of lastSnapshot?.rooms ?? []) {
-    for (const w of room.workers ?? []) if (w.mood === 'waiting') out.push(w);
+    for (const w of room.workers ?? []) if (w.mood === 'waiting') out.push({ w, room });
   }
-  return out.sort((a, b) => (a.statusAt ?? Infinity) - (b.statusAt ?? Infinity));
+  return out.sort((a, b) => (a.w.statusAt ?? Infinity) - (b.w.statusAt ?? Infinity));
 }
 
 // 트레이 메뉴에 적을 이름. 이름을 가리기로 해 뒀으면 세션 이름 대신 방 이름을 쓴다 —
 // 화면을 공유하는 동안엔 트레이 메뉴도 같이 보인다(방 이름은 원래 가리지 않는 값이다).
-function trayNameOf(w) {
-  return (settings.view.names === 'show' ? w.name : w.room) || w.room || '—';
+//
+// **가린 쪽에서는 nameOf를 쓰지 않는다.** nameOf는 별칭이 없으면 세션 이름을 돌려주고,
+// 세션이 여럿인 방에서는 별칭 뒤에 세션 이름을 붙이므로 어느 쪽이든 가린 것이 새어 나간다.
+function trayNameOf(w, room) {
+  const shown = settings.view.names === 'show' ? nameOf(w, room) : room?.label || w.room;
+  return shown || w.room || '—';
 }
 
 async function openTerminalFor(w) {
@@ -774,8 +780,8 @@ function waitingMenu() {
   const list = waitingWorkers().slice(0, 8);
   if (!list.length) return [{ label: t('tray.waitingNone'), enabled: false }];
   const now = Date.now();
-  return list.map((w) => ({
-    label: `${trayNameOf(w)} · ${fmtDur(w.statusAt ? now - w.statusAt : 0)}`,
+  return list.map(({ w, room }) => ({
+    label: `${trayNameOf(w, room)} · ${fmtDur(w.statusAt ? now - w.statusAt : 0)}`,
     click: () => openTerminalFor(w),
   }));
 }
@@ -946,7 +952,7 @@ function waitMenuSig() {
   const now = Date.now();
   return waitingWorkers()
     .slice(0, 8)
-    .map((w) => `${w.key}:${Math.floor((now - (w.statusAt ?? now)) / 60_000)}`)
+    .map(({ w }) => `${w.key}:${Math.floor((now - (w.statusAt ?? now)) / 60_000)}`)
     .join('|');
 }
 
