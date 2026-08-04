@@ -1993,6 +1993,17 @@ window.__office = {
   get state() {
     return state;
   },
+  // 지금 그려진 배치 — 방 사각형(논리 좌표)과 배율. README 캡처를 방에 딱 맞게 자르려면
+  // 방이 화면 어디에 있는지 알아야 하고, 그 답은 여기밖에 없다.
+  // (`view`는 아래에 이미 있다 — 표시 설정을 바꾸는 쪽이라 이름을 겹치게 둘 수 없다.)
+  get layout() {
+    return {
+      scale,
+      width: view.width,
+      height: view.height,
+      boxes: view.boxes.map((b) => ({ key: b.room.key, x: b.x, y: b.y, w: b.w, h: b.h })),
+    };
+  },
   push(next) {
     state = next;
     refresh();

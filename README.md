@@ -56,7 +56,10 @@ your answer** —
   (you still paste it yourself)
 - A **yellow dot** goes on the tray icon and an **OS notification** fires (Windows toast · macOS
   notification) — clicking it opens the window with that desk selected
-- The top bar keeps a running count like `1 waiting on you · longest 3m`
+- The top bar shows a **`2 waiting on you · longest 3m` chip** — the only filled thing on the
+  screen. Click it and the one **waiting longest** opens. It also stands as the top group in the
+  left-hand session list, counting up every second. Answer, and the chip and the group **vanish
+  entirely**
 - Leave it unanswered and it **calls again at 5 · 15 · 30 · 60 minutes**, and past 5 minutes the
   **tray icon starts blinking** — a toast slides past (you were in a meeting, or full-screen)
   but the tray stays where it is
@@ -73,25 +76,33 @@ lands in the panel and the notification.
 
 ## The right-hand panel
 
-<img src="docs/images/en/panel.png" width="345" alt="Session panel — context gauge, subagents, timeline, reattach command" align="right" />
+<img src="docs/images/en/panel.png" width="345" alt="Session panel — waiting card, context gauge, subagents, to-dos, timeline" align="right" />
 
-Click a desk to see what that session is really up to.
+The panel has three tabs — **Session · Attendance · Settings**. Clicking a desk brings you back
+to Session from wherever you were.
 
+Click a desk to see what that session is really up to. **The reading order is the urgency order.**
+
+- If it is waiting on you, a **yellow card sits right under the name** — what it is asking, how
+  long it has been, and a copy button when there is a suggested reply
 - **Context gauge** — tokens · window size · model
-- That session's **model · context window · effort · Fast** (per-session values, not account ones)
+- **Right now**
 - Attached **subagents** and the instruction each was given
-- **Right now · latest instruction · linked MRs**
+- One line — `Terminal · Up 47m · Updated 1m ago` — plus **Details**, which unfolds the values you
+  do not read every time: model · context window · effort · Fast · PID · mode (per-session values,
+  not account ones)
+- **Latest instruction · first instruction · linked MRs**
 - The **plan it got approved** in plan mode — its title, and a button that opens the plan file
 - The session's own **to-do list** — `2/6` with a progress bar and whatever is still open. Only
   the item in progress is bright; ones waiting their turn are marked `waits on #3`. Sessions that
   never wrote a list get no block at all
 - **Timeline** — instructions received (yellow) ↔ things said (blue)
-- **Open in terminal** at the bottom — launches a terminal in that session's working directory
-  and reattaches to it. If Windows Terminal is present it comes up as a new tab in the open
+- **Open in terminal, pinned to the bottom** — it never scrolls out of reach, however long the
+  rest gets. Launches a terminal in that session's working directory and reattaches to it. If Windows Terminal is present it comes up as a new tab in the open
   window. The **copy button** next to it hands you just the command
 
-With nothing selected, the default view is a clock and your **account usage** (5-hour session ·
-7-day week). Usage only appears once a tap is installed in your statusline — the tray menu's
+With nothing selected, the default view is an **office summary** and your **account usage**
+(5-hour session · 7-day week). Usage only appears once a tap is installed in your statusline — the tray menu's
 **Usage feed (statusline)** sets that up for you. The **question mark** in the bottom right
 explains how to read the bubbles.
 
@@ -99,10 +110,11 @@ explains how to read the bubbles.
 
 ## Attendance
 
-The **Attendance** button in the top bar. The office shows you how many are waiting right now,
+The panel's **Attendance** tab (the top-bar button goes there too). The office shows you how many
+are waiting right now,
 but **without a record there is no way to know how many minutes you left them waiting today.**
 
-<img src="docs/images/en/attendance.png" width="420" alt="Attendance — today and the last 7 days, by room, longest waits" align="right" />
+<img src="docs/images/en/attendance.png" width="330" alt="Attendance — today and the last 7 days, by room, longest waits" align="right" />
 
 - Today · last 7 days — session count · time working · **time spent waiting on me** · peak context
 - A per-room breakdown and the **longest waits** (only those over a minute)
@@ -145,10 +157,16 @@ Automatic installation is blocked for unsigned macOS builds, so there a new vers
   under a parent into one room** and give a cryptic name like `src` an **alias**. Attendance is
   not grouped — it keeps recording the working-directory name, so changing the rule never breaks
   continuity with past records
-- Once you have a lot of rooms, **filter them by name** in the top-right box. Pin the ones you
-  watch with `☆` in Settings and collapse the rest with `▥` — all three change the view only,
+- The left-hand **session list** groups everything by state — waiting on you · going in circles ·
+  failed · working · resting · clocked out. The urgent group is always on top, so twenty rooms
+  need no scanning. Click a row to open that desk; click a desk in the office and the row
+  highlights to match
+- Once you have a lot of rooms, **filter them by name** in the box above the list. Pin the ones you
+  watch with `☆` in Settings and collapse the rest — all three change the view only,
   so a collapsed room still nudges you. A `3 hidden` badge appears while anything is out of
   sight, and clicking it clears the lot
+- **Either side column folds away** — the two buttons in the top bar, or `Ctrl+[` · `Ctrl+]`.
+  Fold both and the window is all office. It stays folded across restarts
 - **Shrink to a corner** — the `▭` button in the top bar (or the tray menu) drops the office
   into a small frameless window that stays **always on top**. Just the office and a one-line
   count. Space is tight, so it keeps three rooms and puts the ones **waiting on you or going in
