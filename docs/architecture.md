@@ -104,7 +104,9 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   트레이·상단바는 `index.mjs`가 그대로 그린다),
   방별 세기(`ROOM_LEVELS`·`KEEN_STEPS_MS` — 끈 방은 판정을 다 돌린 뒤 마지막에 걸러낸다),
   소리(`soundFor`·`SOUND_SILENT_KINDS` — 재알림에는 안 낸다. Electron의 `silent`는 끄는 쪽
-  스위치라 부르는 쪽에서 뒤집는다).
+  스위치라 부르는 쪽에서 뒤집는다),
+  적을 이름(`nameOf` — 방에 별칭이 붙었으면 방 이름이 이긴다. 별칭 여부는 `label !== key`로
+  알므로 설정을 여기까지 끌어오지 않는다. 트레이 목록도 같은 함수를 쓴다).
   문턱을 건드렸으면 `npm test`로 확인한다 (시각을 인자로 받으므로 30분을 기다릴 필요가 없다)
 - `main/tasks.mjs` — 패널에 늘어놓을 최대 개수(`MAX_ITEMS`), 캐시 열쇠(`signature` — 디렉터리
   mtime으로는 제자리 덮어쓰기를 못 본다. 주석에 이유가 있다)
