@@ -1689,8 +1689,14 @@ function drawSeatBody(ctx, seat, t, hover, selected) {
   }
   if (dim) ctx.globalAlpha = 1;
 
-  // 서브에이전트가 붙어 있으면 비서가 자리 옆에 서서 보고한다
-  if (worker.aides?.length) drawAides(ctx, seat, t);
+  // 서브에이전트가 붙어 있으면 비서가 자리 옆에 서서 보고한다.
+  //
+  // **앉아 있을 때만이다.** 자리를 비운 게는 drawWanderer가 그리고 그쪽도 비서를 데려가므로
+  // (drawAidesBeside), 여기서 앉음 여부를 안 보면 한 세션의 비서가 두 곳에 동시에 선다 —
+  // 대기로 앞에 나설 때·걸어 나갈 때·자리로 돌아올 때 다 그랬다.
+  // 보고 말풍선이 붙는 자리(seat.aideAnchor)도 두 함수가 서로 덮어써서 그리는 순서에
+  // 달려 있었는데, 한쪽만 그리게 되면서 그것도 하나로 정해진다.
+  if (seated && worker.aides?.length) drawAides(ctx, seat, t);
 
   if (seated) seat.actor = { x: cx, y: seat.y + 20, seated: true };
 }
