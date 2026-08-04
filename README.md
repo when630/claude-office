@@ -177,10 +177,13 @@ Automatic installation is blocked for unsigned macOS builds, so there a new vers
   `Ctrl+0` restores the window-width scale and the centre in one go (`Ctrl+=` · `Ctrl+-` step the
   scale). Steps go in halves from 2× to 8× — as fine as stays crisp — and the zoom is **not** saved
 - **Shrink to a corner** — the `▭` button in the top bar (or the tray menu) drops the office
-  into a small frameless window that stays **always on top**. Just the office and a one-line
-  count. Space is tight, so it keeps three rooms and puts the ones **waiting on you or going in
-  circles** first. Click a desk and it grows back with that desk selected. Size, position and
-  mode are remembered, so it comes back the way you left it
+  into a small frameless window that stays **always on top**. No rooms here — just the crabs,
+  **gathered in one place**. The front row is whoever is waiting on you, stuck or failed, with a
+  name and how long it has been like that; the back row is everyone working, unnamed. No waiting,
+  no front row. Nobody wanders in this window — there is no reason to chase a moving target in a
+  view you only glance at. **Hover a crab and the one-line header tells you which room it is in**;
+  click it and the window grows back with that session selected. Size, position and mode are
+  remembered, so it comes back the way you left it
 - **Waiting on you** in the tray menu lists whatever is waiting, longest first — click one and
   **its terminal opens right there.** No need to open the window and hunt for the desk
 - Three **global shortcuts** (rebind them in Settings) — `Ctrl+Alt+O` shows and hides the window,
