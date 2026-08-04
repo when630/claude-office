@@ -1,0 +1,234 @@
+// 미니 창의 줄 세우기 (renderer/render.mjs의 miniRoster·miniPlan·layoutMini).
+//
+// 미니에서 눈으로 확인하기 가장 어려운 두 가지를 여기서 붙잡는다:
+//   - **자리가 밀리지 않는가** — 새 대기가 생겼을 때 이미 서 있던 게의 순번이 바뀌면
+//     눌렀는데 다른 게가 눌린다. 곁눈질용 창에서 그건 곧 오작동이다.
+//   - **앞줄이 살아남는가** — 창을 최소로 줄였을 때 접히는 것은 뒷줄이어야 한다.
+//     화면을 굽어 보면 알 수 있지만 220px·420px을 매번 눈으로 세는 것은 회귀 테스트가 아니다.
+//
+// render.mjs는 모듈 로드 때 sprites.mjs가 canvas를 만들므로 node로는 안 열린다.
+// **document를 최소한으로 세워** 열어 준다 (walk.test.mjs와 같은 수법).
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+globalThis.document = {
+  createElement: () => ({
+    width: 0,
+    height: 0,
+    getContext: () => ({
+      fillStyle: '',
+      fillRect() {},
+      clearRect() {},
+      drawImage() {},
+      getImageData: () => ({ data: new Uint8ClampedArray(4) }),
+      putImageData() {},
+    }),
+  }),
+};
+
+const { miniRoster, miniPlan, layoutMini, pickAt } = await import('../renderer/render.mjs');
+
+// 방 하나에 워커 몇. miniRoster가 보는 필드만 채운다.
+function room(key, workers) {
+  return { key, label: key, cwd: `/${key}`, workers };
+}
+
+// statusAt은 **절대 시각**이다 (main/collect.mjs) — 작을수록 오래된 상태다
+function w(key, mood, statusAt = 1000) {
+  return { key, name: key, mood, statusAt };
+}
+
+const keys = (list) => list.map((e) => e.worker.key);
+
+// 미니 기본 크기(420×300)와 최소 크기(220×150)에서 무대에 남는 논리 크기.
+// 무대는 창에서 손잡이 22px과 여백 12px을 뺀 만큼이고, 미니 배율은 2다 (pickScale).
+const BIG = { w: Math.floor((420 - 12) / 2), h: Math.floor((300 - 22 - 12) / 2) };
+const SMALL = { w: Math.floor((220 - 12) / 2), h: Math.floor((150 - 22 - 12) / 2) };
+
+test('앞줄에는 나를 기다리는 것만 선다 — 퇴근한 것은 세우지 않는다', () => {
+  const { front, back } = miniRoster([
+    room('a', [w('k1', 'waiting'), w('k2', 'typing'), w('k3', 'done')]),
+    room('b', [w('k4', 'stuck'), w('k5', 'idle'), w('k6', 'stopped')]),
+  ]);
+  assert.deepEqual(keys(front), ['k1', 'k4']);
+  assert.deepEqual(keys(back), ['k2', 'k5', 'k6']);
+});
+
+test('실패도 앞줄에 선다 — 큰 창의 roomScore는 이걸 0점으로 셌다', () => {
+  const { front, back } = miniRoster([room('a', [w('busy', 'typing'), w('boom', 'failed')])]);
+  assert.deepEqual(keys(front), ['boom']);
+  assert.deepEqual(keys(back), ['busy']);
+});
+
+test('상태 우선순위대로 선다 — 대기 → 헤맴 → 실패', () => {
+  const { front } = miniRoster([
+    room('a', [w('f', 'failed', 100), w('s', 'stuck', 100), w('wt', 'waiting', 100)]),
+  ]);
+  assert.deepEqual(keys(front), ['wt', 's', 'f']);
+});
+
+test('같은 상태끼리는 오래 기다린 것이 앞이다', () => {
+  const { front } = miniRoster([
+    room('a', [w('new', 'waiting', 9000), w('old', 'waiting', 1000), w('mid', 'waiting', 5000)]),
+  ]);
+  assert.deepEqual(keys(front), ['old', 'mid', 'new']);
+});
+
+// 이게 이 파일의 핵심이다. 대기 시간은 단조 증가하므로 새로 생긴 대기는 늘 줄 끝에 붙어야 한다.
+test('새 대기가 생겨도 이미 서 있던 게의 순번은 그대로다', () => {
+  const before = miniRoster([room('a', [w('one', 'waiting', 1000), w('two', 'waiting', 2000), w('busy', 'typing', 500)])]);
+  assert.deepEqual(keys(before.front), ['one', 'two']);
+
+  // busy가 답을 물어 왔다 — 방금 대기로 바뀌었으므로 statusAt이 가장 늦다
+  const after = miniRoster([room('a', [w('one', 'waiting', 1000), w('two', 'waiting', 2000), w('busy', 'waiting', 7000)])]);
+  assert.deepEqual(keys(after.front), ['one', 'two', 'busy']);
+  // 앞의 둘은 자리를 지켰다
+  assert.equal(keys(after.front).indexOf('one'), keys(before.front).indexOf('one'));
+  assert.equal(keys(after.front).indexOf('two'), keys(before.front).indexOf('two'));
+});
+
+test('statusAt이 없는 것은 같은 급의 뒤로 밀린다 — 키 순으로 갈린다', () => {
+  const { back } = miniRoster([
+    room('a', [{ key: 'zz', name: 'zz', mood: 'idle' }, { key: 'aa', name: 'aa', mood: 'idle' }, w('has', 'idle', 10)],),
+  ]);
+  assert.deepEqual(keys(back), ['has', 'aa', 'zz']);
+});
+
+test('기본 크기에서는 앞줄이 이름·경과·게이지를 다 달고 한 줄에 선다', () => {
+  const plan = miniPlan({ ...BIG, front: 2, back: 5, scale: 2 });
+  assert.equal(plan.detail, 2);
+  assert.equal(plan.rows, 1);
+  assert.equal(plan.frontShown, 2);
+  assert.equal(plan.foldedFront, 0);
+  assert.equal(plan.foldedBack, 0, '기본 크기에 다섯은 다 들어간다');
+});
+
+test('최소 크기에서도 앞줄은 남고 접히는 것은 뒷줄이다', () => {
+  const plan = miniPlan({ ...SMALL, front: 2, back: 5, scale: 2 });
+  assert.equal(plan.frontShown, 2, '앞줄은 상세도를 깎아서라도 남긴다');
+  assert.equal(plan.foldedFront, 0);
+  assert.equal(plan.foldedBack, 5, '뒷줄은 줄째로 접힌다');
+});
+
+// 실측에서 걸린 것 — 셋이면 두 열에 두 줄이 되어 세로에 안 들어가 앞줄이 접혔다.
+// 상세도 0에서는 이름을 떼므로 칸이 좁아도 되고, 그러면 세 열이 한 줄에 선다.
+test('최소 크기에 대기가 셋이어도 앞줄은 접히지 않는다', () => {
+  const plan = miniPlan({ ...SMALL, front: 3, back: 5, scale: 2 });
+  assert.equal(plan.foldedFront, 0);
+  assert.equal(plan.rows, 1, '이름을 떼고 한 줄에 세운다');
+  assert.equal(plan.cols, 3);
+});
+
+test('앞줄이 많으면 상세도가 먼저 깎이고, 그래도 안 들어가면 마지막에 접힌다', () => {
+  const plan = miniPlan({ ...SMALL, front: 6, back: 0, scale: 2 });
+  assert.equal(plan.detail, 0, '이름·경과를 떼고 게이지만 남긴다');
+  assert.ok(plan.frontShown >= plan.cols, '적어도 한 줄은 세운다');
+  assert.equal(plan.frontShown + plan.foldedFront, 6);
+});
+
+test('창이 커질수록 상세도가 내려가는 일은 없다', () => {
+  let prev = 0;
+  for (let h = SMALL.h; h <= BIG.h; h += 1) {
+    const d = miniPlan({ w: SMALL.w, h, front: 3, back: 4, scale: 2 }).detail;
+    assert.ok(d >= prev, `높이 ${h}에서 상세도가 ${prev} → ${d}로 내려갔다`);
+    prev = d;
+  }
+});
+
+// 창을 좁히면 열이 줄고 줄이 늘어난다 — 접히는 것은 세로가 모자랄 때뿐이어야 한다.
+// 폭은 창의 최소치(220px)부터 훑는다. 그보다 좁은 창은 만들 수 없다 (main/index.mjs의 minWidth).
+test('폭이 좁아도 앞줄은 접히지 않는다 — 열이 줄면 줄이 늘어난다', () => {
+  for (let width = SMALL.w; width <= BIG.w; width += 4) {
+    const plan = miniPlan({ w: width, h: BIG.h, front: 4, back: 0, scale: 2 });
+    assert.equal(plan.foldedFront, 0, `폭 ${width}에서 앞줄이 접혔다`);
+    assert.equal(plan.frontShown, 4);
+    assert.ok(plan.cols * plan.rows >= 4);
+  }
+});
+
+test('최소 크기에서 앞줄이 둘은 들어간다', () => {
+  const plan = miniPlan({ ...SMALL, front: 2, back: 0, scale: 2 });
+  assert.equal(plan.cols, 2);
+  assert.equal(plan.rows, 1);
+  assert.equal(plan.foldedFront, 0);
+});
+
+test('배율이 올라가도 글자 줄 간격이 논리 좌표로 줄어든다', () => {
+  const two = miniPlan({ ...BIG, front: 1, back: 1, scale: 2 });
+  const four = miniPlan({ ...BIG, front: 1, back: 1, scale: 4 });
+  assert.ok(four.lineH < two.lineH, '글자는 확대 밖에서 12px 고정이라 논리 간격이 좁아진다');
+  assert.ok(four.nameDy < two.nameDy);
+});
+
+test('layoutMini가 만든 자리는 창 안에 있고 클릭 판정이 걸린다', () => {
+  const view = layoutMini(
+    [room('a', [w('k1', 'waiting', 100), w('k2', 'typing'), w('k3', 'idle')])],
+    BIG.w,
+    BIG.h,
+    { scale: 2, nameOf: (x) => x.name },
+  );
+  assert.equal(view.seats.length, 3);
+  assert.equal(view.boxes.length, 0, '방은 그리지 않는다');
+  for (const s of view.seats) {
+    assert.ok(s.x >= 0 && s.x + s.w <= BIG.w, `${s.worker.key}가 가로로 넘쳤다`);
+    assert.ok(s.y >= 0 && s.y + s.h <= BIG.h, `${s.worker.key}가 세로로 넘쳤다`);
+    // 돌아다니지 않으므로 첫 프레임을 그리기 전에도 actor가 채워져 있어야 한다 (pickAt)
+    assert.ok(s.actor && Number.isFinite(s.actor.x) && Number.isFinite(s.actor.y));
+    assert.equal(s.actor.seated, false);
+    assert.ok(s.hue != null, '방 색은 발판에 남긴다');
+  }
+});
+
+test('앞줄이 뒷줄보다 아래에 선다 — 앞에 선 것이 아래라야 원근이 맞는다', () => {
+  const view = layoutMini(
+    [room('a', [w('wt', 'waiting', 100), w('busy', 'typing')])],
+    BIG.w,
+    BIG.h,
+    { scale: 2 },
+  );
+  const front = view.seats.find((s) => s.worker.key === 'wt');
+  const back = view.seats.find((s) => s.worker.key === 'busy');
+  assert.ok(front.front && !back.front);
+  assert.ok(front.feet > back.feet, '앞줄의 발이 더 아래에 있어야 한다');
+});
+
+// 미니에서 할 수 있는 일은 게를 누르는 것 하나뿐이다 — 잘못 잡히면 그게 곧 오작동이다.
+// 큰 창과 같은 pickAt을 쓰므로(view 모양을 맞춰 뒀다) 그것까지 여기서 확인한다.
+test('게마다 자기 자리가 집힌다 — 눌렀는데 옆 게가 잡히지 않는다', () => {
+  const view = layoutMini(
+    [
+      room('api', [w('api-1', 'waiting', 12), w('api-2', 'typing')]),
+      room('web', [w('web-1', 'typing'), w('web-2', 'idle')]),
+      room('docs', [w('docs-1', 'waiting', 3), w('docs-2', 'failed', 40)]),
+    ],
+    BIG.w,
+    BIG.h,
+    { scale: 2, nameOf: (x) => x.name },
+  );
+  assert.equal(view.seats.length, 6);
+  for (const s of view.seats) {
+    for (const [why, x, y] of [
+      ['몸통', s.actor.x, s.actor.y - 5],
+      ['머리', s.actor.x, s.actor.y - 11],
+      ['발', s.actor.x, s.actor.y],
+      ['칸 가운데', s.x + Math.floor(s.w / 2), s.y + Math.floor(s.h / 2)],
+    ]) {
+      const hit = pickAt(view, x, y);
+      assert.equal(hit?.worker.key, s.worker.key, `${s.worker.key}의 ${why}에서 ${hit?.worker.key}가 잡혔다`);
+    }
+  }
+});
+
+test('대기가 없으면 앞줄이 아예 없다', () => {
+  const view = layoutMini([room('a', [w('busy', 'typing'), w('z', 'idle')])], BIG.w, BIG.h, { scale: 2 });
+  assert.equal(view.seats.filter((s) => s.front).length, 0);
+  assert.equal(view.seats.length, 2);
+  assert.equal(view.mini.rows, 0);
+});
+
+test('아무도 없으면 자리도 없다 — 안내는 app.mjs가 적는다', () => {
+  const view = layoutMini([], BIG.w, BIG.h, { scale: 2 });
+  assert.equal(view.seats.length, 0);
+  assert.equal(view.width, BIG.w);
+  assert.equal(view.height, BIG.h);
+});

@@ -389,6 +389,10 @@ body.mini main {
 body.mini #stage {
   padding: 6px;
 }
+/* 아무도 출근하지 않았을 때의 안내. 큰 창의 40px 위 여백을 미니에 쓸 자리는 없다 */
+body.mini #stage-empty {
+  margin: 12px auto;
+}
 /* 미니 모드도 큰 창과 같은 위계다 — 대기가 먼저 서고 총원은 가라앉는다.
    22px 줄에 칩을 세울 자리는 없으니 굵기와 색으로만 낸다. */
 #mini-stats {

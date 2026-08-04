@@ -1858,6 +1858,360 @@ function findChats(walkers) {
   return chats;
 }
 
+// ── 미니 창. 방을 그리지 않고 클로드만 모아 세운다.
+//
+// 큰 창의 `layout`/`render`를 배율만 낮춰 쓰던 것을 걷어냈다. 220px 폭에서는 방·벽·비품이
+// 화면을 다 먹고 게가 5%로 줄어드는데, 곁눈질로 알고 싶은 것은 "누가 나를 기다리는가" 하나다.
+// 방 단위로 자르던 것(상위 세 방)도 같이 없앴다 — 네 번째 방의 대기가 안 보였다.
+//
+// **전원 서 있다.** 걷기만 끄고 앉히면 `isSeated`가 waiting을 앉음으로 보지 않아 `clawdSeated`가
+// `asleep`을 골라, **나를 기다리는 게가 자는 모습**으로 그려진다(머리 위 gBang과 정면충돌).
+// 서 있게 두면 대기가 `armsHigh`(손 든 자세)로 읽히고, 의자·책상·자리 전환·잡담·비품 코드를
+// 통째로 안 탄다 — 그래서 여기는 `layout`/`render`에 플래그를 얹지 않고 따로 짠 함수다.
+//
+// 세로 구성(칸 위를 0으로, 논리 좌표):
+//   +0  상태 기호 말풍선(11)   +13 게 머리(12)   +25 발 = actor.y
+//   그 아래로 상세도만큼 — 이름 → 경과 시간 → 컨텍스트 막대
+const M_PAD = 3;
+const M_GLYPH_H = 11; // drawGlyphBubble이 쓰는 높이
+const M_GLYPH_GAP = 2; // 기호 밑 → 머리
+const M_BODY_H = 12; // 게 키 (SPR.stand.h)
+const M_BAR_H = 4; // drawContextBar
+const M_BAR_GAP = 2;
+const M_ROW_GAP = 4;
+const M_FRONT_MIN_W = 34; // 앞줄 한 칸 — 이름이 서너 글자는 들어갈 폭
+// 이름·경과를 떼어낸 상세도(0)에서는 게(16)와 게이지(24)만 들어가면 된다. 여기서도 34를 요구하면
+// 최소 크기 창에서 열이 모자라 줄이 늘어나고, 그 줄이 세로에 안 들어가 **앞줄이 접혔다**.
+const M_FRONT_BARE_W = 26;
+// 칸 폭의 위 끝. 창을 넓히면 남는 폭을 칸에 다 나눠 주는데, 그러면 게 셋이 창 양 끝으로
+// 흩어져 "모아 놓은" 꼴이 아니게 된다 — 칸은 이만큼까지만 넓히고 줄째로 가운데에 놓는다.
+const M_FRONT_MAX_W = 58;
+const M_BACK_W = 20; // 뒷줄 한 칸 — 게 16px + 좌우 2px
+// 뒷줄이 화면 절반을 먹으면 앞줄이 밀린다. 넘치는 만큼은 `+n`으로 접는다.
+const M_BACK_ROWS_MAX = 3;
+const M_HEAD_H = M_GLYPH_H + M_GLYPH_GAP + M_BODY_H; // 칸 위 → 발
+
+// 앞줄에 서는 상태 — 나를 기다리거나 막혔거나 실패한 것. 이름·경과·게이지를 다 달아 준다.
+const MINI_FRONT_MOODS = ['waiting', 'stuck', 'failed'];
+// 줄 세우는 순서. 방이 아니라 **상태**가 순위를 정한다 — 큰 창의 roomScore가 failed를
+// 0점으로 세서 실패만 있는 방이 뒤로 밀렸던 것이 여기서 없어진다.
+//
+// stopped가 맨 뒤인 이유: 이 앱에서 멈춘 세션은 흐리게 그리고(drawSeatBody) 방 조명을 내릴 때도
+// 살아 있는 것으로 세지 않는다(LIVE_MOODS). 뒷줄에서도 일하는 것보다 앞에 세울 이유가 없다.
+const MINI_RANK = { waiting: 0, stuck: 1, failed: 2, typing: 3, idle: 4, stopped: 5 };
+
+// 같은 급끼리는 **오래된 것이 앞**이다. statusAt은 단조 증가하므로 새로 생긴 대기가 줄 끝에
+// 붙고 이미 서 있던 게의 자리는 밀리지 않는다 — 눌렀는데 다른 게가 눌리면 곁눈질이 안 된다.
+function miniCmp(a, b) {
+  const ra = MINI_RANK[a.worker.mood] ?? 9;
+  const rb = MINI_RANK[b.worker.mood] ?? 9;
+  if (ra !== rb) return ra - rb;
+  const sa = a.worker.statusAt ?? Infinity;
+  const sb = b.worker.statusAt ?? Infinity;
+  if (sa !== sb) return sa - sb;
+  return a.worker.key < b.worker.key ? -1 : a.worker.key > b.worker.key ? 1 : 0;
+}
+
+// 방을 헐어 게만 두 줄로 나눈다. 퇴근한 것(done)은 세우지 않는다 — 12시간 남는 목록이라
+// 뒷줄을 채워 봐야 곁눈질에 도움이 안 된다.
+export function miniRoster(rooms) {
+  const front = [];
+  const back = [];
+  for (const room of rooms ?? []) {
+    for (const worker of room.workers ?? []) {
+      if (worker.mood === 'done') continue;
+      (MINI_FRONT_MOODS.includes(worker.mood) ? front : back).push({ worker, room });
+    }
+  }
+  return { front: front.sort(miniCmp), back: back.sort(miniCmp) };
+}
+
+// 몇 열·몇 줄·어느 상세도로 세울까. **순수 함수다** — 인원수와 크기만 받으므로 node로 테스트된다.
+//
+// 사다리는 앞줄을 지키는 쪽으로 내려간다: 상세도(이름·경과·게이지)를 먼저 깎고, 그다음 뒷줄을
+// 줄째로 접고, 앞줄을 자르는 것은 창을 최소로 줄인 경우의 마지막 수단이다.
+// 폭 때문에 앞줄이 잘리는 일은 없다 — 열이 줄면 줄이 늘어난다.
+export function miniPlan({ w, h, front = 0, back = 0, scale = 2 }) {
+  // 글자는 확대 밖에서 12px 고정으로 그린다 — 줄 간격을 논리 좌표로 잡으려면 배율로 나눠야 한다
+  const lineH = Math.max(4, Math.ceil((OFFICE_FONT_PX * 1.2) / scale));
+  const nameDy = Math.max(3, Math.ceil((OFFICE_FONT_PX + 3) / scale)); // 발 → 이름 baseline
+  const innerW = Math.max(M_BACK_W, Math.floor(w) - M_PAD * 2);
+  const availH = Math.max(M_HEAD_H, Math.floor(h) - M_PAD * 2);
+
+  const backCols = Math.max(1, Math.floor(innerW / M_BACK_W));
+
+  // 칸의 최소 폭은 **상세도가 정한다** — 글자를 떼면 좁아도 되고, 그만큼 열이 늘어 줄이 줄어든다
+  const colsFor = (d) =>
+    Math.max(1, Math.min(Math.max(1, front), Math.floor(innerW / (d >= 1 ? M_FRONT_MIN_W : M_FRONT_BARE_W))));
+  const rowH = (d) => M_HEAD_H + (d >= 2 ? nameDy + lineH : d >= 1 ? nameDy : 0) + M_BAR_GAP + M_BAR_H;
+  const blockH = (rows, unit) => (rows > 0 ? rows * unit + (rows - 1) * M_ROW_GAP : 0);
+  const rowsFor = (d) => (front > 0 ? Math.ceil(front / colsFor(d)) : 0);
+
+  let detail = 2;
+  while (detail > 0 && blockH(rowsFor(detail), rowH(detail)) > availH) detail -= 1;
+  const cols = colsFor(detail);
+  const cellW = Math.min(M_FRONT_MAX_W, Math.floor(innerW / cols));
+  let rows = rowsFor(detail);
+
+  let frontShown = front;
+  let foldedFront = 0;
+  if (blockH(rows, rowH(detail)) > availH) {
+    rows = Math.max(1, Math.floor((availH + M_ROW_GAP) / (rowH(detail) + M_ROW_GAP)));
+    frontShown = Math.min(front, rows * cols);
+    foldedFront = front - frontShown;
+  }
+  const frontH = blockH(rows, rowH(detail));
+
+  // 뒷줄은 앞줄이 자리를 잡은 뒤 남은 높이만큼만 선다
+  const space = availH - frontH - (rows > 0 ? M_ROW_GAP : 0);
+  const fitRows = (room) => (room < M_HEAD_H ? 0 : Math.floor((room + M_ROW_GAP) / (M_HEAD_H + M_ROW_GAP)));
+  const wantRows = back > 0 ? Math.ceil(back / backCols) : 0;
+  let backRows = Math.min(wantRows, fitRows(space), M_BACK_ROWS_MAX);
+  // 접을 것이 있으면 개수를 적을 한 줄을 먼저 떼어 둔다 — 안 보이는 게가 몇인지는 알려야 한다
+  if (backRows < wantRows) backRows = Math.min(wantRows, fitRows(space - lineH - 1), M_BACK_ROWS_MAX);
+  const backShown = Math.min(back, backRows * backCols);
+  const foldedBack = back - backShown;
+  const backH = blockH(backRows, M_HEAD_H);
+  const foldH = foldedBack > 0 && space - backH - (backRows > 0 ? M_ROW_GAP : 0) >= lineH ? lineH : 0;
+
+  return {
+    cols,
+    cellW,
+    rows,
+    detail,
+    frontShown,
+    foldedFront,
+    backCols,
+    backRows,
+    backShown,
+    foldedBack,
+    lineH,
+    nameDy,
+    innerW,
+    availH,
+    frontRowH: rowH(detail),
+    // 덩이 전체를 세로 가운데에 놓는다. 위로 붙이면 아래 절반이 빈 바닥으로 남아 떠 보인다.
+    top: M_PAD + Math.max(0, Math.floor((availH - (foldH + backH + (backRows || foldH ? M_ROW_GAP : 0) + frontH)) / 2)),
+    foldH,
+    backH,
+    frontH,
+  };
+}
+
+// 칸 하나를 만든다. **자리가 고정이라 actor를 여기서 채운다** — 돌아다니지 않으므로 그릴 때
+// 갱신할 것이 없고, 첫 프레임 전에도 클릭 판정(pickAt)이 걸린다.
+function miniSeat(entry, hue, { x, y, w, h, feet, front, detail, nameOf }) {
+  return {
+    worker: entry.worker,
+    room: entry.room,
+    hue,
+    name: nameOf ? nameOf(entry.worker) : entry.worker.name,
+    front,
+    detail,
+    x,
+    y,
+    w,
+    h,
+    feet,
+    actor: { x: Math.round(x + w / 2), y: feet, seated: false },
+  };
+}
+
+// 미니의 레이아웃. `layout`과 달리 **보이는 창의 크기를 그대로 받는다** — 확대도 이동도 없어서
+// 사무실이 창보다 커질 일이 없고, 그래서 pan이 늘 0이다.
+// 돌려주는 모양은 `layout`과 맞춰 둔다(seats·width·height) — pickAt을 그대로 쓴다.
+export function layoutMini(rooms, maxW, maxH, opts = {}) {
+  const { nameOf, scale = 2 } = opts;
+  const list = rooms ?? [];
+  const hues = assignHues(list);
+  const { front, back } = miniRoster(list);
+  const plan = miniPlan({ w: maxW, h: maxH, front: front.length, back: back.length, scale });
+  const seats = [];
+
+  // 뒷줄이 위, 앞줄이 아래 — 앞에 선 것이 아래라야 원근이 맞고, 이름표가 붙는 줄이 바닥에 선다
+  let y = plan.top + plan.foldH;
+  for (let r = 0; r < plan.backRows; r++) {
+    const from = r * plan.backCols;
+    const n = Math.min(plan.backCols, plan.backShown - from);
+    if (n <= 0) break;
+    const left = M_PAD + Math.floor((plan.innerW - n * M_BACK_W) / 2);
+    for (let i = 0; i < n; i++) {
+      const e = back[from + i];
+      seats.push(
+        miniSeat(e, hues.get(e.room.key), {
+          x: left + i * M_BACK_W,
+          y,
+          w: M_BACK_W,
+          h: M_HEAD_H,
+          feet: y + M_HEAD_H,
+          front: false,
+          detail: 0,
+          nameOf,
+        }),
+      );
+    }
+    y += M_HEAD_H + M_ROW_GAP;
+  }
+  // 마지막 뒷줄 뒤에 붙은 간격이 곧 두 줄 사이 간격이다. 뒷줄이 아예 없고 접힘 표시만 있을
+  // 때도 한 칸은 떼어 준다 — `+7`이 앞줄 게의 기호 말풍선에 닿는다.
+  if (plan.backRows === 0 && plan.foldH) y += M_ROW_GAP;
+
+  for (let r = 0; r < plan.rows; r++) {
+    const from = r * plan.cols;
+    const n = Math.min(plan.cols, plan.frontShown - from);
+    if (n <= 0) break;
+    const left = M_PAD + Math.floor((plan.innerW - n * plan.cellW) / 2);
+    for (let i = 0; i < n; i++) {
+      const e = front[from + i];
+      seats.push(
+        miniSeat(e, hues.get(e.room.key), {
+          x: left + i * plan.cellW,
+          y,
+          w: plan.cellW,
+          h: plan.frontRowH,
+          feet: y + M_HEAD_H,
+          front: true,
+          detail: plan.detail,
+          nameOf,
+        }),
+      );
+    }
+    y += plan.frontRowH + M_ROW_GAP;
+  }
+
+  return { boxes: [], seats, width: Math.max(1, maxW), height: Math.max(1, maxH), mini: plan };
+}
+
+// 미니의 자세. 앉은 모습이 없으므로 상태를 **자세로만** 구분한다 —
+// 뒷줄에는 이름표도 없어서 두드리는 손(typing)·자는 모습(stopped)·그냥 서 있는 것(idle)이
+// 유일한 구분이다. 머리 위 기호는 그 위에 얹힌다(glyphKeyFor).
+function clawdMini(worker, t) {
+  switch (worker.mood) {
+    case 'waiting':
+      return SPR.armsHigh; // 손을 들고 부른다
+    case 'stuck':
+      // 아주 느리게 팔을 들었다 내린다 = 머리 긁적. 두드리는 150ms와 확연히 달라야 한다
+      return Math.floor(t / 700) % 2 ? SPR.armsHigh : SPR.stand;
+    case 'stopped':
+      return SPR.asleep;
+    case 'typing':
+      return Math.floor(t / 150) % 2 ? SPR.armsUp : SPR.stand;
+    default:
+      return SPR.stand; // idle · failed — 실패는 머리 위 gCross가 말한다
+  }
+}
+
+function drawMiniSeat(ctx, seat, t, labels, opts) {
+  const { hover, selected, scale, noteOf, tint, plan } = opts;
+  const { worker } = seat;
+  const cx = seat.actor.x;
+  const feet = seat.feet;
+  const spr = clawdMini(worker, t);
+  const isSel = selected === worker.key;
+
+  if (isSel || hover === worker.key) {
+    ctx.globalAlpha = isSel ? 0.3 : 0.15;
+    rect(ctx, cx - 9, feet - 2, 18, 3, isSel ? COLORS.sel : '#ffffff');
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.globalAlpha = 0.35;
+  rect(ctx, cx - 6, feet - 1, 12, 2, COLORS.shadow);
+  ctx.globalAlpha = 1;
+  // 방을 안 그리는 대신 **방 색을 발판에 남긴다** — 어느 방의 게인지 힌트가 이것뿐이다
+  if (seat.hue != null) rect(ctx, cx - 7, feet, 14, 1, hsl(seat.hue, 36, 31, tint));
+
+  const dim = worker.mood === 'stopped';
+  if (dim) ctx.globalAlpha = 0.45;
+  drawSprite(ctx, spr, cx - spr.w / 2, feet - spr.h);
+  if (dim) ctx.globalAlpha = 1;
+
+  // 상태 기호. 큰 창처럼 머리 **옆**에 붙이면 좁은 칸에서 옆 게를 덮으므로 늘 머리 위 가운데다.
+  const glyph = SPR[glyphKeyFor(worker, { slot: slotNow(), tms: t })] ?? null;
+  if (glyph) {
+    const float = worker.mood === 'waiting' ? Math.round(Math.sin(t / 260) * 1.5) : Math.round(Math.sin(t / 900) * 1);
+    drawGlyphBubble(ctx, cx, feet - spr.h - M_GLYPH_GAP + float, glyph);
+  }
+
+  if (!seat.front) return;
+
+  // **이름을 가려도 줄은 그대로 비운다** — 이름이 있을 때와 게이지 높이가 달라지면
+  // 이름을 가린 화면에서 줄이 들쭉날쭉해진다(큰 창의 drawSeatTag와 같은 판단이다).
+  let y = feet;
+  if (seat.detail >= 1) {
+    y += plan.nameDy;
+    const name = seatName(seat);
+    if (name) {
+      labels.push({
+        x: cx,
+        y,
+        text: fitText(ctx, name, (seat.w - 3) * scale),
+        color: isSel ? COLORS.sel : COLORS.label,
+        size: 8,
+        align: 'center',
+      });
+    }
+  }
+  if (seat.detail >= 2) {
+    y += plan.lineH;
+    const note = noteOf ? noteOf(worker) : '';
+    if (note) {
+      labels.push({
+        x: cx,
+        y,
+        // 대기만 색을 준다 — 나머지는 기호가 이미 말하고 있다
+        color: worker.mood === 'waiting' ? '#d8a33a' : COLORS.labelDim,
+        text: fitText(ctx, note, (seat.w - 3) * scale),
+        size: 8,
+        align: 'center',
+      });
+    }
+  }
+  if (worker.context?.pct != null) drawContextBar(ctx, cx, y + M_BAR_GAP, worker.context.pct, Math.min(24, seat.w - 4));
+}
+
+// 미니를 그린다. 방·바닥무늬·비품·의자·책상·말풍선·전환이 전부 없으므로 `render`와 공유하는 것은
+// 바닥(drawFloor)·기호(drawGlyphBubble)·게이지(drawContextBar)·글자 꼬리(paintLabels)뿐이다.
+export function renderMini(ctx, view, opts) {
+  const { scale, dpr, t, hover, selected, noteOf } = opts;
+  const labels = [];
+  const plan = view.mini ?? miniPlan({ w: view.width, h: view.height, scale });
+  const tint = nightTint(slotNow());
+  view.tint = tint;
+
+  ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  drawFloor(ctx, { x: 0, y: 0, w: ctx.canvas.width / (scale * dpr), h: ctx.canvas.height / (scale * dpr) }, tint);
+
+  // 두 줄을 가르는 선. 뒷줄이 없으면 그을 것도 없다.
+  if (plan.rows > 0 && (plan.backRows > 0 || plan.foldH)) {
+    const y = plan.top + plan.foldH + plan.backH + Math.floor(M_ROW_GAP / 2);
+    ctx.globalAlpha = 0.5;
+    rect(ctx, M_PAD, y, plan.innerW, 1, shade(COLORS.wall, tint.l));
+    ctx.globalAlpha = 1;
+  }
+
+  // 이름·경과를 칸 폭에 맞춰 자르려면(fitText) 재는 글꼴이 실제로 그릴 글꼴이어야 한다
+  ctx.font = labelFont();
+  const seatOpts = { hover, selected, scale, noteOf, tint, plan };
+  for (const seat of view.seats) drawMiniSeat(ctx, seat, t, labels, seatOpts);
+
+  // 접힌 뒷줄. 안 보이는 게가 몇인지는 적어야 한다 — 없으면 "게가 사라졌다"가 된다.
+  const folded = plan.foldedBack + plan.foldedFront;
+  if (folded > 0 && plan.foldH) {
+    labels.push({
+      x: M_PAD + plan.innerW / 2,
+      y: plan.top + plan.foldH,
+      text: `+${folded}`,
+      color: COLORS.labelDim,
+      size: 8,
+      align: 'center',
+    });
+  }
+
+  paintLabels(ctx, labels, { scale, dpr });
+}
+
 // 캔버스는 **보이는 창**이고 사무실이 그 안에서 움직인다(app.mjs의 panX·panY).
 // 세계 좌표 → 화면은 `world * scale + pan`이다. 전에는 캔버스가 사무실만큼 컸는데,
 // 그러면 8배로 확대했을 때 수천만 픽셀짜리 비트맵을 매 프레임 다시 그리고 바닥도 거기서 끝난다.
@@ -1991,9 +2345,14 @@ export function render(ctx, view, opts) {
     paintBubble(ctx, g, s.speech, labels);
   }
 
-  // 텍스트는 확대 밖에서 — 픽셀 확대에 딸려가면 읽을 수 없다.
-  // 픽셀 폰트는 글자 원점이 정수여야 또렷하다. textAlign에 맡기면 가운데 정렬에서
-  // 0.5px이 남아 서브픽셀 안티에일리어싱이 끼므로, 직접 재서 정수로 반올림한다.
+  paintLabels(ctx, labels, { scale, dpr, pan });
+}
+
+// 텍스트는 확대 밖에서 — 픽셀 확대에 딸려가면 읽을 수 없다.
+// 픽셀 폰트는 글자 원점이 정수여야 또렷하다. textAlign에 맡기면 가운데 정렬에서
+// 0.5px이 남아 서브픽셀 안티에일리어싱이 끼므로, 직접 재서 정수로 반올림한다.
+// 큰 창과 미니가 같은 꼬리를 쓴다 — 글자를 그리는 규칙이 두 벌이면 한쪽만 흐려진다.
+function paintLabels(ctx, labels, { scale, dpr, pan = { x: 0, y: 0 } }) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'left';

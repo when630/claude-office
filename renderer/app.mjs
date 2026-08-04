@@ -1,4 +1,13 @@
-import { layout, render, pickAt, clearTextCache, OFFICE_FONT_PX, OFFICE_FONT_FAMILY } from './render.mjs';
+import {
+  layout,
+  layoutMini,
+  render,
+  renderMini,
+  pickAt,
+  clearTextCache,
+  OFFICE_FONT_PX,
+  OFFICE_FONT_FAMILY,
+} from './render.mjs';
 import { THEMES } from './themes.mjs';
 import {
   t,
@@ -48,8 +57,6 @@ const captionEl = document.querySelector('body > .caption');
 // 프레임 유무는 창을 만들 때 정해지고 나중에 못 바꾸므로 창을 갈아 끼우는 쪽을 골랐고,
 // 여기서는 그 창인지만 보고 상단바·패널을 접는다.
 const MINI = new URLSearchParams(location.search).get('mini') === '1';
-// 미니에 다 들어가지 않으니 방을 추린다. 기다리는 방·헤매는 방이 먼저다.
-const MINI_ROOMS = 3;
 
 let state = { rooms: [], recent: [], stats: {}, usage: null, ts: 0 };
 let meta = null;
@@ -199,17 +206,6 @@ let zoomScale = null;
 // 창 폭이 정한 배율. 확대해도 **방 줄 나누기는 이걸로** 재므로 따로 들고 있는다.
 let baseScale = scale;
 
-// 미니에 그릴 방을 고른다. 좁은 창에 방을 다 밀어 넣으면 아무것도 안 읽히므로,
-// **지금 봐야 하는 방**부터 남긴다 — 나를 기다리는 방, 헤매는 방, 일하는 방 순.
-function roomScore(room) {
-  let best = 0;
-  for (const w of room.workers ?? []) {
-    const rank = { waiting: 3, stuck: 2, typing: 1 }[w.mood] ?? 0;
-    if (rank > best) best = rank;
-  }
-  return best;
-}
-
 // 방이 열 개를 넘어가면 사무실이 그냥 벽지가 된다. 이름으로 거르고, 자주 보는 방을 앞에 고정하고,
 // 관심 없는 방은 접는다. 세 가지가 다 **보기만** 건드린다 — 알림도 근태도 그대로 돈다.
 function roomsToDraw() {
@@ -224,14 +220,22 @@ function roomsToDraw() {
     rooms = [...rooms].sort((a, b) => pin(a) - pin(b));
   }
 
-  if (!MINI) return rooms;
-  // 미니는 첫 방밖에 안 보이는 크기일 수 있다 — 급한 방을 **맨 앞으로** 올린다.
-  // 같은 급끼리는 원래 순서(인원수 순)를 지킨다: 매 스냅샷 자리가 뒤집히면 곁눈질이 안 된다.
-  return [...rooms]
-    .map((r, i) => ({ r, i, s: roomScore(r) }))
-    .sort((a, b) => b.s - a.s || a.i - b.i)
-    .slice(0, MINI_ROOMS)
-    .map((x) => x.r);
+  return rooms;
+}
+
+// 미니는 **거르기를 따르지 않는다.** 방이 아니라 게 단위로 세우므로 상한이 없고,
+// 미니에는 거르기를 푸는 문(목록·배지)이 없어서 걸러 둔 것이 그냥 사라진 것으로 읽힌다.
+function roomsForCanvas() {
+  return MINI ? (state.rooms ?? []) : roomsToDraw();
+}
+
+// 앞줄 게 이름 아래 한 줄 — 이 상태로 얼마나 있었나. 1분 안쪽은 적지 않는다.
+// **매 프레임 다시 부른다**(renderMini의 noteOf) — 레이아웃에서 한 번 만들어 두면
+// 스냅샷이 안 올 동안 분이 멈춘다(상단바의 shownWaitMin과 같은 함정이다).
+function miniNote(w) {
+  if (!w.statusAt) return '';
+  const ms = Date.now() - w.statusAt;
+  return ms < 60_000 ? '' : fmtDur(ms);
 }
 
 // ── 입주. 방을 **처음 본 시각**을 기억해 이삿짐 박스를 잠깐 놓아 준다.
@@ -274,16 +278,29 @@ function relayout() {
   const avail = Math.max(120, (stage.clientWidth || 800) - STAGE_PAD);
   baseScale = pickScale(avail);
   scale = zoomScale ?? baseScale;
-  // 줄 나누기는 **자동 배율로** 잰다 — 배율마다 방이 다시 접히면 확대할 때 보고 있던 방이
-  // 다른 줄로 튄다. 늘린 만큼 캔버스가 무대보다 커지고, 그 캔버스를 끌어 옮기는 것이 화면 이동이다.
-  const logicalW = Math.max(120, Math.floor(avail / baseScale));
-  const rooms = markMoveIn(roomsToDraw());
-  view = layout(rooms, logicalW, { themes: cfg.roomThemes, nameOf: canvasName });
 
   // 캔버스는 **보이는 창만큼**이다(사무실만큼이 아니다). 사무실은 그 안에서 움직이고 바닥은
   // 보이는 범위를 늘 채운다 — 사무실 크기로 잡으면 끌었을 때 바닥이 끝나 종이처럼 잘려 보이고,
   // 8배에서는 수천만 픽셀짜리 비트맵을 매 프레임 다시 그리게 된다.
   const { w: cssW, h: cssH } = stageInner();
+
+  if (MINI) {
+    // 미니는 확대도 이동도 없다 — 사무실이 보이는 창을 그대로 채우므로 배율은 창 폭에 맡기고,
+    // 레이아웃에 창 크기를 통째로 넘겨 그 안에서 줄을 나누게 한다(pan은 늘 0이다).
+    // 입주 박스(markMoveIn)는 방을 그리는 연출이라 여기서는 세지 않는다.
+    scale = baseScale;
+    view = layoutMini(roomsForCanvas(), Math.floor(cssW / scale), Math.floor(cssH / scale), {
+      scale,
+      nameOf: canvasName,
+    });
+  } else {
+    const rooms = markMoveIn(roomsForCanvas());
+    // 줄 나누기는 **자동 배율로** 잰다 — 배율마다 방이 다시 접히면 확대할 때 보고 있던 방이
+    // 다른 줄로 튄다. 늘린 만큼 캔버스가 무대보다 커지고, 그 캔버스를 끌어 옮기는 것이 화면 이동이다.
+    const logicalW = Math.max(120, Math.floor(avail / baseScale));
+    view = layout(rooms, logicalW, { themes: cfg.roomThemes, nameOf: canvasName });
+  }
+
   canvas.style.width = `${cssW}px`;
   canvas.style.height = `${cssH}px`;
   canvas.width = Math.round(cssW * dpr);
@@ -293,7 +310,8 @@ function relayout() {
 }
 
 function frame(t) {
-  render(ctx, view, { scale, dpr, t, hover, selected, pan: { x: panX, y: panY } });
+  if (MINI) renderMini(ctx, view, { scale, dpr, t, hover, selected, noteOf: miniNote });
+  else render(ctx, view, { scale, dpr, t, hover, selected, pan: { x: panX, y: panY } });
   requestAnimationFrame(frame);
 }
 
@@ -337,7 +355,10 @@ function applyPan() {
   panY = Math.round(panY * dpr) / dpr;
 }
 
+// 미니는 확대도 이동도 없다 — 사무실이 창을 그대로 채우므로 옮길 여지가 없고, 실수로
+// 끌려 나가면 되돌릴 문(스페이스·Ctrl+0)이 그 창에는 안내돼 있지 않다.
 function panBy(dx, dy) {
+  if (MINI) return;
   panX += dx;
   panY += dy;
   applyPan();
@@ -346,6 +367,7 @@ function panBy(dx, dy) {
 // 가운데로 데려온다. 확대해 헤매다가 돌아올 곳이 있어야 한다 —
 // 스타크래프트에서 스페이스를 톡 누르는 것과 같은 자리다.
 function centerOffice() {
+  if (MINI) return;
   const { w, h } = stageInner();
   panX = (w - view.width * scale) / 2;
   panY = (h - view.height * scale) / 2;
@@ -362,6 +384,7 @@ function stepScale(from, dir) {
 // at(화면 좌표)에 있던 지점이 배율을 바꾼 뒤에도 그 자리에 남는다 — 커서 밑을 붙잡지 않으면
 // 확대할 때마다 화면이 어디론가 튀고, 보고 있던 방을 다시 찾아야 한다.
 function zoomTo(next, at) {
+  if (MINI) return;
   const to = Math.min(SCALES.at(-1), Math.max(SCALES[0], next));
   // 이미 그 배율이다(사다리 끝에 닿았다) — 놓인 자리도, 자동에 맡긴 상태도 건드리지 않는다.
   // 여기서 zoomScale을 박으면 끝에서 한 번 더 굴린 것만으로 창 폭 추종이 풀린다.
@@ -1073,12 +1096,22 @@ function drawRoomBadge() {
     shownBtn.textContent = t('topbar.hidden', { n: hidden });
     shownBtn.title = t('topbar.hiddenTitle');
   }
-  // 전부 걸러졌으면 빈 캔버스 대신 이유를 적는다.
-  // 캔버스는 절대 배치라 안내를 덮으므로(끌어 옮기느라 그렇게 띄웠다) 아예 감춘다.
-  const empty = total > 0 && hidden === total;
+}
+
+// 빈 화면 대신 이유를 적는다. 캔버스는 절대 배치라 안내를 덮으므로(끌어 옮기느라 그렇게
+// 띄웠다) 아예 감춘다.
+//
+// **미니도 이걸 지난다.** 전에는 drawStats가 미니에서 조기 반환해 여기까지 오지 않았고,
+// 방을 늘 셋까지 그려서 드러나지 않았을 뿐이다 — 출근한 게가 없으면 빈 창만 남았고
+// 미니에는 그 이유를 적을 다른 자리(패널·목록)가 없다.
+function drawStageEmpty() {
+  const rooms = state.rooms ?? [];
+  const shown = roomsForCanvas();
+  // 미니는 거르기를 따르지 않으므로 "다 걸러졌다"가 없다 — 아무도 출근하지 않은 경우뿐이다
+  const empty = MINI ? !shown.some((r) => r.workers?.length) : rooms.length > 0 && shown.length === 0;
   stageEmpty.hidden = !empty;
   canvas.hidden = empty;
-  if (empty) stageEmpty.textContent = t('topbar.allHidden');
+  if (empty) stageEmpty.textContent = t(MINI ? 'mini.nobody' : 'topbar.allHidden');
 }
 
 function drawStats() {
@@ -1086,6 +1119,7 @@ function drawStats() {
   const u = state.usage;
   const waitMin = longestWaitMin();
   shownWaitMin = waitMin;
+  drawStageEmpty();
   if (MINI) {
     drawMiniStats();
     return;
