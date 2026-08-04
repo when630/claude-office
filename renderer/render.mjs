@@ -1890,6 +1890,10 @@ const M_BACK_W = 20; // 뒷줄 한 칸 — 게 16px + 좌우 2px
 // 뒷줄이 화면 절반을 먹으면 앞줄이 밀린다. 넘치는 만큼은 `+n`으로 접는다.
 const M_BACK_ROWS_MAX = 3;
 const M_HEAD_H = M_GLYPH_H + M_GLYPH_GAP + M_BODY_H; // 칸 위 → 발
+// 남는 높이를 위아래로 나누는 비율(위쪽 몫). 반씩 나누면 **위가 많이 비어 보인다** —
+// 칸마다 기호 말풍선 자리(11px)를 늘 비워 두는데 뒷줄의 일하는 게에는 기호가 없어서,
+// 뒷줄 위로 22px(화면 기준)이 늘 빈 띠로 남는다. 그만큼을 아래로 넘긴다.
+const M_TOP_BIAS = 1 / 4;
 
 // 앞줄에 서는 상태 — 나를 기다리거나 막혔거나 실패한 것. 이름·경과·게이지를 다 달아 준다.
 const MINI_FRONT_MOODS = ['waiting', 'stuck', 'failed'];
@@ -1995,10 +1999,14 @@ export function miniPlan({ w, h, front = 0, back = 0, scale = 2 }) {
       innerW,
       availH,
       frontRowH,
-      // 덩이 전체를 세로 가운데에 놓는다. 위로 붙이면 아래 절반이 빈 바닥으로 남아 떠 보인다.
+      // 덩이를 세로로 놓는 자리. 가운데보다 위로 붙인다(M_TOP_BIAS) — 위로 다 붙이면 아래가
+      // 통째로 빈 바닥이 되어 떠 보이고, 반씩 나누면 기호 자리 때문에 위가 많이 비어 보인다.
       top:
         M_PAD +
-        Math.max(0, Math.floor((availH - (foldH + backH + (backRows || foldH ? M_ROW_GAP : 0) + frontH)) / 2)),
+        Math.max(
+          0,
+          Math.floor((availH - (foldH + backH + (backRows || foldH ? M_ROW_GAP : 0) + frontH)) * M_TOP_BIAS),
+        ),
       foldH,
       backH,
       frontH,
