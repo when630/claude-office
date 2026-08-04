@@ -170,8 +170,29 @@ function stepOf(steps, value) {
   return n;
 }
 
+// 방을 같이 넘긴다 — 알림에 적을 이름이 방 별칭에 달려 있다(nameOf).
 export function* everyWorker(snapshot) {
-  for (const room of snapshot?.rooms ?? []) for (const w of room.workers ?? []) yield w;
+  for (const room of snapshot?.rooms ?? []) for (const w of room.workers ?? []) yield [w, room];
+}
+
+// ── 알림에 적을 이름.
+//
+// 세션 이름만 쓰고 있었다. 그런데 **방에 별칭을 붙였다는 것은 그 이름이 알아보기 쉽다는
+// 뜻이다** — 사용자가 손으로 지은 이름이 있는데 토스트가 세션 이름을 부르면, 화면에서
+// "프론트"라고 부르던 방이 알림에서는 낯선 이름으로 온다.
+//
+// 별칭이 붙었는지는 **label과 key를 비교해서** 안다(main/rooms.mjs의 labelOf는 별칭이 없으면
+// key를 그대로 돌려준다). collect가 이미 label에 별칭을 넣어 두므로 여기까지 설정을 끌어올
+// 필요가 없다 — 스냅샷만 보면 된다.
+//
+// **한 방에 세션이 여럿이면 세션 이름을 뒤에 붙인다.** 방 이름만 쓰면 세 자리가 다 같은
+// 제목으로 불려 어느 세션이 기다리는지 알 수 없다. 자리가 하나뿐인 방(대부분)에서는
+// 방 이름만 나온다.
+export function nameOf(w, room) {
+  const aliased = room?.label && room.label !== room.key;
+  if (!aliased) return w.name;
+  const many = (room.workers?.length ?? 0) > 1;
+  return many ? t('notify.nameInRoom', { room: room.label, name: w.name }) : room.label;
 }
 
 // mood가 'waiting'인 동안 statusAt은 갱신되지 않는다(실측) — 곧 기다리기 시작한 시각이다.
@@ -181,7 +202,7 @@ function waitedOf(w, now) {
 
 export function longestWait(snapshot, now = Date.now()) {
   let worst = 0;
-  for (const w of everyWorker(snapshot)) {
+  for (const [w] of everyWorker(snapshot)) {
     if (w.mood === 'waiting') worst = Math.max(worst, waitedOf(w, now));
   }
   return worst;
@@ -194,12 +215,12 @@ function needsText(w) {
 
 function decideWaiting(state, snapshot, now, first, out, rooms) {
   const waiting = new Map();
-  for (const w of everyWorker(snapshot)) if (w.mood === 'waiting') waiting.set(w.key, w);
+  for (const [w, room] of everyWorker(snapshot)) if (w.mood === 'waiting') waiting.set(w.key, [w, room]);
 
   // 답을 받았거나 사라진 놈은 잊는다 — 다음에 또 물어보면 처음부터 센다
   for (const key of [...state.waiting.keys()]) if (!waiting.has(key)) state.waiting.delete(key);
 
-  for (const [key, w] of waiting) {
+  for (const [key, [w, room]] of waiting) {
     const waited = waitedOf(w, now);
     // 민감한 방은 재알림을 앞당긴다. 세기를 바꾸면 넘긴 문턱 수의 뜻도 달라져 그 순간 한 번
     // 튈 수 있는데, 자주 만지는 값이 아니고 방향도 "더 부른다" 쪽이라 그대로 둔다.
@@ -221,7 +242,7 @@ function decideWaiting(state, snapshot, now, first, out, rooms) {
         kind: 'waiting',
         key,
         room: w.room,
-        title: t('notify.waitingTitle', { name: w.name }),
+        title: t('notify.waitingTitle', { name: nameOf(w, room) }),
         body: needsText(w),
       });
       continue;
@@ -233,7 +254,7 @@ function decideWaiting(state, snapshot, now, first, out, rooms) {
       kind: 'escalate',
       key,
       room: w.room,
-      title: t('notify.escalateTitle', { name: w.name, d: fmtDur(waited) }),
+      title: t('notify.escalateTitle', { name: nameOf(w, room), d: fmtDur(waited) }),
       body: needsText(w),
     });
   }
@@ -245,7 +266,7 @@ function decideWaiting(state, snapshot, now, first, out, rooms) {
 // state.mood를 읽기만 한다. 갱신은 뒤따르는 decideDone이 하므로 여기서는 **직전 기분**이
 // 그대로 남아 있다 — 그래서 "처음 보는 자리인가"와 "방금 들어섰는가"를 가릴 수 있다.
 function decideStuck(state, snapshot, out) {
-  for (const w of everyWorker(snapshot)) {
+  for (const [w, room] of everyWorker(snapshot)) {
     if (w.mood !== 'stuck') continue;
     const prev = state.mood.get(w.key);
     if (!prev || prev.mood === 'stuck') continue;
@@ -253,7 +274,7 @@ function decideStuck(state, snapshot, out) {
       kind: 'stuck',
       key: w.key,
       room: w.room,
-      title: t('notify.stuckTitle', { name: w.name }),
+      title: t('notify.stuckTitle', { name: nameOf(w, room) }),
       body: w.detail || t('notify.stuckBody'),
     });
   }
@@ -271,7 +292,7 @@ const DONE_TITLE = {
 
 function decideDone(state, snapshot, now, first, out) {
   const live = new Set();
-  for (const w of everyWorker(snapshot)) {
+  for (const [w, room] of everyWorker(snapshot)) {
     live.add(w.key);
     const prev = state.mood.get(w.key);
     if (prev?.mood === w.mood) continue;
@@ -291,7 +312,7 @@ function decideDone(state, snapshot, now, first, out) {
       kind: 'done',
       key: w.key,
       room: w.room,
-      title: t(title, { name: w.name }),
+      title: t(title, { name: nameOf(w, room) }),
       // 얼마나 걸렸는지가 먼저다. 마지막 상황을 알면 뒤에 붙여 무슨 일이었는지도 보여준다
       body: [t('notify.doneBody', { d: fmtDur(busy) }), w.detail].filter(Boolean).join(' · '),
     });
@@ -303,7 +324,7 @@ function decideDone(state, snapshot, now, first, out) {
 // 자동 압축이 돌아 세션의 기억이 잘리기 전에 손쓸 기회를 주려면 불러야 한다.
 function decideContext(state, snapshot, first, out) {
   const live = new Set();
-  for (const w of everyWorker(snapshot)) {
+  for (const [w, room] of everyWorker(snapshot)) {
     const pct = w.context?.pct;
     if (pct == null) continue;
     live.add(w.key);
@@ -316,7 +337,7 @@ function decideContext(state, snapshot, first, out) {
       kind: 'context',
       key: w.key,
       room: w.room,
-      title: t('notify.contextTitle', { name: w.name, pct }),
+      title: t('notify.contextTitle', { name: nameOf(w, room), pct }),
       body: t('notify.contextBody', {
         used: fmtTokens(w.context.tokens),
         limit: fmtTokens(w.context.limit),

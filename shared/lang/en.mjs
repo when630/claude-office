@@ -335,6 +335,8 @@ export default {
     doneBody: 'took {d}',
     stuckTitle: '{name} looks stuck',
     stuckBody: 'Tools failing one after another, or no progress for a while',
+    // Name used when a room has an alias and more than one session in it (nameOf in main/notify.mjs)
+    nameInRoom: '{room} · {name}',
     hotkeyFailTitle: 'Could not register a shortcut',
     hotkeyFailBody: '{keys} — another app already holds it. Pick a different combination in Settings.',
     updateReadyTitle: 'Claude Office {v} is ready',
