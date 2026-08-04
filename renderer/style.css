@@ -431,8 +431,9 @@ body.mini #stage {
 
 /* 사무실은 스크롤이 아니라 **우리가 놓는다.** 스크롤은 0보다 작아질 수 없어 왼쪽 위 꼭짓점에
    갇히는데, 확대해 놓고 나면 바로 그 모서리 근처를 화면 가운데로 데려올 수 없다.
-   캔버스를 absolute로 띄우고 left·top을 직접 넣는다(app.mjs의 applyPan) — 여백(padding)이
-   그 좌표의 0점이다. */
+   캔버스는 보이는 창만큼이고 그 안에서 사무실이 움직인다(app.mjs의 panX·panY).
+   absolute로 띄우는 것은 **자리를 옮기려는 게 아니라** 안내(#stage-empty)를 밀어내지 않기
+   위해서다 — 좌표를 주지 않으므로 여백 안쪽에 그대로 선다. */
 #stage {
   flex: 1;
   overflow: hidden;

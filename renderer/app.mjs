@@ -280,14 +280,10 @@ function relayout() {
   const rooms = markMoveIn(roomsToDraw());
   view = layout(rooms, logicalW, { themes: cfg.roomThemes, nameOf: canvasName });
 
-  // 방이 적어도 바닥은 화면을 채운다 — 빈 캔버스가 잘려 보이지 않게.
-  // 줄여서 캔버스가 무대보다 좁아진 경우도 같다 — 방 자리는 그대로 두고 바닥만 늘린다.
-  const minH = Math.floor(((stage.clientHeight || 400) - STAGE_PAD) / scale);
-  view.height = Math.max(view.height, minH);
-  view.width = Math.max(view.width, Math.floor(avail / scale));
-
-  const cssW = view.width * scale;
-  const cssH = Math.max(view.height * scale, 120);
+  // 캔버스는 **보이는 창만큼**이다(사무실만큼이 아니다). 사무실은 그 안에서 움직이고 바닥은
+  // 보이는 범위를 늘 채운다 — 사무실 크기로 잡으면 끌었을 때 바닥이 끝나 종이처럼 잘려 보이고,
+  // 8배에서는 수천만 픽셀짜리 비트맵을 매 프레임 다시 그리게 된다.
+  const { w: cssW, h: cssH } = stageInner();
   canvas.style.width = `${cssW}px`;
   canvas.style.height = `${cssH}px`;
   canvas.width = Math.round(cssW * dpr);
@@ -297,17 +293,19 @@ function relayout() {
 }
 
 function frame(t) {
-  render(ctx, view, { scale, dpr, t, hover, selected });
+  render(ctx, view, { scale, dpr, t, hover, selected, pan: { x: panX, y: panY } });
   requestAnimationFrame(frame);
 }
 
 // ── 확대·이동. Figma의 손버릇을 그대로 쓴다 — Ctrl+휠(트랙패드 핀치 포함)로 확대,
 // 스페이스나 가운데 버튼으로 끌어 옮기기, 스페이스를 톡 누르면 가운데로 복귀.
 //
-// 옮기는 것은 **캔버스를 놓는 자리**(`panX`·`panY`)다. 스크롤로 하면 0보다 작아질 수 없어
+// 옮기는 것은 **사무실을 놓는 자리**(`panX`·`panY`)다. 스크롤로 하면 0보다 작아질 수 없어
 // 왼쪽 위 꼭짓점에 갇히는데, 확대해 놓고 나면 정작 그 모서리의 방을 화면 가운데로 데려올 수 없다.
-// 좌표는 `#stage`의 여백 안쪽을 0점으로 하는 CSS px이고, 히트 테스트는 그대로 돈다 —
-// getBoundingClientRect가 지금 놓인 자리를 알려주기 때문이다.
+//
+// 캔버스는 **보이는 창**에 고정이고 그 안에서 세계를 옮겨 그린다(render.mjs가 pan을 받는다) —
+// 캔버스 자체를 밀면 바닥이 캔버스에서 끝나 사무실이 종이처럼 잘려 보인다.
+// 좌표는 캔버스 왼쪽 위를 0점으로 하는 CSS px이고, 세계 좌표는 `(화면 - pan) / scale`이다.
 let panX = 0;
 let panY = 0;
 
@@ -322,9 +320,12 @@ function stageInner() {
 // **어디까지 끌 수 있나.** 사무실의 어느 점이든 화면 가운데로 데려올 수 있고 그 이상은 안 나간다 —
 // 모서리 방을 가운데 놓고 보려면 이만큼이 필요하고, 이보다 풀면 사무실을 화면 밖으로 잃는다.
 function clampPan() {
-  const { w, h } = stageInner();
   const cw = view.width * scale;
   const ch = view.height * scale;
+  // 아직 그릴 사무실이 없다(첫 스냅샷 전) — 자리를 건드리지 않는다.
+  // 여기서 빈 사무실을 가운데로 몰면 첫 스냅샷이 화면 중앙에서 시작한다.
+  if (!cw || !ch) return;
+  const { w, h } = stageInner();
   panX = Math.min(w / 2, Math.max(w / 2 - cw, panX));
   panY = Math.min(h / 2, Math.max(h / 2 - ch, panY));
 }
@@ -332,9 +333,8 @@ function clampPan() {
 function applyPan() {
   clampPan();
   // 기기 픽셀에 맞춰 놓는다 — 반 픽셀 어긋난 자리에서는 픽셀 아트 경계가 흐려진다
-  const snap = (v) => Math.round(v * dpr) / dpr;
-  canvas.style.left = `${snap(panX)}px`;
-  canvas.style.top = `${snap(panY)}px`;
+  panX = Math.round(panX * dpr) / dpr;
+  panY = Math.round(panY * dpr) / dpr;
 }
 
 function panBy(dx, dy) {
@@ -363,17 +363,18 @@ function stepScale(from, dir) {
 // 확대할 때마다 화면이 어디론가 튀고, 보고 있던 방을 다시 찾아야 한다.
 function zoomTo(next, at) {
   const to = Math.min(SCALES.at(-1), Math.max(SCALES[0], next));
-  // 이미 그 배율이다(사다리 끝에 닿았다) — 스크롤도, 자동에 맡긴 상태도 건드리지 않는다.
+  // 이미 그 배율이다(사다리 끝에 닿았다) — 놓인 자리도, 자동에 맡긴 상태도 건드리지 않는다.
   // 여기서 zoomScale을 박으면 끝에서 한 번 더 굴린 것만으로 창 폭 추종이 풀린다.
   if (to === scale) return;
-  const before = canvas.getBoundingClientRect();
-  const lx = (at.x - before.left) / scale;
-  const ly = (at.y - before.top) / scale;
+  const r = canvas.getBoundingClientRect();
+  // 커서 밑의 세계 좌표. 캔버스는 안 움직이므로 배율만 갈아 끼우고 그 점을 제자리에 다시 놓는다
+  const wx = (at.x - r.left - panX) / scale;
+  const wy = (at.y - r.top - panY) / scale;
   zoomScale = to;
   relayout();
-  // 여백·지금 놓인 자리를 손으로 계산하지 않는다 — 바뀐 뒤 좌표를 다시 재서 그 차이만 민다
-  const after = canvas.getBoundingClientRect();
-  panBy(at.x - (after.left + lx * scale), at.y - (after.top + ly * scale));
+  panX = at.x - r.left - wx * scale;
+  panY = at.y - r.top - wy * scale;
+  applyPan();
 }
 
 // 키로 확대할 때 붙잡을 지점 — 무대 가운데다
@@ -507,9 +508,10 @@ window.addEventListener('blur', () => {
 });
 
 // ── 히트 테스트. 게가 돌아다니므로 자리 사각형보다 지금 서 있는 위치가 먼저다.
+// 화면 → 세계는 놓인 자리를 뺀 뒤 배율로 나눈다 (그리는 쪽과 같은 셈이다)
 function seatAt(clientX, clientY) {
   const r = canvas.getBoundingClientRect();
-  return pickAt(view, (clientX - r.left) / scale, (clientY - r.top) / scale);
+  return pickAt(view, (clientX - r.left - panX) / scale, (clientY - r.top - panY) / scale);
 }
 
 canvas.addEventListener('mousemove', (e) => {
