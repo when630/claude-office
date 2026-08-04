@@ -435,3 +435,89 @@ test('나머지 종류는 켜면 다 소리를 낸다', () => {
     assert.equal(soundFor(kind, true), true, kind);
   }
 });
+
+// ── 알림에 적을 이름 (#107)
+//
+// 세션 이름만 부르고 있었다. 방에 별칭을 붙였다는 것은 **그 이름이 알아보기 쉽다는 뜻**인데,
+// 화면에서 "프론트"라고 부르던 방이 토스트에서는 낯선 세션 이름으로 왔다.
+//
+// 별칭이 붙었는지는 label과 key를 비교해서 안다 — collect가 이미 label에 별칭을 넣어 두므로
+// 판정 쪽으로 설정을 끌어올 필요가 없다. 여기서는 그 규칙을 붙잡는다.
+const { nameOf } = await import('../main/notify.mjs');
+
+// 별칭이 붙은 방. label !== key가 곧 "사용자가 이름을 지었다"는 신호다.
+function aliased(label, workers) {
+  return { ts: T0, rooms: [{ key: 'room', label, cwd: '/room', workers }], recent: [], stats: {}, usage: null };
+}
+
+test('별칭이 없으면 세션 이름을 그대로 부른다', () => {
+  const room = { key: 'room', label: 'room', workers: [{ name: 'sess' }] };
+  assert.equal(nameOf({ name: 'sess' }, room), 'sess');
+  // 방 정보가 없어도 터지지 않는다 — 부르는 쪽이 늘 방을 들고 있다고 믿지 않는다
+  assert.equal(nameOf({ name: 'sess' }, null), 'sess');
+  assert.equal(nameOf({ name: 'sess' }, undefined), 'sess');
+});
+
+test('별칭을 붙였으면 방 이름으로 부른다', () => {
+  const room = { key: 'room', label: '프론트', workers: [{ name: 'sess' }] };
+  assert.equal(nameOf({ name: 'sess' }, room), '프론트');
+});
+
+test('한 방에 세션이 여럿이면 세션 이름을 뒤에 붙인다', () => {
+  // 방 이름만 쓰면 세 자리가 다 같은 제목으로 불려 어느 세션이 기다리는지 알 수 없다
+  const room = { key: 'room', label: '프론트', workers: [{ name: 'a' }, { name: 'b' }] };
+  assert.equal(nameOf({ name: 'a' }, room), '프론트 · a');
+  assert.equal(nameOf({ name: 'b' }, room), '프론트 · b');
+});
+
+test('대기·재알림 제목이 방 이름으로 온다', () => {
+  setLang('ko');
+  const state = primed();
+  const out = decideNotifications(state, aliased('프론트', [waiter('w1', T0)]), T0);
+  assert.deepEqual(kinds(out), ['waiting']);
+  assert.match(out[0].title, /^프론트/);
+  assert.doesNotMatch(out[0].title, /w1/);
+
+  // 재알림도 같은 이름을 쓴다 — 한 세션이 두 이름으로 불리면 그게 더 헷갈린다
+  const later = decideNotifications(state, aliased('프론트', [waiter('w1', T0)]), T0 + 6 * MIN);
+  assert.deepEqual(kinds(later), ['escalate']);
+  assert.match(later[0].title, /^프론트/);
+});
+
+test('완료·헤맴·컨텍스트 제목도 같은 이름을 쓴다', () => {
+  setLang('ko');
+  // 완료 — 일하다 끝난 자리만 부른다
+  const done = createNotifyState();
+  decideNotifications(done, aliased('프론트', [busy('w1', T0)]), T0);
+  decideNotifications(done, aliased('프론트', [busy('w1', T0)]), T0 + 5 * MIN);
+  const out = decideNotifications(
+    done,
+    aliased('프론트', [ended('w1', 'idle', T0 + 5 * MIN)]),
+    T0 + 5 * MIN,
+    { room: 'normal' },
+  );
+  assert.deepEqual(kinds(out), ['done']);
+  assert.match(out[0].title, /^프론트/);
+
+  // 컨텍스트
+  const ctx = primed();
+  const hot = decideNotifications(ctx, aliased('프론트', [ctxWorker('w2', 90)]), T0);
+  assert.deepEqual(kinds(hot), ['context']);
+  assert.match(hot[0].title, /^프론트 컨텍스트 90%/);
+
+  // 헤맴 — 일하던 자리가 헤매기 시작한 순간에 부른다
+  const st = primed();
+  decideNotifications(st, aliased('프론트', [busy('w3', T0)]), T0);
+  const lost = decideNotifications(st, aliased('프론트', [ended('w3', 'stuck', T0)]), T0 + MIN);
+  assert.deepEqual(kinds(lost), ['stuck']);
+  assert.match(lost[0].title, /^프론트/);
+});
+
+test('방 이름으로 불러도 어느 방인지는 그대로 실린다', () => {
+  // room은 방별 알림 세기(levelOf)가 읽는 값이다 — 이름을 바꾼 것이 그 판정을 건드리면 안 된다
+  const out = decideNotifications(primed(), aliased('프론트', [waiter('w1', T0)]), T0);
+  assert.equal(out[0].room, 'room');
+  // 끈 방은 여전히 걸러진다
+  const off = decideNotifications(primed(), aliased('프론트', [waiter('w1', T0)]), T0, { room: 'off' });
+  assert.deepEqual(kinds(off), []);
+});
