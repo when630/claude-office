@@ -762,8 +762,8 @@ function waitingWorkers() {
 // 트레이 메뉴에 적을 이름. 이름을 가리기로 해 뒀으면 세션 이름 대신 방 이름을 쓴다 —
 // 화면을 공유하는 동안엔 트레이 메뉴도 같이 보인다(방 이름은 원래 가리지 않는 값이다).
 //
-// **가린 쪽에서는 nameOf를 쓰지 않는다.** nameOf는 별칭이 없으면 세션 이름을 돌려주고,
-// 세션이 여럿인 방에서는 별칭 뒤에 세션 이름을 붙이므로 어느 쪽이든 가린 것이 새어 나간다.
+// **가린 쪽에서는 nameOf를 쓰지 않는다.** nameOf는 별칭이 없는 방에서 세션 이름을 돌려주므로
+// 그대로 쓰면 가린 것이 새어 나간다 — 별칭이 붙은 방만 안전한 것으로는 부족하다.
 function trayNameOf(w, room) {
   const shown = settings.view.names === 'show' ? nameOf(w, room) : room?.label || w.room;
   return shown || w.room || '—';

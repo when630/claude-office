@@ -463,11 +463,13 @@ test('별칭을 붙였으면 방 이름으로 부른다', () => {
   assert.equal(nameOf({ name: 'sess' }, room), '프론트');
 });
 
-test('한 방에 세션이 여럿이면 세션 이름을 뒤에 붙인다', () => {
-  // 방 이름만 쓰면 세 자리가 다 같은 제목으로 불려 어느 세션이 기다리는지 알 수 없다
+test('세션이 여럿인 방에서도 방 이름만 쓴다 (#109)', () => {
+  // 어느 세션인지 알 수 있게 별칭 뒤에 세션 이름을 붙여 봤는데(`프론트 · a`), 그러면 세션이
+  // 둘이 되는 순간 별칭을 붙여 밀어낸 그 낯선 이름이 다시 따라 나온다 — 지우기만 하면
+  // 나중에 같은 판단이 다시 들어와도 아무도 못 잡으므로 여기서 뒤집어 붙잡는다.
   const room = { key: 'room', label: '프론트', workers: [{ name: 'a' }, { name: 'b' }] };
-  assert.equal(nameOf({ name: 'a' }, room), '프론트 · a');
-  assert.equal(nameOf({ name: 'b' }, room), '프론트 · b');
+  assert.equal(nameOf({ name: 'a' }, room), '프론트');
+  assert.equal(nameOf({ name: 'b' }, room), '프론트');
 });
 
 test('대기·재알림 제목이 방 이름으로 온다', () => {

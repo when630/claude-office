@@ -332,8 +332,6 @@ export default {
     doneBody: '{d} 걸렸습니다',
     stuckTitle: '{name} 이(가) 헤매는 것 같습니다',
     stuckBody: '도구가 연달아 실패하거나 한동안 진전이 없습니다',
-    // 방에 별칭을 붙였는데 그 방에 세션이 여럿일 때 부르는 이름 (main/notify.mjs의 nameOf)
-    nameInRoom: '{room} · {name}',
     hotkeyFailTitle: '단축키를 잡지 못했습니다',
     hotkeyFailBody: '{keys} — 이미 다른 앱이 쓰고 있습니다. 설정에서 다른 조합으로 바꿔 주세요.',
     updateReadyTitle: 'Claude Office {v} 준비됨',

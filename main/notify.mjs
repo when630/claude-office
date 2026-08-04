@@ -185,14 +185,14 @@ export function* everyWorker(snapshot) {
 // key를 그대로 돌려준다). collect가 이미 label에 별칭을 넣어 두므로 여기까지 설정을 끌어올
 // 필요가 없다 — 스냅샷만 보면 된다.
 //
-// **한 방에 세션이 여럿이면 세션 이름을 뒤에 붙인다.** 방 이름만 쓰면 세 자리가 다 같은
-// 제목으로 불려 어느 세션이 기다리는지 알 수 없다. 자리가 하나뿐인 방(대부분)에서는
-// 방 이름만 나온다.
+// **세션이 여럿인 방에서도 방 이름만 쓴다.** 어느 세션인지 알 수 있게 별칭 뒤에 세션 이름을
+// 붙여 봤는데(`프론트 · sess-2`), 그러면 세션이 둘이 되는 순간 별칭을 붙여 밀어낸 그 낯선
+// 이름이 다시 따라 나온다 — 별칭을 붙이는 뜻이 "그 이름으로 부르라"는 것이다.
+// 어느 자리인지는 창을 열면 사무실과 패널이 말하고, 트레이의 기다리는 세션 목록도 오래
+// 기다린 순으로 늘어놓는다. 토스트 제목이 그것까지 감당할 자리는 아니다.
 export function nameOf(w, room) {
   const aliased = room?.label && room.label !== room.key;
-  if (!aliased) return w.name;
-  const many = (room.workers?.length ?? 0) > 1;
-  return many ? t('notify.nameInRoom', { room: room.label, name: w.name }) : room.label;
+  return aliased ? room.label : w.name;
 }
 
 // mood가 'waiting'인 동안 statusAt은 갱신되지 않는다(실측) — 곧 기다리기 시작한 시각이다.
