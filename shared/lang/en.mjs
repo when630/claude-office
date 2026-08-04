@@ -158,7 +158,7 @@ export default {
     pid: 'PID',
     mode: 'Mode',
     updated: 'Updated',
-    factsMore: 'Details',
+    factsMore: 'Details',
     tab: { session: 'Session' },
     aides: 'Subagents attached: {n}',
     needTitle: 'Waiting on you',
