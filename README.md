@@ -167,6 +167,11 @@ Automatic installation is blocked for unsigned macOS builds, so there a new vers
   sight, and clicking it clears the lot
 - **Either side column folds away** — the two buttons in the top bar, or `Ctrl+[` · `Ctrl+]`.
   Fold both and the window is all office. It stays folded across restarts
+- **Pull the office around by hand** — `Ctrl+wheel` (or pinch on a trackpad) zooms, `Space+drag`
+  (or a middle-button drag) moves the view, `Ctrl+0` hands the scale back to the window width
+  (`Ctrl+=` · `Ctrl+-` step it). Whatever sat under the cursor stays there, and zooming never
+  re-wraps the rooms, so you don't lose the one you were watching. Steps are whole numbers to keep
+  the pixels crisp, and the zoom is **not** saved
 - **Shrink to a corner** — the `▭` button in the top bar (or the tray menu) drops the office
   into a small frameless window that stays **always on top**. Just the office and a one-line
   count. Space is tight, so it keeps three rooms and puts the ones **waiting on you or going in

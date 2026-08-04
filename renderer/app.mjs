@@ -182,6 +182,22 @@ function pickScale(width) {
 
 const STAGE_PAD = MINI ? 12 : 24; // style.css의 #stage padding 상하좌우 (미니는 6px)
 
+// ── 손으로 정하는 배율. 창 폭에 맡기는 것(pickScale)만으로는 방이 늘어난 뒤가 답답하다 —
+// 한눈에 보려면 줄여야 하고 한 자리를 들여다보려면 늘려야 한다.
+//
+// 배율은 **정수만** 쓴다. 픽셀 아트를 1.5배로 늘리면 픽셀마다 폭이 달라져(2px·1px·2px…)
+// 뭉갠 것처럼 보인다 — 확대가 매끄러운 것보다 픽셀이 또렷한 편이 이 화면에서는 낫다.
+//
+// 아래 끝이 2배인 이유: 글자는 확대 밖에서 12px 고정으로 그린다(render.mjs 머리말).
+// 1배까지 줄이면 방보다 글자가 커져 이름표·방 이름·말풍선이 서로 덮어 아무것도 읽히지 않는다 —
+// 굽어서 확인했다. 사무실 전체를 한 장에 보는 것은 **글자를 끄는 축소판**이 따로 있어야 한다.
+const SCALES = [2, 3, 4, 6, 8];
+// null이면 창 폭에 맡긴다. **저장하지 않는다** — 다시 켰을 때 8배로 확대된 채 뜨면
+// 그건 "방이 안 보인다"가 된다(이름 거르기와 같은 판단이다).
+let zoomScale = null;
+// 창 폭이 정한 배율. 확대해도 **방 줄 나누기는 이걸로** 재므로 따로 들고 있는다.
+let baseScale = scale;
+
 // 미니에 그릴 방을 고른다. 좁은 창에 방을 다 밀어 넣으면 아무것도 안 읽히므로,
 // **지금 봐야 하는 방**부터 남긴다 — 나를 기다리는 방, 헤매는 방, 일하는 방 순.
 function roomScore(room) {
@@ -256,14 +272,20 @@ function relayout() {
   // clientWidth는 padding을 포함한다 — 빼지 않으면 가로 스크롤바가 생기고
   // 그게 세로 공간을 잠식해 세로 스크롤바까지 딸려 나온다
   const avail = Math.max(120, (stage.clientWidth || 800) - STAGE_PAD);
-  scale = pickScale(avail);
-  const logicalW = Math.max(120, Math.floor(avail / scale));
+  baseScale = pickScale(avail);
+  scale = zoomScale ?? baseScale;
+  // 줄 나누기는 **자동 배율로** 잰다 — 배율마다 방이 다시 접히면 확대할 때 보고 있던 방이
+  // 다른 줄로 튄다. 늘린 만큼 캔버스가 무대보다 넓어져 스크롤이 생기고, 그 스크롤을 끌어
+  // 옮기는 것이 화면 이동이다.
+  const logicalW = Math.max(120, Math.floor(avail / baseScale));
   const rooms = markMoveIn(roomsToDraw());
   view = layout(rooms, logicalW, { themes: cfg.roomThemes, nameOf: canvasName });
 
-  // 방이 적어도 바닥은 화면을 채운다 — 빈 캔버스가 잘려 보이지 않게
+  // 방이 적어도 바닥은 화면을 채운다 — 빈 캔버스가 잘려 보이지 않게.
+  // 줄여서 캔버스가 무대보다 좁아진 경우도 같다 — 방 자리는 그대로 두고 바닥만 늘린다.
   const minH = Math.floor(((stage.clientHeight || 400) - STAGE_PAD) / scale);
   view.height = Math.max(view.height, minH);
+  view.width = Math.max(view.width, Math.floor(avail / scale));
 
   const cssW = view.width * scale;
   const cssH = Math.max(view.height * scale, 120);
@@ -278,6 +300,144 @@ function frame(t) {
   requestAnimationFrame(frame);
 }
 
+// ── 확대·이동. Figma의 손버릇을 그대로 쓴다 — Ctrl+휠(트랙패드 핀치 포함)로 확대,
+// 스페이스나 가운데 버튼으로 끌어 옮기기, Ctrl+0으로 자동 배율 복귀.
+//
+// 옮기는 것은 **무대의 스크롤**이다. 캔버스를 변환으로 밀지 않으므로 스크롤바·관성·휠이
+// 브라우저 것 그대로고, 히트 테스트도 getBoundingClientRect가 이미 스크롤을 셈에 넣는다.
+
+// 한 단계 위·아래 배율. 끝이면 그대로 둔다.
+function stepScale(from, dir) {
+  return dir > 0
+    ? (SCALES.find((s) => s > from) ?? from)
+    : ([...SCALES].reverse().find((s) => s < from) ?? from);
+}
+
+// at(화면 좌표)에 있던 지점이 배율을 바꾼 뒤에도 그 자리에 남는다 — 커서 밑을 붙잡지 않으면
+// 확대할 때마다 화면이 어디론가 튀고, 보고 있던 방을 다시 찾아야 한다.
+function zoomTo(next, at) {
+  const to = Math.min(SCALES.at(-1), Math.max(SCALES[0], next));
+  // 이미 그 배율이다(사다리 끝에 닿았다) — 스크롤도, 자동에 맡긴 상태도 건드리지 않는다.
+  // 여기서 zoomScale을 박으면 끝에서 한 번 더 굴린 것만으로 창 폭 추종이 풀린다.
+  if (to === scale) return;
+  const before = canvas.getBoundingClientRect();
+  const lx = (at.x - before.left) / scale;
+  const ly = (at.y - before.top) / scale;
+  zoomScale = to;
+  relayout();
+  // 무대의 padding·지금 스크롤을 손으로 계산하지 않는다 — 바뀐 뒤 좌표를 다시 재서 그 차이만 민다
+  const after = canvas.getBoundingClientRect();
+  stage.scrollLeft += after.left + lx * scale - at.x;
+  stage.scrollTop += after.top + ly * scale - at.y;
+}
+
+// 키로 확대할 때 붙잡을 지점 — 무대 가운데다
+function stageCenter() {
+  const r = stage.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+
+// 트랙패드 핀치는 한 손짓에 작은 값이 잔뜩 온다 — 이벤트마다 한 단계씩 올리면 순간이동한다.
+// 마우스 휠 한 칸(100~120)만큼 모이면 한 단계 움직인다.
+const ZOOM_NOTCH = 100;
+let wheelAcc = 0;
+
+// 창에서 받는다 — Chromium은 Ctrl+휠을 페이지 확대로 쓰므로 사무실 밖에서 굴린 것까지
+// 막아야 껍데기(목록·패널 글자)가 같이 커지지 않는다. 확대는 사무실 위에서만 한다.
+window.addEventListener(
+  'wheel',
+  (e) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    if (!stage.contains(e.target)) return;
+    if (Math.sign(e.deltaY) !== Math.sign(wheelAcc)) wheelAcc = 0;
+    wheelAcc += e.deltaY;
+    if (Math.abs(wheelAcc) < ZOOM_NOTCH) return;
+    const dir = wheelAcc < 0 ? 1 : -1; // 밀어 올리면 확대
+    wheelAcc = 0;
+    zoomTo(stepScale(scale, dir), { x: e.clientX, y: e.clientY });
+  },
+  { passive: false },
+);
+
+let spaceHeld = false;
+let pan = null;
+// 끌어 옮긴 뒤에 오는 click은 자리 선택이 아니다 — 한 번 삼킨다
+let swallowClick = false;
+
+function setCursor() {
+  const c = pan ? 'grabbing' : spaceHeld ? 'grab' : hover ? 'pointer' : 'default';
+  // 인라인 style 속성은 CSP에 막혀 있지만 CSSOM은 대상이 아니다(막대 채우기와 같은 이유)
+  stage.style.cursor = c;
+  canvas.style.cursor = c;
+}
+
+function endPan() {
+  if (!pan) return;
+  swallowClick = pan.moved;
+  pan = null;
+  setCursor();
+}
+
+stage.addEventListener('pointerdown', (e) => {
+  swallowClick = false;
+  // 스페이스를 누른 채로, 또는 가운데 버튼으로 끈다 (둘 다 Figma와 같다)
+  if (!(e.button === 1 || (e.button === 0 && spaceHeld))) return;
+  e.preventDefault(); // 가운데 버튼의 자동 스크롤을 막는다
+  pan = { x: e.clientX, y: e.clientY, left: stage.scrollLeft, top: stage.scrollTop, moved: false };
+  // 무대 밖으로 나가도 계속 끌린다 — 놓을 때까지 이 요소가 포인터를 잡고 있는다
+  stage.setPointerCapture(e.pointerId);
+  setCursor();
+});
+stage.addEventListener('pointermove', (e) => {
+  if (!pan) return;
+  const dx = e.clientX - pan.x;
+  const dy = e.clientY - pan.y;
+  // 손떨림은 클릭으로 남긴다 — 2px까지는 끈 것으로 보지 않는다
+  if (Math.abs(dx) > 2 || Math.abs(dy) > 2) pan.moved = true;
+  stage.scrollLeft = pan.left - dx;
+  stage.scrollTop = pan.top - dy;
+});
+stage.addEventListener('pointerup', endPan);
+stage.addEventListener('pointercancel', endPan);
+
+window.addEventListener('keydown', (e) => {
+  // 글자를 치는 중이면 손대지 않는다 — 거르기 칸에 공백이 안 들어가는 것으로 드러난다
+  const typing = Boolean(e.target?.closest?.('input, select, textarea'));
+  if (e.code === 'Space') {
+    // 버튼에 초점이 있을 때의 스페이스는 그 버튼을 누르는 것이다 (Ctrl 조합은 버튼과 안 겹친다)
+    if (typing || spaceHeld || e.target?.closest?.('button')) return;
+    spaceHeld = true;
+    e.preventDefault(); // 스페이스는 스크롤 단축키다 — 받는 동안엔 그 기본 동작을 막는다
+    setCursor();
+    return;
+  }
+  if (typing || !(e.ctrlKey || e.metaKey) || e.altKey) return;
+  // Chromium의 페이지 확대와 같은 조합을 쓴다 — 여기서 막지 않으면 껍데기가 같이 커진다
+  if (e.key === '=' || e.key === '+') {
+    e.preventDefault();
+    zoomTo(stepScale(scale, 1), stageCenter());
+  } else if (e.key === '-' || e.key === '_') {
+    e.preventDefault();
+    zoomTo(stepScale(scale, -1), stageCenter());
+  } else if (e.key === '0') {
+    e.preventDefault();
+    zoomScale = null; // 창 폭에 다시 맡긴다
+    relayout();
+  }
+});
+window.addEventListener('keyup', (e) => {
+  if (e.code !== 'Space') return;
+  spaceHeld = false;
+  setCursor();
+});
+// 창을 벗어난 사이의 keyup은 오지 않는다 — 눌린 채로 남으면 돌아와서 클릭이 안 먹는다
+window.addEventListener('blur', () => {
+  spaceHeld = false;
+  endPan();
+  setCursor();
+});
+
 // ── 히트 테스트. 게가 돌아다니므로 자리 사각형보다 지금 서 있는 위치가 먼저다.
 function seatAt(clientX, clientY) {
   const r = canvas.getBoundingClientRect();
@@ -285,12 +445,15 @@ function seatAt(clientX, clientY) {
 }
 
 canvas.addEventListener('mousemove', (e) => {
+  // 끌어 옮기는 중에는 히트 테스트를 하지 않는다 — 지나간 자리마다 이름표가 켜진다
+  if (pan) return;
   const seat = seatAt(e.clientX, e.clientY);
   hover = seat?.worker.key ?? null;
-  canvas.style.cursor = seat ? 'pointer' : 'default';
+  setCursor();
 });
 canvas.addEventListener('mouseleave', () => {
   hover = null;
+  setCursor();
 });
 // 자리를 고르는 **단 하나의 문**. 캔버스·목록·대기 칩·알림 클릭이 다 여기를 지나야
 // 목록의 표시와 패널이 어긋나지 않는다 (전에는 각자 selected를 만지고 drawPanel만 불렀다).
@@ -304,6 +467,11 @@ function selectKey(key) {
 }
 
 canvas.addEventListener('click', (e) => {
+  // 화면을 끌어 옮긴 손짓이었다 — 놓은 자리의 게를 고르는 것이 아니다
+  if (swallowClick || spaceHeld) {
+    swallowClick = false;
+    return;
+  }
   const seat = seatAt(e.clientX, e.clientY);
   // 미니에는 패널이 없다 — 자리를 누르면 큰 창으로 올라가며 그 자리가 펼쳐진다
   if (MINI) {
@@ -1999,6 +2167,7 @@ window.__office = {
   get layout() {
     return {
       scale,
+      baseScale,
       width: view.width,
       height: view.height,
       boxes: view.boxes.map((b) => ({ key: b.room.key, x: b.x, y: b.y, w: b.w, h: b.h })),
@@ -2020,6 +2189,12 @@ window.__office = {
   // 콕 집은 언어만 받는다.
   lang(next) {
     applyLang({ lang: next, pref: next });
+  },
+  // 배율을 콕 집는다(Ctrl+휠과 같은 길). null이면 창 폭에 맡기는 자동으로 돌아간다 —
+  // 헤드리스로 확대·축소 화면을 굽어 볼 때 쓴다(휠 이벤트를 흉내 낼 필요가 없다).
+  zoom(next) {
+    zoomScale = next == null ? null : Math.min(SCALES.at(-1), Math.max(SCALES[0], next));
+    relayout();
   },
 };
 

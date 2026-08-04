@@ -75,6 +75,11 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   뼈대에 박힌 것은 `data-icon` 속성으로 채운다(`applyStaticText`)
 - `renderer/app.mjs`의 `RAIL_GROUPS` — 왼쪽 목록의 묶음과 순서. **캔버스와 같은 것을 본다**
   (`roomsToDraw`) — 목록에만 있는 세션이 생기면 눌렀는데 자리를 못 찾는다
+- `renderer/app.mjs`의 배율 — 자동은 `pickScale`(창 폭), 손으로 정하는 것은 `SCALES`·`zoomScale`
+  (Ctrl+휠·스페이스 드래그). **정수배만 쓰고 2배가 아래 끝이다** — 글자는 확대 밖에서 12px로
+  그리므로 1배까지 줄이면 방보다 글자가 커져 이름표가 서로 덮는다. 줄 나누기는 `baseScale`로
+  재고(확대할 때 방이 다시 접히면 보던 방을 잃는다), 옮기는 것은 `#stage`의 스크롤이다
+  (`zoomTo`가 커서 밑 좌표를 붙잡는 방법이 주석에 있다)
 - `shared/pixels.mjs` — 한 글자가 한 픽셀, 팔레트는 파일 맨 위. 행 길이가 어긋나면 바로 에러가 난다
 - `renderer/themes.mjs` — 사무실 종류(설정 창의 목록도 여기서 나온다). `station`이 자리 모양을,
   `props`·`wall`이 비품을 정한다
@@ -154,6 +159,8 @@ DevTools 콘솔에서 `__office.push(state)` / `__office.select(key)`로 임의 
 입력 대기·실패처럼 평소 안 나오는 화면을 확인할 수 있다. `__office.view({ names, roomThemes })`와
 `__office.lang('en')`은 설정을 **저장하지 않고** 바꿔 보는 입구다 — 헤드리스로 화면을 굽어
 확인할 때 쓴다(`lang`은 main을 거치지 않으므로 `'auto'`는 뜻이 없다).
+`__office.zoom(n)`은 Ctrl+휠과 같은 길로 배율을 콕 집는다(`null`이면 자동으로 복귀) —
+휠 이벤트를 흉내 내지 않고 확대·축소 화면을 굽어 볼 수 있다.
 `__office.layout`은 지금 그려진 방 사각형(논리 좌표)과 배율을 돌려준다 — 캡처를 방에 딱 맞게
 자르려면 방이 화면 어디인지 알아야 하고, 캔버스라 DOM으로는 물어볼 수 없다.
 
