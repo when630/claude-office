@@ -545,9 +545,20 @@ function notify(title, body, onClick, sound = false) {
 // 방해금지도 같은 규칙이다. 문턱은 조용한 동안에도 그대로 전진하고 여기서 **토스트만** 참는다 —
 // 밀린 것을 쌓아 뒀다 해제하는 순간 몰아 띄우지 않는다. 해제 시점에도 여전히 기다리고 있으면
 // 다음 문턱에서 자연히 다시 부른다. 트레이 점·깜빡임은 조용한 동안에도 그대로다.
+//
+// 이름을 가리기로 해 뒀으면 판정에도 그것을 알린다. **토스트는 트레이 메뉴보다 화면 공유에
+// 더 잘 잡힌다** — 화면 한쪽에 크게 떠서 녹화·캡처에 그대로 남는데, 사무실 화면과 트레이는
+// 지키고 토스트만 새고 있었다(#110).
 function maybeNotify(snapshot) {
   const quiet = isQuiet(settings.quiet);
-  for (const item of decideNotifications(notifyState, snapshot, Date.now(), settings.roomNotify)) {
+  const masked = settings.view.names !== 'show';
+  for (const item of decideNotifications(
+    notifyState,
+    snapshot,
+    Date.now(),
+    settings.roomNotify,
+    masked,
+  )) {
     if (!notifyOn(item.kind) || quiet) continue;
     // 세션에 딸린 알림은 그 자리를 펼쳐주고, 계정 사용량처럼 주인이 없는 건 창만 띄운다
     notify(
@@ -759,14 +770,10 @@ function waitingWorkers() {
   return out.sort((a, b) => (a.w.statusAt ?? Infinity) - (b.w.statusAt ?? Infinity));
 }
 
-// 트레이 메뉴에 적을 이름. 이름을 가리기로 해 뒀으면 세션 이름 대신 방 이름을 쓴다 —
-// 화면을 공유하는 동안엔 트레이 메뉴도 같이 보인다(방 이름은 원래 가리지 않는 값이다).
-//
-// **가린 쪽에서는 nameOf를 쓰지 않는다.** nameOf는 별칭이 없으면 세션 이름을 돌려주고,
-// 세션이 여럿인 방에서는 별칭 뒤에 세션 이름을 붙이므로 어느 쪽이든 가린 것이 새어 나간다.
+// 트레이 메뉴에 적을 이름. 가리기는 nameOf가 안다 — 화면을 공유하는 동안엔 트레이 메뉴도
+// 같이 보이므로 토스트와 같은 규칙으로 돈다(가리면 방 이름).
 function trayNameOf(w, room) {
-  const shown = settings.view.names === 'show' ? nameOf(w, room) : room?.label || w.room;
-  return shown || w.room || '—';
+  return nameOf(w, room, settings.view.names !== 'show') || w.room || '—';
 }
 
 async function openTerminalFor(w) {

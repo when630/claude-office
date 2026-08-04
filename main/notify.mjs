@@ -185,14 +185,23 @@ export function* everyWorker(snapshot) {
 // key를 그대로 돌려준다). collect가 이미 label에 별칭을 넣어 두므로 여기까지 설정을 끌어올
 // 필요가 없다 — 스냅샷만 보면 된다.
 //
-// **한 방에 세션이 여럿이면 세션 이름을 뒤에 붙인다.** 방 이름만 쓰면 세 자리가 다 같은
-// 제목으로 불려 어느 세션이 기다리는지 알 수 없다. 자리가 하나뿐인 방(대부분)에서는
-// 방 이름만 나온다.
-export function nameOf(w, room) {
+// **세션이 여럿인 방에서도 방 이름만 쓴다.** 어느 세션인지 알 수 있게 별칭 뒤에 세션 이름을
+// 붙여 봤는데(`프론트 · sess-2`), 그러면 세션이 둘이 되는 순간 별칭을 붙여 밀어낸 그 낯선
+// 이름이 다시 따라 나온다 — 별칭을 붙이는 뜻이 "그 이름으로 부르라"는 것이다.
+// 어느 자리인지는 창을 열면 사무실과 패널이 말하고, 트레이의 기다리는 세션 목록도 오래
+// 기다린 순으로 늘어놓는다. 토스트 제목이 그것까지 감당할 자리는 아니다.
+//
+// **이름을 가리기로 해 뒀으면 방 이름을 쓴다**(`masked`). 방 이름은 어느 모드에서도 가리지
+// 않는 값이고 트레이 대기 목록이 이미 그 규칙으로 돈다 — 토스트와 목록이 한 세션을 다른
+// 이름으로 부르지 않는다. 별칭이 없는 방에서 세션 이름을 돌려주는 갈래가 곧 새는 자리였다.
+//
+// 모드가 아니라 불린을 받는다. `mask`와 `hide`가 여기서는 갈리지 않고(토스트는 제목이 없을
+// 수 없으니 `hide`도 무언가는 불러야 한다), 그래야 이름 모드 어휘를 아는 곳이 늘지 않는다.
+export function nameOf(w, room, masked = false) {
+  // 방이 없는 경우까지 세션 이름으로 흘리지 않는다 — 렌더러가 별칭을 못 찾을 때 쓰는 말이다
+  if (masked) return room?.label || w.room || t('names.aliasBare');
   const aliased = room?.label && room.label !== room.key;
-  if (!aliased) return w.name;
-  const many = (room.workers?.length ?? 0) > 1;
-  return many ? t('notify.nameInRoom', { room: room.label, name: w.name }) : room.label;
+  return aliased ? room.label : w.name;
 }
 
 // mood가 'waiting'인 동안 statusAt은 갱신되지 않는다(실측) — 곧 기다리기 시작한 시각이다.
@@ -208,12 +217,18 @@ export function longestWait(snapshot, now = Date.now()) {
   return worst;
 }
 
-// 터미널 세션은 무엇을 묻는지 알 수 없다(선택지는 답하기 전엔 대화 파일에 안 남는다)
-function needsText(w) {
-  return w.needs || t(w.kind === 'bg' ? 'notify.needsBg' : 'notify.needsTerminal');
+// 터미널 세션은 무엇을 묻는지 알 수 없다(선택지는 답하기 전엔 대화 파일에 안 남는다).
+//
+// **가리는 동안에는 알아도 적지 않는다.** needs는 선택지 문구 그대로라 경로·지시문이 실린다 —
+// 제목만 방 이름으로 바꿔 놓고 몸통에 프로젝트 사정을 남기면 반쪽이다. 모를 때 쓰는 말이
+// 이미 있으니 그것으로 돌린다(몸통을 비우지 않는 이유도 그것이다 — 무엇을 기다리는지까지
+// 사라지면 알림의 값어치가 준다).
+function needsText(w, masked) {
+  if (masked || !w.needs) return t(w.kind === 'bg' ? 'notify.needsBg' : 'notify.needsTerminal');
+  return w.needs;
 }
 
-function decideWaiting(state, snapshot, now, first, out, rooms) {
+function decideWaiting(state, snapshot, now, first, out, rooms, masked) {
   const waiting = new Map();
   for (const [w, room] of everyWorker(snapshot)) if (w.mood === 'waiting') waiting.set(w.key, [w, room]);
 
@@ -242,8 +257,8 @@ function decideWaiting(state, snapshot, now, first, out, rooms) {
         kind: 'waiting',
         key,
         room: w.room,
-        title: t('notify.waitingTitle', { name: nameOf(w, room) }),
-        body: needsText(w),
+        title: t('notify.waitingTitle', { name: nameOf(w, room, masked) }),
+        body: needsText(w, masked),
       });
       continue;
     }
@@ -254,8 +269,8 @@ function decideWaiting(state, snapshot, now, first, out, rooms) {
       kind: 'escalate',
       key,
       room: w.room,
-      title: t('notify.escalateTitle', { name: nameOf(w, room), d: fmtDur(waited) }),
-      body: needsText(w),
+      title: t('notify.escalateTitle', { name: nameOf(w, room, masked), d: fmtDur(waited) }),
+      body: needsText(w, masked),
     });
   }
 }
@@ -265,7 +280,7 @@ function decideWaiting(state, snapshot, now, first, out, rooms) {
 //
 // state.mood를 읽기만 한다. 갱신은 뒤따르는 decideDone이 하므로 여기서는 **직전 기분**이
 // 그대로 남아 있다 — 그래서 "처음 보는 자리인가"와 "방금 들어섰는가"를 가릴 수 있다.
-function decideStuck(state, snapshot, out) {
+function decideStuck(state, snapshot, out, masked) {
   for (const [w, room] of everyWorker(snapshot)) {
     if (w.mood !== 'stuck') continue;
     const prev = state.mood.get(w.key);
@@ -274,8 +289,9 @@ function decideStuck(state, snapshot, out) {
       kind: 'stuck',
       key: w.key,
       room: w.room,
-      title: t('notify.stuckTitle', { name: nameOf(w, room) }),
-      body: w.detail || t('notify.stuckBody'),
+      title: t('notify.stuckTitle', { name: nameOf(w, room, masked) }),
+      // detail은 마지막으로 한 말이다 — 가리는 동안에는 무슨 일이었는지 대신 일반 문구로
+      body: (!masked && w.detail) || t('notify.stuckBody'),
     });
   }
 }
@@ -290,7 +306,7 @@ const DONE_TITLE = {
   stopped: 'notify.stoppedTitle',
 };
 
-function decideDone(state, snapshot, now, first, out) {
+function decideDone(state, snapshot, now, first, out, masked) {
   const live = new Set();
   for (const [w, room] of everyWorker(snapshot)) {
     live.add(w.key);
@@ -312,9 +328,12 @@ function decideDone(state, snapshot, now, first, out) {
       kind: 'done',
       key: w.key,
       room: w.room,
-      title: t(title, { name: nameOf(w, room) }),
-      // 얼마나 걸렸는지가 먼저다. 마지막 상황을 알면 뒤에 붙여 무슨 일이었는지도 보여준다
-      body: [t('notify.doneBody', { d: fmtDur(busy) }), w.detail].filter(Boolean).join(' · '),
+      title: t(title, { name: nameOf(w, room, masked) }),
+      // 얼마나 걸렸는지가 먼저다. 마지막 상황을 알면 뒤에 붙여 무슨 일이었는지도 보여준다 —
+      // 가리는 동안에는 그 꼬리만 뗀다. 걸린 시간은 프로젝트 사정이 아니다.
+      body: [t('notify.doneBody', { d: fmtDur(busy) }), masked ? null : w.detail]
+        .filter(Boolean)
+        .join(' · '),
     });
   }
   for (const key of [...state.mood.keys()]) if (!live.has(key)) state.mood.delete(key);
@@ -322,7 +341,7 @@ function decideDone(state, snapshot, now, first, out) {
 
 // 컨텍스트는 게이지 색으로만 경고한다(85% 빨강) — 창을 보고 있어야 알 수 있다.
 // 자동 압축이 돌아 세션의 기억이 잘리기 전에 손쓸 기회를 주려면 불러야 한다.
-function decideContext(state, snapshot, first, out) {
+function decideContext(state, snapshot, first, out, masked) {
   const live = new Set();
   for (const [w, room] of everyWorker(snapshot)) {
     const pct = w.context?.pct;
@@ -337,7 +356,8 @@ function decideContext(state, snapshot, first, out) {
       kind: 'context',
       key: w.key,
       room: w.room,
-      title: t('notify.contextTitle', { name: nameOf(w, room), pct }),
+      title: t('notify.contextTitle', { name: nameOf(w, room, masked), pct }),
+      // 몸통은 토큰 수뿐이라 가릴 것이 없다 — 사용량 알림도 마찬가지다
       body: t('notify.contextBody', {
         used: fmtTokens(w.context.tokens),
         limit: fmtTokens(w.context.limit),
@@ -378,15 +398,19 @@ function decideUsage(state, usage, now, first, out) {
 // `rooms`는 방별 알림 세기(방 이름 → 'off' | 'keen')다. 알림을 끈 방의 것은 **판정을 다 돌린
 // 뒤** 마지막에 덜어낸다 — 중간에 빼면 문턱 상태가 어긋나서, 다시 켜는 순간 그 동안 넘긴
 // 문턱이 한꺼번에 터진다(종류별 on/off와 같은 규칙).
-export function decideNotifications(state, snapshot, now = Date.now(), rooms = null) {
+//
+// `masked`는 이름을 가리기로 해 뒀는가다(nameOf·needsText). 문구를 짓는 곳이 여기라서 인자로
+// 받는다 — 띄우기 직전에 index.mjs가 걸러내려면 제목을 다시 렌더할 수 있어야 하고, 그러려면
+// 판정이 완성된 문구 대신 키와 인자를 내보내야 한다. 불린 하나를 내려보내는 편이 작다.
+export function decideNotifications(state, snapshot, now = Date.now(), rooms = null, masked = false) {
   const out = [];
   const first = !state.primed;
   state.primed = true;
-  decideWaiting(state, snapshot, now, first, out, rooms);
+  decideWaiting(state, snapshot, now, first, out, rooms, masked);
   // 순서가 뜻이 있다 — decideStuck은 decideDone이 갱신하기 전의 기분을 읽는다
-  if (!first) decideStuck(state, snapshot, out);
-  decideDone(state, snapshot, now, first, out);
-  decideContext(state, snapshot, first, out);
+  if (!first) decideStuck(state, snapshot, out, masked);
+  decideDone(state, snapshot, now, first, out, masked);
+  decideContext(state, snapshot, first, out, masked);
   decideUsage(state, snapshot?.usage, now, first, out);
   // 계정 사용량처럼 방이 없는 알림은 그대로 지나간다 — 어느 방의 일도 아니다
   return out.filter((o) => o.room == null || levelOf(rooms, o.room) !== 'off');
