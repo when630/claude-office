@@ -399,11 +399,20 @@ body.mini #stage-empty {
   display: flex;
   align-items: center;
   gap: 7px;
+  /* 왼쪽을 다 쓴다 — 사용률과 버튼은 오른쪽에 붙고 남는 폭이 여기 몫이다 */
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
 }
+/* **여기는 flex 상자여야 한다.** `.ico`는 `display: block`인 플렉스 아이템이고(위 정의),
+   아이콘을 쓰는 다른 자리는 다 그 부모가 flex다. 이 줄만 한 겹 더 깊어서(`#mini-stats` → `.w`
+   → svg) 아이콘이 블록 박스로 서고 글자를 **아래 줄로 밀어냈다** — 22px 손잡이에 두 줄이
+   들어앉아 아이콘이 위로 삐져나왔다. #wait-chip과 같은 모양으로 세운다. */
 #mini-stats .w {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   color: var(--acc);
   font-weight: 700;
 }
@@ -419,17 +428,43 @@ body.mini #stage-empty {
   color: var(--b2);
   font-style: normal;
 }
-/* 마우스를 올린 게가 어느 방인지 — 숫자 대신 이 줄이 뜬다. 방이 먼저고 이름이 뒤로 물러난다 */
+/* 마우스를 올린 게가 어느 방인지 — 숫자 대신 이 줄이 뜬다. 방이 먼저고 이름이 뒤로 물러난다.
+   좁은 창에서 줄이 넘치면 **이름부터 줄인다**(방과 컨텍스트는 안 줄인다) — 그러지 않으면
+   줄 끝의 컨텍스트 퍼센트가 통째로 잘려 나간다. */
 #mini-stats .rm {
+  flex: 0 1 auto;
+  min-width: 0;
   color: var(--t1);
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* **늘어나지 않는다**(`0 1 auto`) — 늘리면 컨텍스트 퍼센트가 줄 오른쪽 끝까지 밀려 계정
+   사용률(#mini-usage) 옆에 붙고, 그 둘이 한 덩이로 읽힌다. 세션 값과 계정 값을 섞지 않는다. */
+/* 줄이는 몫을 방보다 크게 준다(3) — 마우스를 올리는 이유가 **방을 알려는 것**이라
+   좁아질 때 먼저 줄어야 하는 쪽은 이름이다 */
 #mini-stats .nm {
+  flex: 0 3 auto;
+  min-width: 0;
   color: var(--t3);
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* 그 게의 컨텍스트 사용률. 라벨 없이 숫자만 두고 **캔버스 막대와 같은 문턱 색**을 쓴다
+   (render.mjs의 barColor와 같은 값 — 60%에서 노랑, 85%에서 빨강).
+   오른쪽 계정 사용률(#mini-usage)은 회색이라 색만으로 세션 값과 계정 값이 갈린다. */
+#mini-stats .ct {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+#mini-stats .ct.ok {
+  color: var(--done);
+}
+#mini-stats .ct.mid {
+  color: var(--warn);
+}
+#mini-stats .ct.hi {
+  color: var(--fail);
 }
 #mini-stats .s {
   color: var(--stuck);
@@ -437,9 +472,24 @@ body.mini #stage-empty {
 #mini-stats .f {
   color: var(--fail);
 }
+/* 계정 사용률 — 늘 있지만 급하지 않다. 큰 창의 #usage-mini와 같은 톤으로 가라앉힌다 */
+#mini-usage {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  color: var(--t3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* `display`를 정한 규칙에는 `[hidden]`을 같이 적는다 — UA의 `[hidden]{display:none}`을
+   ID 선택자가 이긴다(#wait-chip·#office와 같은 함정) */
+#mini-usage[hidden] {
+  display: none;
+}
 /* 미니 모드의 손잡이 위에 서므로 여기만 드래그에서 빼 준다 */
 #mini-grow {
-  margin-left: auto;
+  flex: none;
   padding: 0 5px;
   line-height: 18px;
   -webkit-app-region: no-drag;

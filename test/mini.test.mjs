@@ -126,12 +126,77 @@ test('앞줄이 많으면 상세도가 먼저 깎이고, 그래도 안 들어가
   assert.equal(plan.frontShown + plan.foldedFront, 6);
 });
 
-test('창이 커질수록 상세도가 내려가는 일은 없다', () => {
-  let prev = 0;
-  for (let h = SMALL.h; h <= BIG.h; h += 1) {
-    const d = miniPlan({ w: SMALL.w, h, front: 3, back: 4, scale: 2 }).detail;
-    assert.ok(d >= prev, `높이 ${h}에서 상세도가 ${prev} → ${d}로 내려갔다`);
-    prev = d;
+// **창을 키웠는데 보이는 게가 줄어드는 일이 없어야 한다.** 전에는 있었다 — 폭 220에서 높이를
+// 200 → 220으로 키우면 7마리(앞줄 3 + 뒷줄 4)가 3마리로 줄었다. 상세도가 오르면 칸 최소 폭도
+// 올라 열이 줄고 앞줄이 한 줄 늘어나는데, 그 한 줄이 뒷줄 자리를 다 먹었다.
+//
+// **상세도의 단조성은 불변식이 아니다** — 뒷줄을 살리려고 일부러 내려간다(폭 420·높이 190에서
+// 상세도 2 대신 1을 골라 뒷줄 여섯을 세운다). 그걸 지키려 들면 이 버그를 다시 심는다.
+// 총합이 아니라 **사전식**으로 잰다. 총합 단조성은 "앞줄이 최우선"과 충돌한다 — 창이 조금 커져
+// 접혀 있던 앞줄 게 하나가 펴질 때, 그 한 줄이 뒷줄 넷을 밀어내는 구간이 있다. 나를 기다리는
+// 게 하나가 뒷줄 넷보다 앞이므로 그건 옳은 거래다. 지켜야 하는 것은 이 둘이다:
+//   - 창이 커질 때 앞줄이 줄지 않는다
+//   - 앞줄이 그대로면 뒷줄도 줄지 않는다  ← 여기가 깨져 있었다
+test('창을 키웠을 때 앞줄이 줄지 않고, 앞줄이 그대로면 뒷줄도 줄지 않는다', () => {
+  for (let w = SMALL.w; w <= BIG.w * 2; w += 2) {
+    for (const [front, back] of [
+      [0, 3],
+      [1, 4],
+      [2, 6],
+      [2, 14],
+      [3, 6],
+      [4, 10],
+      [6, 20],
+      [8, 30],
+    ]) {
+      let prev = null;
+      for (let h = 20; h <= BIG.h * 3; h += 1) {
+        const p = miniPlan({ w, h, front, back, scale: 2 });
+        if (prev) {
+          const where = `폭 ${w}·높이 ${h} (대기 ${front}·작업 ${back})`;
+          assert.ok(p.frontShown >= prev.frontShown, `${where}: 앞줄이 ${prev.frontShown} → ${p.frontShown}으로 줄었다`);
+          if (p.frontShown === prev.frontShown) {
+            assert.ok(p.backShown >= prev.backShown, `${where}: 뒷줄이 ${prev.backShown} → ${p.backShown}으로 줄었다`);
+          }
+        }
+        prev = p;
+      }
+    }
+  }
+});
+
+// `+n` 한 줄(≈8px)을 확보하려고 뒷줄 한 줄(25px = 게 넷)을 내주던 구간이 있었다.
+// 총원은 22px 손잡이에 늘 적혀 있으므로 게를 세우는 쪽이 낫다.
+test('접힌 개수를 적으려고 뒷줄을 내주지 않는다', () => {
+  for (let w = SMALL.w; w <= BIG.w; w += 2) {
+    for (let h = 30; h <= BIG.h; h += 1) {
+      const p = miniPlan({ w, h, front: 2, back: 14, scale: 2 });
+      if (p.foldH > 0) continue; // 적을 자리가 있었던 경우는 논외
+      // 접힘 표시를 뺀 만큼으로 뒷줄이 한 줄이라도 더 섰어야 한다면 실패다
+      const roomForOneMore = p.availH - p.frontH - (p.rows > 0 ? 4 : 0) - p.backH - (p.backRows > 0 ? 4 : 0);
+      assert.ok(
+        p.foldedBack === 0 || roomForOneMore < 25,
+        `폭 ${w}·높이 ${h}: 뒷줄 한 줄이 더 들어갈 자리(${roomForOneMore})가 남았는데 ${p.foldedBack}마리를 접었다`,
+      );
+    }
+  }
+});
+
+// 접힌 개수와 세운 개수를 합치면 늘 전원이다 — 어느 크기에서도 게가 조용히 사라지지 않는다
+test('세운 것과 접힌 것을 합치면 전원이다', () => {
+  for (const w of [SMALL.w, 140, BIG.w]) {
+    for (const h of [20, SMALL.h, 90, BIG.h]) {
+      for (const [front, back] of [
+        [0, 0],
+        [2, 6],
+        [5, 14],
+        [9, 31],
+      ]) {
+        const p = miniPlan({ w, h, front, back, scale: 2 });
+        assert.equal(p.frontShown + p.foldedFront, front, `앞줄 셈이 안 맞는다 (${w}×${h})`);
+        assert.equal(p.backShown + p.foldedBack, back, `뒷줄 셈이 안 맞는다 (${w}×${h})`);
+      }
+    }
   }
 });
 

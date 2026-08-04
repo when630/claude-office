@@ -1890,6 +1890,10 @@ const M_BACK_W = 20; // 뒷줄 한 칸 — 게 16px + 좌우 2px
 // 뒷줄이 화면 절반을 먹으면 앞줄이 밀린다. 넘치는 만큼은 `+n`으로 접는다.
 const M_BACK_ROWS_MAX = 3;
 const M_HEAD_H = M_GLYPH_H + M_GLYPH_GAP + M_BODY_H; // 칸 위 → 발
+// 남는 높이를 위아래로 나누는 비율(위쪽 몫). 반씩 나누면 **위가 많이 비어 보인다** —
+// 칸마다 기호 말풍선 자리(11px)를 늘 비워 두는데 뒷줄의 일하는 게에는 기호가 없어서,
+// 뒷줄 위로 22px(화면 기준)이 늘 빈 띠로 남는다. 그만큼을 아래로 넘긴다.
+const M_TOP_BIAS = 1 / 4;
 
 // 앞줄에 서는 상태 — 나를 기다리거나 막혔거나 실패한 것. 이름·경과·게이지를 다 달아 준다.
 const MINI_FRONT_MOODS = ['waiting', 'stuck', 'failed'];
@@ -1928,9 +1932,13 @@ export function miniRoster(rooms) {
 
 // 몇 열·몇 줄·어느 상세도로 세울까. **순수 함수다** — 인원수와 크기만 받으므로 node로 테스트된다.
 //
-// 사다리는 앞줄을 지키는 쪽으로 내려간다: 상세도(이름·경과·게이지)를 먼저 깎고, 그다음 뒷줄을
-// 줄째로 접고, 앞줄을 자르는 것은 창을 최소로 줄인 경우의 마지막 수단이다.
-// 폭 때문에 앞줄이 잘리는 일은 없다 — 열이 줄면 줄이 늘어난다.
+// 상세도 셋(2 이름+경과 · 1 이름 · 0 게이지만)을 **다 계산해 보고 고른다.** 전에는 들어가는
+// 가장 높은 상세도를 탐욕스럽게 집었는데, 상세도가 오르면 칸 최소 폭도 올라(M_FRONT_BARE_W →
+// M_FRONT_MIN_W) 열이 줄고 앞줄이 한 줄 늘어난다. 그 한 줄이 뒷줄 자리를 다 먹어서
+// **창을 키웠는데 보이는 게가 줄어드는** 구간이 생겼다(폭 220에서 높이 200→220에 7마리→3마리).
+//
+// 고르는 기준은 사전식이다: `앞줄 인원 → 뒷줄 인원 → 상세도`. 이름은 마우스를 올려 볼 수
+// 있지만(#128) 안 보이는 게는 올려 볼 수도 없다.
 export function miniPlan({ w, h, front = 0, back = 0, scale = 2 }) {
   // 글자는 확대 밖에서 12px 고정으로 그린다 — 줄 간격을 논리 좌표로 잡으려면 배율로 나눠야 한다
   const lineH = Math.max(4, Math.ceil((OFFICE_FONT_PX * 1.2) / scale));
@@ -1939,63 +1947,86 @@ export function miniPlan({ w, h, front = 0, back = 0, scale = 2 }) {
   const availH = Math.max(M_HEAD_H, Math.floor(h) - M_PAD * 2);
 
   const backCols = Math.max(1, Math.floor(innerW / M_BACK_W));
-
-  // 칸의 최소 폭은 **상세도가 정한다** — 글자를 떼면 좁아도 되고, 그만큼 열이 늘어 줄이 줄어든다
-  const colsFor = (d) =>
-    Math.max(1, Math.min(Math.max(1, front), Math.floor(innerW / (d >= 1 ? M_FRONT_MIN_W : M_FRONT_BARE_W))));
-  const rowH = (d) => M_HEAD_H + (d >= 2 ? nameDy + lineH : d >= 1 ? nameDy : 0) + M_BAR_GAP + M_BAR_H;
   const blockH = (rows, unit) => (rows > 0 ? rows * unit + (rows - 1) * M_ROW_GAP : 0);
-  const rowsFor = (d) => (front > 0 ? Math.ceil(front / colsFor(d)) : 0);
-
-  let detail = 2;
-  while (detail > 0 && blockH(rowsFor(detail), rowH(detail)) > availH) detail -= 1;
-  const cols = colsFor(detail);
-  const cellW = Math.min(M_FRONT_MAX_W, Math.floor(innerW / cols));
-  let rows = rowsFor(detail);
-
-  let frontShown = front;
-  let foldedFront = 0;
-  if (blockH(rows, rowH(detail)) > availH) {
-    rows = Math.max(1, Math.floor((availH + M_ROW_GAP) / (rowH(detail) + M_ROW_GAP)));
-    frontShown = Math.min(front, rows * cols);
-    foldedFront = front - frontShown;
-  }
-  const frontH = blockH(rows, rowH(detail));
-
-  // 뒷줄은 앞줄이 자리를 잡은 뒤 남은 높이만큼만 선다
-  const space = availH - frontH - (rows > 0 ? M_ROW_GAP : 0);
   const fitRows = (room) => (room < M_HEAD_H ? 0 : Math.floor((room + M_ROW_GAP) / (M_HEAD_H + M_ROW_GAP)));
-  const wantRows = back > 0 ? Math.ceil(back / backCols) : 0;
-  let backRows = Math.min(wantRows, fitRows(space), M_BACK_ROWS_MAX);
-  // 접을 것이 있으면 개수를 적을 한 줄을 먼저 떼어 둔다 — 안 보이는 게가 몇인지는 알려야 한다
-  if (backRows < wantRows) backRows = Math.min(wantRows, fitRows(space - lineH - 1), M_BACK_ROWS_MAX);
-  const backShown = Math.min(back, backRows * backCols);
-  const foldedBack = back - backShown;
-  const backH = blockH(backRows, M_HEAD_H);
-  const foldH = foldedBack > 0 && space - backH - (backRows > 0 ? M_ROW_GAP : 0) >= lineH ? lineH : 0;
 
-  return {
-    cols,
-    cellW,
-    rows,
-    detail,
-    frontShown,
-    foldedFront,
-    backCols,
-    backRows,
-    backShown,
-    foldedBack,
-    lineH,
-    nameDy,
-    innerW,
-    availH,
-    frontRowH: rowH(detail),
-    // 덩이 전체를 세로 가운데에 놓는다. 위로 붙이면 아래 절반이 빈 바닥으로 남아 떠 보인다.
-    top: M_PAD + Math.max(0, Math.floor((availH - (foldH + backH + (backRows || foldH ? M_ROW_GAP : 0) + frontH)) / 2)),
-    foldH,
-    backH,
-    frontH,
-  };
+  // 상세도 하나로 끝까지 짜 본다. 앞줄을 먼저 앉히고 남은 높이를 뒷줄에 준다.
+  function planFor(detail) {
+    // 칸의 최소 폭은 **상세도가 정한다** — 글자를 떼면 좁아도 되고, 그만큼 열이 늘어 줄이 줄어든다
+    const cols = Math.max(
+      1,
+      Math.min(Math.max(1, front), Math.floor(innerW / (detail >= 1 ? M_FRONT_MIN_W : M_FRONT_BARE_W))),
+    );
+    const frontRowH = M_HEAD_H + (detail >= 2 ? nameDy + lineH : detail >= 1 ? nameDy : 0) + M_BAR_GAP + M_BAR_H;
+    let rows = front > 0 ? Math.ceil(front / cols) : 0;
+    let frontShown = front;
+    let foldedFront = 0;
+    // 상세도를 다 깎아도 세로가 모자라면 앞줄도 자른다 — 창을 최소로 줄인 경우의 마지막 수단이다.
+    // 폭 때문에 잘리는 일은 없다: 열이 줄면 줄이 늘어난다.
+    if (blockH(rows, frontRowH) > availH) {
+      rows = Math.max(1, Math.floor((availH + M_ROW_GAP) / (frontRowH + M_ROW_GAP)));
+      frontShown = Math.min(front, rows * cols);
+      foldedFront = front - frontShown;
+    }
+    const frontH = blockH(rows, frontRowH);
+
+    // 뒷줄은 앞줄이 자리를 잡은 뒤 남은 높이만큼만 선다
+    const space = availH - frontH - (rows > 0 ? M_ROW_GAP : 0);
+    const wantRows = back > 0 ? Math.ceil(back / backCols) : 0;
+    // 뒷줄을 먼저 최대한 세우고, **남는 자리가 있을 때만** 접힌 개수를 적는다.
+    // 전에는 `+n` 한 줄(lineH ≈ 8)을 먼저 떼어 뒀는데, 그 8px 때문에 뒷줄 한 줄(25px = 게 넷)이
+    // 통째로 날아가는 구간이 있었다(220×200에서 뒷줄 넷 대신 `+14` 한 줄만 남았다).
+    // 총원은 22px 손잡이에 늘 적혀 있으므로 게를 세우는 쪽이 낫다.
+    const backRows = Math.min(wantRows, fitRows(space), M_BACK_ROWS_MAX);
+    const backShown = Math.min(back, backRows * backCols);
+    const foldedBack = back - backShown;
+    const backH = blockH(backRows, M_HEAD_H);
+    const foldH = foldedBack > 0 && space - backH - (backRows > 0 ? M_ROW_GAP : 0) >= lineH ? lineH : 0;
+
+    return {
+      cols,
+      cellW: Math.min(M_FRONT_MAX_W, Math.floor(innerW / cols)),
+      rows,
+      detail,
+      frontShown,
+      foldedFront,
+      backCols,
+      backRows,
+      backShown,
+      foldedBack,
+      lineH,
+      nameDy,
+      innerW,
+      availH,
+      frontRowH,
+      // 덩이를 세로로 놓는 자리. 가운데보다 위로 붙인다(M_TOP_BIAS) — 위로 다 붙이면 아래가
+      // 통째로 빈 바닥이 되어 떠 보이고, 반씩 나누면 기호 자리 때문에 위가 많이 비어 보인다.
+      top:
+        M_PAD +
+        Math.max(
+          0,
+          Math.floor((availH - (foldH + backH + (backRows || foldH ? M_ROW_GAP : 0) + frontH)) * M_TOP_BIAS),
+        ),
+      foldH,
+      backH,
+      frontH,
+    };
+  }
+
+  // 앞줄이 많이 서는 쪽 → 뒷줄이 많이 서는 쪽 → 상세도가 높은 쪽
+  const better = (a, b) =>
+    a.frontShown !== b.frontShown
+      ? a.frontShown > b.frontShown
+      : a.backShown !== b.backShown
+        ? a.backShown > b.backShown
+        : a.detail > b.detail;
+
+  let best = planFor(0);
+  for (const d of [1, 2]) {
+    const cand = planFor(d);
+    if (better(cand, best)) best = cand;
+  }
+  return best;
 }
 
 // 칸 하나를 만든다. **자리가 고정이라 actor를 여기서 채운다** — 돌아다니지 않으므로 그릴 때
