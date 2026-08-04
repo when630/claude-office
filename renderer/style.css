@@ -389,6 +389,10 @@ body.mini main {
 body.mini #stage {
   padding: 6px;
 }
+/* 아무도 출근하지 않았을 때의 안내. 큰 창의 40px 위 여백을 미니에 쓸 자리는 없다 */
+body.mini #stage-empty {
+  margin: 12px auto;
+}
 /* 미니 모드도 큰 창과 같은 위계다 — 대기가 먼저 서고 총원은 가라앉는다.
    22px 줄에 칩을 세울 자리는 없으니 굵기와 색으로만 낸다. */
 #mini-stats {
@@ -414,6 +418,18 @@ body.mini #stage {
 #mini-stats i {
   color: var(--b2);
   font-style: normal;
+}
+/* 마우스를 올린 게가 어느 방인지 — 숫자 대신 이 줄이 뜬다. 방이 먼저고 이름이 뒤로 물러난다 */
+#mini-stats .rm {
+  color: var(--t1);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#mini-stats .nm {
+  color: var(--t3);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 #mini-stats .s {
   color: var(--stuck);
@@ -487,6 +503,12 @@ body.mini #stage {
 #office {
   display: block;
   image-rendering: pixelated;
+}
+/* 안내(#stage-empty)를 덮지 않으려면 정말로 감춰야 한다 — ID 선택자의 `display: block`이
+   UA의 `[hidden] { display: none }`을 이기므로 여기서 같이 적는다(#wait-chip과 같은 함정).
+   **큰 창에서도 안 듣고 있었다** — 전부 걸러 놓으면 안내 대신 빈 캔버스가 남았다. */
+#office[hidden] {
+  display: none;
 }
 
 /* ── 왼쪽 세션 목록. 캔버스와 같은 것을 보고(거르기·접기를 지난 방), 급한 순서로 묶는다. */

@@ -86,6 +86,7 @@ export default {
   // 미니 모드 손잡이
   mini: {
     grow: '원래 크기로',
+    nobody: '출근한 클로드가 없다',
   },
 
   kind: {

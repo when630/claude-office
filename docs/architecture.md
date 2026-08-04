@@ -46,7 +46,9 @@ renderer/           픽셀 렌더러 (app · render · sprites · themes · talk
                     패널은 판이 셋(세션 · 출근부 · 설정) — 설정·출근부가 `<dialog>`에서
                     여기로 들어왔다
                     미니 모드는 같은 index.html을 `?mini=1`로 연 **별도 창**이다 — 프레임
-                    유무는 창을 만들 때 정해지고 나중에 못 바꾸기 때문이다
+                    유무는 창을 만들 때 정해지고 나중에 못 바꾸기 때문이다.
+                    캔버스는 큰 창과 **다른 함수**를 탄다(`layoutMini`·`renderMini`) —
+                    방을 안 그리고 게만 두 줄로 모아 세운다
 renderer/fonts/     번들 폰트 둘 — 사무실 픽셀 폰트(Mona S 12px)와 껍데기 본문
                     (Pretendard Variable). 둘 다 OFL 1.1. **선언만 두고 설치를 기대하지
                     않는다** — 그 전에는 설치한 사람만 Pretendard를 봤다 (renderer/fonts/README.md)
@@ -69,7 +71,9 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   모양 조각(`.btn-round`·`.btn-pill`·`.btn-wide`·`.btn-quiet`·`.btn-ico`)을 얹는다 —
   **동작을 가리키는 클래스(`.copy`·`.go`·`.hint-btn`…)는 JS가 잡으므로 건드리지 않는다.**
   `display`를 정하는 규칙에는 `[hidden]`을 같이 적는다 — UA의 `[hidden]{display:none}`은
-  id·class 규칙에 밀려서, 속성만 켜고 화면은 그대로인 상태가 된다(대기 칩이 그랬다)
+  id·class 규칙에 밀려서, 속성만 켜고 화면은 그대로인 상태가 된다(대기 칩이 그랬고 **캔버스도
+  그랬다** — `#office{display:block}`이 이겨서 전부 걸러 놓으면 안내 대신 빈 캔버스가 남았다.
+  절대 배치라 안내를 덮는데, 감추는 쪽이 안 듣고 있었다)
 - `renderer/app.mjs`의 `ICONS`·`icon()` — 아이콘은 **글자가 아니라 12×12 도형**이다.
   Pretendard에 `▭ ▣ ▤ ▥ ⊞ ◧ ◨ ❗`가 없어서 글자로 찍으면 글자별로 대체 폰트를 찾아 내려간다.
   뼈대에 박힌 것은 `data-icon` 속성으로 채운다(`applyStaticText`)
@@ -91,6 +95,20 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   잘려 보이고, 8배에서는 수천만 픽셀짜리 비트맵을 매 프레임 다시 그린다.
   바닥(`drawFloor`)은 보이는 범위를 세계 좌표로 되돌려 그만큼 깔고 **격자는 8px 세계 격자에
   맞춰** 시작한다 — 화면 기준으로 그으면 끌 때마다 격자가 떨린다
+- **미니 창은 `render.mjs`의 다른 함수를 탄다** — `layoutMini`·`renderMini`이고, `app.mjs`에서
+  갈라지는 곳은 `relayout`·`frame` 둘뿐이다(클릭 판정은 `pickAt`을 그대로 쓴다 — view 모양을
+  맞춰 뒀다). 줄 세우는 순서는 `miniRoster`(상태 우선순위 → 오래 기다린 순 → 키), 몇 열·몇 줄·
+  어느 상세도로 세울지는 `miniPlan`이다. **둘 다 순수 함수라 `test/mini.test.mjs`가 node로 돈다.**
+  좁힐 때 깎는 순서는 상세도(이름·경과) → 뒷줄 줄째로 접기(`+n`) → 마지막에 앞줄이다.
+  칸 폭의 최소치가 상세도를 탄다(`M_FRONT_MIN_W`·`M_FRONT_BARE_W`) — 이름을 뗀 칸에 34px를
+  요구하면 최소 크기 창에서 열이 모자라 줄이 늘고, 그 줄이 세로에 안 들어가 앞줄이 접혔다.
+  **미니에서는 전원 서 있다**(`clawdMini`) — 걷기만 끄고 앉히면 `isSeated`가 waiting을 앉음으로
+  보지 않아 `clawdSeated`가 `asleep`을 골라, 나를 기다리는 게가 자는 모습으로 그려진다.
+  서 있게 두면 대기가 `armsHigh`로 읽히고 의자·책상·자리 전환·잡담·비품을 통째로 안 탄다
+  (그래서 `test/walk.test.mjs`도 손댈 것이 없다). 미니는 **거르기를 따르지 않는다** —
+  거르기를 푸는 문(목록·배지)이 그 창에 없어서 걸러 둔 것이 사라진 것으로 읽힌다.
+  방을 안 그리니 어느 방인지 짚을 길이 없어서, 게에 마우스를 올리면 22px 손잡이에
+  `방 · 이름`을 적는다(`setMiniHover`) — 좁은 창에 말풍선을 띄우면 그게 곧 옆 게를 덮는다
 - `shared/pixels.mjs` — 한 글자가 한 픽셀, 팔레트는 파일 맨 위. 행 길이가 어긋나면 바로 에러가 난다
 - `renderer/themes.mjs` — 사무실 종류(설정 창의 목록도 여기서 나온다). `station`이 자리 모양을,
   `props`·`wall`이 비품을 정한다
@@ -159,6 +177,14 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   시각을 인자로 받으므로 하루를 기다리지 않고 `test/history.test.mjs`가 확인한다
 - `main/notify-tap.mjs` — 훅이 돌릴 스크립트(`scriptSource` — `.mjs`라 ESM이다),
   받은 문구를 쓸지 정하는 규칙(`noteNeeds`·`NOTE_SLACK_MS`), 남은 파일을 버릴 기준(`NOTE_MAX_AGE_MS`)
+- `main/index.mjs` — 미니 창의 **항상 위**(`createMini`): Windows에서는 `alwaysOnTop: true`만으로는
+  안 된다. 기본 레벨 `floating`은 Electron이 창을 **작업 표시줄 뒤로** 옮기는 레벨이고
+  (`behind_task_bar_` — `floating`·`torn-off-menu`·`modal-panel`·`main-menu`·`status`가 대상),
+  그 자리는 topmost 띠 아래라서 처음엔 위에 있다가 **다른 창을 누르는 순간 가라앉는다**.
+  `pop-up-menu` 이상이 작업 표시줄 위라 그 이동이 일어나지 않는다 — 대신 작업 표시줄을 덮는다.
+  맥은 `NSFloatingWindowLevel`이 제대로 도므로 건드리지 않는다(올리면 Dock을 덮는다).
+  초점을 잃을 때 `moveTop()`으로 한 번 더 올린다 — 초점을 가져오지 않으므로 방금 누른 창을
+  방해하지 않는다
 - `main/index.mjs` — `POLL_MS`, `BLINK_MS`(깜빡임 주기), `signature`(스냅샷 중복 전송 판정에서 뺄 필드),
   전역 단축키(`HOTKEY_ACTIONS`·`ACCEL_OK`·`applyHotkeys` — 등록 실패는 반환값으로만 오므로
   `hotkeyFailed`에 담아 설정 창까지 올린다), 트레이의 대기 목록(`waitingMenu`·`waitMenuSig` —

@@ -460,6 +460,21 @@ function createMini() {
     },
   });
 
+  // **Windows에서는 레벨을 올려야 진짜로 위에 남는다.** `alwaysOnTop: true`의 기본 레벨은
+  // `floating`이고, Electron은 그 레벨(과 status까지)에서 창을 **작업 표시줄 뒤로** 옮긴다
+  // (native_window_views.cc의 `behind_task_bar_` → `MoveBehindTaskBarIfNeeded`). 작업 표시줄
+  // 뒤는 topmost 띠 아래라서, 처음엔 위에 있다가 **다른 창을 누르는 순간 그 밑으로 가라앉는다.**
+  // `pop-up-menu`부터가 작업 표시줄 **위**라 그 이동이 아예 일어나지 않는다.
+  //
+  // 맥은 건드리지 않는다 — NSFloatingWindowLevel이 제대로 돌고, 레벨을 올리면 Dock을 덮는다.
+  if (process.platform === 'win32') mini.setAlwaysOnTop(true, 'pop-up-menu');
+
+  // 그래도 다른 앱이 topmost를 뺏어 가면 우리가 초점을 잃을 때 다시 올린다.
+  // `moveTop`은 초점을 가져오지 않으므로 방금 누른 창을 방해하지 않는다.
+  mini.on('blur', () => {
+    if (mini && !mini.isDestroyed() && mini.isAlwaysOnTop()) mini.moveTop();
+  });
+
   mini.loadFile(path.join(ROOT, 'renderer', 'index.html'), { query: { mini: '1' } });
   mini.webContents.setWindowOpenHandler(({ url }) => {
     openExternal(url);

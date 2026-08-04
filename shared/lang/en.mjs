@@ -88,6 +88,7 @@ export default {
   // Mini-window handle
   mini: {
     grow: 'Back to full size',
+    nobody: 'Nobody in yet',
   },
 
   kind: {
