@@ -43,6 +43,8 @@ export default {
     failed: '실패',
     longest: '최장 {d}',
     tokens: '{n} tok',
+    // 대기 칩을 누르면 가장 오래 기다리는 자리가 열린다 — 사무실을 눈으로 훑지 않아도 된다
+    waitChipTitle: '가장 오래 기다리는 자리로',
   },
 
   // ── 우측 하단 물음표
@@ -147,6 +149,8 @@ export default {
     pid: 'PID',
     mode: '모드',
     updated: '갱신',
+    // 늘 보는 값은 셋뿐이라 나머지는 접어 둔다 (없애지는 않는다)
+    factsMore: '자세히',
     aides: '붙어 있는 서브에이전트 {n}',
     needTitle: '나를 기다리는 중',
     waited: '{d}째 기다리고 있습니다',
