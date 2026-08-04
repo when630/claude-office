@@ -34,12 +34,15 @@ const miniStatsEl = document.getElementById('mini-stats');
 const filterEl = document.getElementById('room-filter');
 const shownBtn = document.getElementById('room-shown');
 const stageEmpty = document.getElementById('stage-empty');
-const cfgDialog = document.getElementById('cfg');
+const panelTabsEl = document.getElementById('panel-tabs');
+const paneSession = document.getElementById('pane-session');
+const paneCfg = document.getElementById('pane-cfg');
 const cfgBody = document.getElementById('cfg-body');
 const cfgTabsEl = document.getElementById('cfg-tabs');
-const attDialog = document.getElementById('att');
+const paneAtt = document.getElementById('pane-att');
 const attBody = document.getElementById('att-body');
 const attTabsEl = document.getElementById('att-tabs');
+const captionEl = document.querySelector('body > .caption');
 
 // 미니 모드는 **같은 페이지를 다른 창에서** 여는 것이다(main/index.mjs의 createMini).
 // 프레임 유무는 창을 만들 때 정해지고 나중에 못 바꾸므로 창을 갈아 끼우는 쪽을 골랐고,
@@ -144,7 +147,7 @@ function bar(pct) {
 
 // CSSOM 직접 조작은 CSP 대상이 아니다
 function paintBars() {
-  for (const el of panel.querySelectorAll('.bar i[data-pct]')) {
+  for (const el of paneSession.querySelectorAll('.bar i[data-pct]')) {
     el.style.width = `${el.dataset.pct}%`;
   }
 }
@@ -293,6 +296,9 @@ canvas.addEventListener('mouseleave', () => {
 // 목록의 표시와 패널이 어긋나지 않는다 (전에는 각자 selected를 만지고 drawPanel만 불렀다).
 function selectKey(key) {
   selected = key ?? null;
+  // 설정·출근부를 열어 둔 채 자리를 눌렀을 때 아무 반응이 없으면 고장으로 읽힌다.
+  // 자리를 고르는 것은 "이걸 보여 달라"는 뜻이므로 세션 판으로 돌아온다.
+  if (key && panelTab !== 'session') setPanelTab('session');
   drawPanel();
   drawRail();
 }
@@ -650,10 +656,10 @@ function workerPanel(w) {
 // 계획서 열기. 파일이 사라졌을 수 있으므로(계획은 사람이 지운다) 실패를 화면에 적는다 —
 // 눌렀는데 아무 일도 안 일어나는 것이 가장 나쁘다.
 function wirePlan() {
-  const btn = panel.querySelector('.plan-open');
+  const btn = paneSession.querySelector('.plan-open');
   if (!btn) return;
   btn.addEventListener('click', async () => {
-    const msg = panel.querySelector('.plan-msg');
+    const msg = paneSession.querySelector('.plan-msg');
     btn.disabled = true;
     const res = await window.office?.openPlan?.(btn.dataset.plan).catch(() => null);
     btn.disabled = false;
@@ -664,11 +670,11 @@ function wirePlan() {
 // 터미널을 띄우는 일은 main이 한다(main/terminal.mjs). 여기서는 누구인지만 넘긴다 —
 // 명령 문자열을 넘기면 그게 임의 명령 실행 통로가 되므로 id만 보낸다.
 function wireJump() {
-  const btn = panel.querySelector('.go');
+  const btn = paneSession.querySelector('.go');
   if (!btn) return;
   btn.addEventListener('click', async () => {
     const w = selected ? findWorker(selected) : null;
-    const msg = panel.querySelector('#jump-msg');
+    const msg = paneSession.querySelector('#jump-msg');
     if (!w) return;
     btn.disabled = true;
     const res = await window.office?.openTerminal?.({ cwd: w.cwd, jobId: w.jobId, sessionId: w.sessionId }).catch(
@@ -691,16 +697,66 @@ function wireJump() {
   });
 }
 
+// ── 패널 탭 (세션 · 출근부 · 설정)
+//
+// 설정·출근부가 창에서 여기로 들어왔다. 창은 배경 차단과 Esc 닫기를 공짜로 줬지만, 420px에
+// 갇혀 방 목록·표가 좁았고 사무실을 보면서 만질 수 없었다.
+//
+// **세션을 고르면 세션 탭으로 돌아온다.** 설정을 열어 둔 채 자리를 눌렀을 때 아무 반응이
+// 없으면 고장으로 읽힌다.
+const PANEL_TABS = [
+  ['session', 'panel.tab.session'],
+  ['att', 'att.title'],
+  ['cfg', 'cfg.title'],
+];
+let panelTab = 'session';
+
+function drawPanelTabs() {
+  panelTabsEl.innerHTML = PANEL_TABS.map(
+    ([k, label]) => `<button type="button" role="tab" aria-selected="${k === panelTab}"
+      class="panel-tab${k === panelTab ? ' on' : ''}" data-panel-tab="${k}">${t(label)}</button>`,
+  ).join('');
+}
+
+// **보이기와 내용 다시 그리기를 갈라 둔다.** 앞은 스냅샷마다 불러도 싸고 아무것도 잃지 않지만,
+// 뒤는 설정·출근부 판을 다시 짜므로 스크롤 자리와 펼쳐 둔 것이 초기화된다.
+function applyPanelTab() {
+  paneSession.hidden = panelTab !== 'session';
+  paneAtt.hidden = panelTab !== 'att';
+  paneCfg.hidden = panelTab !== 'cfg';
+  drawPanelTabs();
+}
+
+function drawPanelView() {
+  if (panelTab === 'cfg') drawCfg();
+  else if (panelTab === 'att') drawAtt();
+}
+
+// 탭을 옮기면 캡션은 허공에 남는다 — 같이 닫는다.
+// 패널이 접혀 있으면 먼저 펴 준다: 상단바의 설정·출근부 버튼을 눌렀는데 아무 일도 없으면 안 된다.
+function setPanelTab(next) {
+  panelTab = next;
+  closeCaption();
+  if (!cfg.panelOpen) saveView({ panelOpen: true });
+  applyPanelTab();
+  drawPanelView();
+}
+
+panelTabsEl.addEventListener('click', (e) => {
+  const tab = e.target?.dataset?.panelTab;
+  if (tab && tab !== panelTab) setPanelTab(tab);
+});
+
 function drawPanel() {
   const w = selected ? findWorker(selected) : null;
   // 패널은 늘 두 층이다 — 굴러가는 몸통(.panel-body)과 바닥에 붙는 주 동작(.jump).
   // 몸통을 flex 열로 만드는 것은 기본 화면뿐이고(버전을 바닥으로 밀기 위해서다),
   // 그 클래스는 idlePanel이 스스로 달고 온다.
-  panel.innerHTML = w ? workerPanel(w) : idlePanel();
+  paneSession.innerHTML = w ? workerPanel(w) : idlePanel();
 
   // **querySelectorAll이어야 한다.** 복사 버튼이 둘(재접속 명령 · 추천 답)이 되면서
   // querySelector 하나만 잡던 코드는 둘째 버튼을 죽은 버튼으로 만들었다.
-  for (const btn of panel.querySelectorAll('.copy')) {
+  for (const btn of paneSession.querySelectorAll('.copy')) {
     btn.addEventListener('click', () => {
       window.office.copy(btn.dataset.cmd);
       const tag = btn.querySelector('span');
@@ -724,15 +780,15 @@ function drawPanel() {
 function tickPanel() {
   const now = Date.now();
   // 기다린 시간은 여기서만 갈아 끼운다 — statusAt이 절대 시각이라 스냅샷을 기다리지 않는다
-  const waited = panel.querySelector('#w-waited');
+  const waited = paneSession.querySelector('#w-waited');
   if (waited) {
     const w = selected ? findWorker(selected) : null;
     waited.textContent = w?.statusAt ? fmtWaited(Date.now() - w.statusAt) : '';
   }
   const u = state.usage;
-  const s = panel.querySelector('#u-session-left');
+  const s = paneSession.querySelector('#u-session-left');
   if (s) s.textContent = u?.session?.resetsAt ? t('usage.left', { d: fmtLeft(u.session.resetsAt - now) }) : '';
-  const wk = panel.querySelector('#u-week-left');
+  const wk = paneSession.querySelector('#u-week-left');
   if (wk) wk.textContent = u?.week?.resetsAt ? t('usage.left', { d: fmtLeft(u.week.resetsAt - now) }) : '';
 }
 
@@ -1084,12 +1140,11 @@ function closeCaption() {
   captionOn = null;
 }
 
-// 캡션은 창(`<dialog>`)의 자식이고 `position: fixed`다 — dialog는 top layer라 그 안의 고정
-// 요소도 위에 그려지고, 스크롤되는 몸통(`#cfg-body`) 밖이라 잘리지 않는다.
+// 캡션은 body의 자식이고 `position: fixed`다. 전에는 창마다 하나씩 두고 dialog가 top layer라는
+// 것에 기대고 있었는데, 창이 없어졌으니 하나로 족하고 **패널을 기준으로** 자리를 잡는다.
 function openCaption(btn) {
   const key = btn.dataset.hint;
-  const dialog = btn.closest('dialog');
-  const el = dialog?.querySelector('.caption');
+  const el = captionEl;
   if (!key || !el) return;
   if (captionOn?.btn === btn) return closeCaption();
   closeCaption();
@@ -1099,9 +1154,9 @@ function openCaption(btn) {
   btn.classList.add('on');
   captionOn = { btn, el };
 
-  // 버튼 아래에 붙이고, 창 밖으로 넘치면 안으로 당긴다.
+  // 버튼 아래에 붙이고, 패널 밖으로 넘치면 안으로 당긴다.
   const b = btn.getBoundingClientRect();
-  const d = dialog.getBoundingClientRect();
+  const d = panel.getBoundingClientRect();
   const w = el.offsetWidth;
   const left = Math.min(Math.max(d.left + 8, b.left - 8), d.right - w - 8);
   const below = b.bottom + 6;
@@ -1303,14 +1358,14 @@ async function saveNotify(patch) {
   if (next) notifyCfg = next;
 }
 
-document.getElementById('cfg-open').addEventListener('click', async () => {
+// 알림·단축키는 트레이 메뉴에서도 바뀐다 — 판을 열 때 다시 받아 와야 화면이 실제와 맞는다.
+async function openCfgTab() {
   notifyCfg = (await window.office?.getNotify?.().catch(() => null)) ?? notifyCfg;
   hotkeyCfg = (await window.office?.getHotkeys?.().catch(() => null)) ?? hotkeyCfg;
   capturing = null;
-  drawCfg();
-  cfgDialog.showModal();
-});
-document.getElementById('cfg-close').addEventListener('click', () => cfgDialog.close());
+  setPanelTab('cfg');
+}
+document.getElementById('cfg-open').addEventListener('click', openCfgTab);
 
 cfgTabsEl.addEventListener('click', (e) => {
   if (handleHintClick(e.target)) return;
@@ -1321,8 +1376,9 @@ cfgTabsEl.addEventListener('click', (e) => {
   drawCfg();
 });
 
-// 조합을 받는 동안은 창의 다른 단축키(닫기 등)보다 먼저 가로챈다.
-cfgDialog.addEventListener('keydown', (e) => {
+// 조합을 받는 동안은 창의 다른 단축키(패널 접기 등)보다 먼저 가로챈다.
+// 전에는 <dialog>가 받았다 — 창이 없어졌으니 문서에서 받고 **캡처 단계**에서 가로챈다.
+document.addEventListener('keydown', (e) => {
   if (!capturing) return;
   e.preventDefault();
   e.stopPropagation();
@@ -1713,9 +1769,10 @@ function drawAtt() {
   paintSparks();
 }
 
-async function openAtt() {
+// 출근부는 열 때마다 main에서 집계를 받아 온다(스냅샷과 달리 밀려 오지 않는다).
+async function openAttTab() {
   attBody.innerHTML = `<p class="dim">${t('att.loading')}</p>`;
-  attDialog.showModal();
+  setPanelTab('att');
   attData = await window.office?.history?.().catch(() => null);
   drawAtt();
 }
@@ -1738,12 +1795,10 @@ shownBtn.addEventListener('click', () => {
 document.getElementById('mini-open').addEventListener('click', () => window.office?.setMini?.(true));
 document.getElementById('mini-grow').addEventListener('click', () => window.office?.setMini?.(false));
 
-document.getElementById('att-open').addEventListener('click', openAtt);
-document.getElementById('att-close').addEventListener('click', () => attDialog.close());
+document.getElementById('att-open').addEventListener('click', openAttTab);
 
 // 캡션은 눌린 버튼 자리에 고정돼 있으므로, 그 자리가 움직이면 닫는다 —
-// 창을 닫을 때(Esc·바깥 클릭 포함), 몸통이 스크롤될 때, 창 크기가 바뀔 때.
-for (const el of [cfgDialog, attDialog]) el.addEventListener('close', closeCaption);
+// 판이 스크롤될 때, 창 크기가 바뀔 때. (탭을 옮길 때는 setPanelTab이 닫는다.)
 for (const el of [cfgBody, attBody]) el.addEventListener('scroll', closeCaption, { passive: true });
 window.addEventListener('resize', closeCaption);
 attTabsEl.addEventListener('click', (e) => {
@@ -1811,8 +1866,9 @@ function applyLang(payload) {
   document.documentElement.lang = getLang();
   applyStaticText();
   refresh();
-  if (cfgDialog.open) drawCfg();
-  if (attDialog.open) drawAtt();
+  drawPanelTabs();
+  if (panelTab === 'cfg') drawCfg();
+  if (panelTab === 'att') drawAtt();
 }
 
 // ── main 프로세스에서 오는 스냅샷
@@ -1821,11 +1877,12 @@ function refresh() {
   // **applyPanes가 relayout보다 먼저다.** 접힘이 폭을 바꾸므로, 먼저 반영하지 않으면
   // 캔버스가 옛 폭으로 줄을 나눈다.
   applyPanes();
+  applyPanelTab();
   relayout();
   drawStats();
   drawRail();
   drawPanel();
-  if (cfgDialog.open && cfgRooms !== roomSig()) drawCfg();
+  if (panelTab === 'cfg' && cfgRooms !== roomSig()) drawCfg();
 }
 
 function applyState(next) {
@@ -1912,6 +1969,8 @@ window.__office = {
 
 // 미니 창인지에 따라 상단바·패널이 접힌다 — 첫 그림 전에 세워야 레이아웃이 한 번에 잡힌다
 document.body.classList.toggle('mini', MINI);
+// 패널 탭도 첫 그림 전에 세운다 — 비어 있는 탭 바가 한 프레임이라도 보이지 않게
+applyPanelTab();
 
 // 첫 그림은 기본 언어(en)로 나가고, meta가 오면 설정된 언어로 다시 짠다 —
 // IPC를 기다리는 동안 빈 화면을 보여주지 않기 위해서다.
