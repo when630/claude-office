@@ -260,6 +260,13 @@ select:focus-visible {
   font-variant-numeric: tabular-nums;
   cursor: pointer;
 }
+/* **`display`를 정한 규칙에는 `[hidden]`을 같이 적어야 한다.** 브라우저가 hidden을 감추는
+   방법은 UA 스타일시트의 `[hidden] { display: none }`인데, 여기 ID 선택자가 그것을 이긴다 —
+   대기가 0이 돼서 `hidden`을 켜도 칩이 그대로 남아 있었다(입력 대기를 처리했는데도 계속
+   "2 입력 대기"가 붙어 있는 것으로 보였다). */
+#wait-chip[hidden] {
+  display: none;
+}
 #wait-chip:hover {
   border-color: var(--acc);
 }
