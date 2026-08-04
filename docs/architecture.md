@@ -41,9 +41,15 @@ main/updater.mjs    GitHub Releases 자동 업데이트 — 받아두고 트레�
                     (서명 없는 맥은 설치가 거부되므로 검사만 하고 알림으로 안내)
 main/preload.cjs    contextBridge (샌드박스라 CJS여야 한다)
 renderer/           픽셀 렌더러 (app · render · sprites · themes · talk · style)
+                    창은 네 덩이다 — 상단바 · 왼쪽 세션 목록(`#rail`) · 사무실 · 오른쪽 패널.
+                    양쪽 열은 접을 수 있고 접힘은 설정에 남는다(`view.railOpen`·`view.panelOpen`).
+                    패널은 판이 셋(세션 · 출근부 · 설정) — 설정·출근부가 `<dialog>`에서
+                    여기로 들어왔다
                     미니 모드는 같은 index.html을 `?mini=1`로 연 **별도 창**이다 — 프레임
                     유무는 창을 만들 때 정해지고 나중에 못 바꾸기 때문이다
-renderer/fonts/     사무실 영역 픽셀 폰트 (Mona S 12px, OFL 1.1)
+renderer/fonts/     번들 폰트 둘 — 사무실 픽셀 폰트(Mona S 12px)와 껍데기 본문
+                    (Pretendard Variable). 둘 다 OFL 1.1. **선언만 두고 설치를 기대하지
+                    않는다** — 그 전에는 설치한 사람만 Pretendard를 봤다 (renderer/fonts/README.md)
 shared/pixels.mjs   픽셀 데이터 — 렌더러와 아이콘 생성기가 공유
 shared/i18n.mjs     화면에 나가는 문구 — t()·언어 정하기, 기간·시각 셈법(언어별로 분기하는 것만)
 shared/lang/*.mjs   언어별 사전 (순수 데이터 — UI 문구 · 방 이름 · 캐릭터 대사)
@@ -57,6 +63,18 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
 
 ## 손댈 만한 곳
 
+- `renderer/style.css` — **껍데기의 값은 다 `:root`에 있다.** 리터럴 hex는 그 정의부 밖에
+  하나도 없어야 한다(모서리·글자 크기도 단으로 접혀 있고, 예외는 모양이 값을 정하는 곳뿐 —
+  주석에 이유가 적혀 있다). 버튼 생김새는 셋(`.btn`·`.btn-go`·`.btn-toggle`)이고 그 위에
+  모양 조각(`.btn-round`·`.btn-pill`·`.btn-wide`·`.btn-quiet`·`.btn-ico`)을 얹는다 —
+  **동작을 가리키는 클래스(`.copy`·`.go`·`.hint-btn`…)는 JS가 잡으므로 건드리지 않는다.**
+  `display`를 정하는 규칙에는 `[hidden]`을 같이 적는다 — UA의 `[hidden]{display:none}`은
+  id·class 규칙에 밀려서, 속성만 켜고 화면은 그대로인 상태가 된다(대기 칩이 그랬다)
+- `renderer/app.mjs`의 `ICONS`·`icon()` — 아이콘은 **글자가 아니라 12×12 도형**이다.
+  Pretendard에 `▭ ▣ ▤ ▥ ⊞ ◧ ◨ ❗`가 없어서 글자로 찍으면 글자별로 대체 폰트를 찾아 내려간다.
+  뼈대에 박힌 것은 `data-icon` 속성으로 채운다(`applyStaticText`)
+- `renderer/app.mjs`의 `RAIL_GROUPS` — 왼쪽 목록의 묶음과 순서. **캔버스와 같은 것을 본다**
+  (`roomsToDraw`) — 목록에만 있는 세션이 생기면 눌렀는데 자리를 못 찾는다
 - `shared/pixels.mjs` — 한 글자가 한 픽셀, 팔레트는 파일 맨 위. 행 길이가 어긋나면 바로 에러가 난다
 - `renderer/themes.mjs` — 사무실 종류(설정 창의 목록도 여기서 나온다). `station`이 자리 모양을,
   `props`·`wall`이 비품을 정한다
@@ -136,6 +154,8 @@ DevTools 콘솔에서 `__office.push(state)` / `__office.select(key)`로 임의 
 입력 대기·실패처럼 평소 안 나오는 화면을 확인할 수 있다. `__office.view({ names, roomThemes })`와
 `__office.lang('en')`은 설정을 **저장하지 않고** 바꿔 보는 입구다 — 헤드리스로 화면을 굽어
 확인할 때 쓴다(`lang`은 main을 거치지 않으므로 `'auto'`는 뜻이 없다).
+`__office.layout`은 지금 그려진 방 사각형(논리 좌표)과 배율을 돌려준다 — 캡처를 방에 딱 맞게
+자르려면 방이 화면 어디인지 알아야 하고, 캔버스라 DOM으로는 물어볼 수 없다.
 
 README의 캡처(`docs/images/en`·`docs/images/ko`)도 그렇게 구운 것이다 — 가짜 preload로
 `window.office`를 세워 스냅샷을 밀어 넣고, 화면 밖에 **보이게** 띄운 창을 `capturePage`로 찍는다.
@@ -159,4 +179,15 @@ README의 캡처(`docs/images/en`·`docs/images/ko`)도 그렇게 구운 것이�
   잡히는 일이 잦다 — 창이 통째로 빠진 그림이 나오면 코드를 의심하기 전에 이것부터 본다
 - **시간대 연출은 페이지의 `Date`를 갈아 끼워 확인한다.** `executeJavaScript`로 `window.Date`를
   시각을 옮긴 것으로 바꾸면 렌더러가 부르는 `new Date()`·`Date.now()`가 다 따라온다 —
-  새벽까지 기다리거나 OS 시계를 만질 필요가 없다
+  새벽까지 기다리거나 OS 시계를 만질 필요가 없다. **README 캡처에는 이게 필수다** —
+  실제 시계로 찍으면 픽스처의 "지금"과 어긋나 `0분`·`방금`이 박힌다
+- **창을 갈아 끼울 때 앞 창을 먼저 없애면 안 된다.** 창이 다 닫히는 순간 Electron이 앱을
+  종료해(`window-all-closed` 기본 동작) 다음 `loadFile`이 `ERR_FAILED`로 끊긴다.
+  두 언어를 이어서 굽는 스크립트라면 `app.on('window-all-closed', () => {})`를 걸어 둔다
+- **말풍선이 떠 있는 순간은 찍어서 골라야 한다.** 8초 주기로 4.8초만 떠 있고 위상이 세션 키
+  해시로 흩어져 있다(`talk.mjs`) — 고정된 시각에 찍으면 십중팔구 없는 프레임이 잡힌다.
+  캔버스라 DOM으로 물어볼 수 없으니 크롭의 흰 픽셀(`BUBBLE_STYLE.real` = `#f2f4f9`)을 센다.
+  기다리는 게는 세 줄을 돌리므로(무엇을 기다리는지 → 얼마나 → 재촉) 24초쯤 훑어 **가장 넓은**
+  말풍선을 고르면 "무엇을 묻는지"가 걸린다
+- 패널을 내용 높이에 맞춰 자를 때 **`scrollHeight`는 못 쓴다** — 내용이 상자보다 짧으면
+  상자 높이를 돌려준다. 마지막 자식의 밑선을 직접 재야 실제 내용 끝이 나온다

@@ -811,16 +811,18 @@ function longestWaitMin() {
 let shownWaitMin = -1;
 
 // 미니의 한 줄. 곁눈질용이라 숫자만 남긴다 — 여기서 길어지면 창을 줄인 뜻이 없다.
+// 미니 모드의 한 줄. 큰 창과 **같은 위계**를 쓴다 — 대기가 먼저 서고 총원은 가라앉는다.
+// 전에는 총원이 맨 앞에 굵게 있었고 대기가 그 뒤에 섞여 있었다.
 function drawMiniStats() {
   const s = state.stats ?? {};
   miniStatsEl.innerHTML = [
-    `<b>${s.total ?? 0}</b>`,
-    s.waiting ? `<span class="w">${s.waiting}</span> ${t('topbar.waiting')}` : '',
-    s.stuck ? `<span class="s">${s.stuck}</span> ${t('topbar.stuck')}` : '',
-    s.failed ? `<span class="f">${s.failed}</span> ${t('topbar.failed')}` : '',
+    s.waiting ? `<span class="w">${icon('bang')}${s.waiting} ${t('topbar.waiting')}</span>` : '',
+    s.stuck ? `<span class="s">${s.stuck}</span>` : '',
+    s.failed ? `<span class="f">${s.failed}</span>` : '',
+    `<span class="n">${s.total ?? 0}</span>`,
   ]
     .filter(Boolean)
-    .join(' · ');
+    .join('<i>·</i>');
 }
 
 // 안 보이는 방이 몇인지, 그리고 거기서 빠져나오는 길. 걸러 놓은 것을 잊고 "방이 사라졌다"고
@@ -855,7 +857,7 @@ function drawStats() {
   waitChip.hidden = waiting === 0;
   if (waiting > 0) {
     waitChip.innerHTML =
-      `❗ <b>${waiting}</b> ${t('topbar.waiting')}` +
+      `${icon('bang')} <b>${waiting}</b> ${t('topbar.waiting')}` +
       (waitMin >= 1 ? ` <span class="t">${t('topbar.longest', { d: fmtDur(waitMin * 60_000) })}</span>` : '');
     waitChip.title = t('topbar.waitChipTitle');
   }
@@ -1273,11 +1275,13 @@ function roomsPane() {
                     <b>${esc(r.label)}</b><small>${esc(r.cwd ?? '')}</small>
                     <span class="cfg-marks">
                       <button type="button" class="btn btn-toggle cfg-mark${cfg.pinned.includes(r.key) ? ' on' : ''}"
-                        data-pin="${esc(r.key)}" title="${t('cfg.roomPin')}">${cfg.pinned.includes(r.key) ? '★' : '☆'}</button>
+                        data-pin="${esc(r.key)}" title="${t('cfg.roomPin')}">${icon(
+                          cfg.pinned.includes(r.key) ? 'pinOn' : 'pin',
+                        )}</button>
                       <button type="button" class="btn btn-toggle cfg-mark${cfg.collapsed.includes(r.key) ? ' on' : ''}"
-                        data-collapse="${esc(r.key)}" title="${t('cfg.roomCollapse')}">${
-                          cfg.collapsed.includes(r.key) ? '▤' : '▥'
-                        }</button>
+                        data-collapse="${esc(r.key)}" title="${t('cfg.roomCollapse')}">${icon(
+                          cfg.collapsed.includes(r.key) ? 'foldOn' : 'fold',
+                        )}</button>
                       ${
                         // 부모 경로를 손으로 적지 않게 한다 — 이 방의 부모를 한 번에 등록한다.
                         // 부모가 드라이브 루트면 온 사무실이 한 방이 되므로 버튼을 안 만든다.
@@ -1286,7 +1290,7 @@ function roomsPane() {
                               cfg.roomGroups.some((g) => samePath(g, parentPath(r.cwd))) ? ' on' : ''
                             }" data-group="${esc(parentPath(r.cwd))}" title="${t('cfg.roomGroup', {
                               parent: esc(parentPath(r.cwd)),
-                            })}">⊞</button>`
+                            })}">${icon('group')}</button>`
                           : ''
                       }
                     </span>
@@ -1852,7 +1856,48 @@ let langPref = 'auto';
 
 // index.html에 박아 둔 고정 문구를 채운다. data-i18n은 글자, data-i18n-title은 title 속성.
 // 뼈대를 HTML에 두고 문구만 여기서 넣으면 언어를 바꿀 때 이 함수만 다시 부르면 된다.
+// ── 아이콘. **글자가 아니라 도형이다.**
+//
+// 전에는 `▭ ▣ ▤ ▥ ⊞ ◧ ◨ ❗`를 글자로 찍었다. 그런데 Pretendard에는 그 글자들이 없어서
+// 글자별로 대체 폰트를 찾아 내려갔고, 사람마다 다른 모양(가끔 색까지 다른 기호 폰트)이 나왔다.
+// 사무실 픽셀 폰트를 뒤에 세워 막아 두었지만(#112) 그건 폰트 대체에 기대는 구조였다.
+//
+// 도형으로 그리면 폰트에 안 매이고, 크기·색을 토큰으로 다룰 수 있다(stroke가 currentColor라
+// 버튼 색이 그대로 온다). 12×12 격자에 1px 선 — 픽셀 사무실과 같은 결이다.
+const ICONS = {
+  // 작은 창으로 / 큰 창으로
+  win: '<rect x="1.5" y="2.5" width="9" height="7" rx="1"/>',
+  winFull:
+    '<rect x="1.5" y="2.5" width="9" height="7" rx="1"/><rect x="3.5" y="4.5" width="5" height="3" fill="currentColor" stroke="none"/>',
+  // 왼쪽·오른쪽 열 접기. 채워진 띠가 그 열이다.
+  paneL:
+    '<rect x="1.5" y="1.5" width="9" height="9" rx="1"/><path d="M5 1.5v9" /><rect x="1.5" y="1.5" width="3.5" height="9" fill="currentColor" stroke="none"/>',
+  paneR:
+    '<rect x="1.5" y="1.5" width="9" height="9" rx="1"/><path d="M7 1.5v9" /><rect x="7" y="1.5" width="3.5" height="9" fill="currentColor" stroke="none"/>',
+  // 방 고정
+  pin: '<path d="M6 1.6 7.36 4.5 10.5 4.94 8.25 7.2 8.8 10.3 6 8.83 3.2 10.3 3.75 7.2 1.5 4.94 4.64 4.5Z"/>',
+  pinOn:
+    '<path d="M6 1.6 7.36 4.5 10.5 4.94 8.25 7.2 8.8 10.3 6 8.83 3.2 10.3 3.75 7.2 1.5 4.94 4.64 4.5Z" fill="currentColor"/>',
+  // 방 접기 — 펼쳐진 것은 줄이 보이고, 접힌 것은 한 줄로 눌린다
+  fold: '<rect x="1.5" y="1.5" width="9" height="9" rx="1"/><path d="M1.5 4.5h9M1.5 7.5h9"/>',
+  foldOn: '<rect x="1.5" y="4.5" width="9" height="3" rx="1" fill="currentColor" stroke="none"/>',
+  // 부모로 묶기
+  group: '<rect x="1.5" y="1.5" width="9" height="9" rx="1"/><path d="M6 3.6v4.8M3.6 6h4.8"/>',
+  // 나를 기다린다
+  bang: '<circle cx="6" cy="6" r="4.5"/><path d="M6 3.7v2.9"/><circle cx="6" cy="8.6" r="0.7" fill="currentColor" stroke="none"/>',
+};
+
+function icon(name) {
+  const d = ICONS[name];
+  if (!d) return '';
+  return `<svg class="ico" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"
+    fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round">${d}</svg>`;
+}
+
 function applyStaticText() {
+  // 뼈대에 박혀 있는 아이콘(미니 모드·열 접기)을 채운다. 사전과 달리 언어를 안 타지만
+  // 같은 자리에서 같이 도는 편이 잊히지 않는다.
+  for (const el of document.querySelectorAll('[data-icon]')) el.innerHTML = icon(el.dataset.icon);
   for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
   for (const el of document.querySelectorAll('[data-i18n-title]')) el.title = t(el.dataset.i18nTitle);
   for (const el of document.querySelectorAll('[data-i18n-ph]')) el.placeholder = t(el.dataset.i18nPh);
@@ -1947,6 +1992,17 @@ document.fonts
 window.__office = {
   get state() {
     return state;
+  },
+  // 지금 그려진 배치 — 방 사각형(논리 좌표)과 배율. README 캡처를 방에 딱 맞게 자르려면
+  // 방이 화면 어디에 있는지 알아야 하고, 그 답은 여기밖에 없다.
+  // (`view`는 아래에 이미 있다 — 표시 설정을 바꾸는 쪽이라 이름을 겹치게 둘 수 없다.)
+  get layout() {
+    return {
+      scale,
+      width: view.width,
+      height: view.height,
+      boxes: view.boxes.map((b) => ({ key: b.room.key, x: b.x, y: b.y, w: b.w, h: b.h })),
+    };
   },
   push(next) {
     state = next;

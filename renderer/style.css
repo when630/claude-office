@@ -214,6 +214,21 @@ select:focus-visible {
   border-color: transparent;
   background: none;
 }
+/* 아이콘만 든 버튼. 글자가 없으니 line-height로 가운데를 맞출 수 없다 — flex로 세운다. */
+.btn-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp1) 7px;
+}
+/* 도형 아이콘. stroke가 currentColor라 버튼 글자색을 그대로 따라온다 —
+   hover·켜짐에서 따로 칠할 것이 없다. */
+.ico {
+  display: block;
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
 /* 폭을 다 쓰고 양끝으로 벌리는 것 — 명령 복사처럼 안에 두 덩이가 서는 버튼 */
 .btn-wide {
   display: flex;
@@ -274,6 +289,9 @@ select:focus-visible {
 }
 #wait-chip b {
   font-weight: 700;
+}
+#wait-chip .ico {
+  margin-right: -1px;
 }
 /* 기다린 시간은 개수보다 한 겹 가라앉힌다 — 먼저 읽어야 하는 것은 "몇 건"이다 */
 #wait-chip .t {
@@ -375,8 +393,31 @@ body.mini #stage {
 body.mini #stage::-webkit-scrollbar {
   display: none;
 }
+/* 미니 모드도 큰 창과 같은 위계다 — 대기가 먼저 서고 총원은 가라앉는다.
+   22px 줄에 칩을 세울 자리는 없으니 굵기와 색으로만 낸다. */
+#mini-stats {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
 #mini-stats .w {
   color: var(--acc);
+  font-weight: 700;
+}
+#mini-stats .ico {
+  width: 10px;
+  height: 10px;
+}
+#mini-stats .n {
+  color: var(--t3);
+  font-variant-numeric: tabular-nums;
+}
+#mini-stats i {
+  color: var(--b2);
+  font-style: normal;
 }
 #mini-stats .s {
   color: var(--stuck);
@@ -1520,9 +1561,12 @@ b.lv-na {
    "나를 기다린다" 하나여야 한다 — 방을 고정해 둔 것과 대기가 같은 색으로 반짝이면
    사무실을 훑을 때 눈이 헛돈다. */
 .cfg-mark {
-  padding: 0 5px;
-  font-size: var(--fs-cap);
-  line-height: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 21px;
+  height: 19px;
+  padding: 0;
 }
 
 /* 알림 종류 — 켜고 끄는 것뿐이라 한 줄에 체크박스와 이름만 둔다 */
