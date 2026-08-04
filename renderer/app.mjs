@@ -530,7 +530,7 @@ function workerPanel(w) {
                 ? // 읽을 수만 있고 쓸 수는 없어 손으로 다시 타야 했다. 클립보드까지가 끝이고
                   // 붙여넣기는 사람이 한다 — 세션에 답을 써 넣지는 않는다.
                   `<p class="reply">${t('panel.suggested', { reply: esc(w.suggestedReply) })}</p>
-                   <button class="copy reply-copy" data-cmd="${esc(w.suggestedReply)}">
+                   <button class="btn btn-wide copy reply-copy" data-cmd="${esc(w.suggestedReply)}">
                      <span>${t('panel.copyReply')}</span>
                    </button>`
                 : ''
@@ -547,7 +547,7 @@ function workerPanel(w) {
             <p>${esc(w.plan.title) || t('panel.planUntitled')}</p>
             ${
               w.plan.file
-                ? `<button class="plan-open" type="button" data-plan="${esc(w.plan.file)}">${t('panel.planOpen')}</button>
+                ? `<button class="btn plan-open" type="button" data-plan="${esc(w.plan.file)}">${t('panel.planOpen')}</button>
                    <p class="hint plan-msg"></p>`
                 : ''
             }
@@ -595,8 +595,8 @@ function workerPanel(w) {
     ${
       cmd
         ? `<div class="jump">
-            <button class="go" type="button">${t('panel.open')}</button>
-            <button class="copy" data-cmd="${esc(cmd)}"><code>${esc(cmd)}</code><span>${t('panel.copy')}</span></button>
+            <button class="btn btn-go go" type="button">${t('panel.open')}</button>
+            <button class="btn btn-wide copy" data-cmd="${esc(cmd)}"><code>${esc(cmd)}</code><span>${t('panel.copy')}</span></button>
           </div>
           <p class="hint jump-msg" id="jump-msg"></p>`
         : ''
@@ -886,7 +886,7 @@ const hintText = new Map();
 
 function hintBtn(key, params) {
   hintText.set(key, t(key, params));
-  return `<button type="button" class="hint-btn" data-hint="${esc(key)}"
+  return `<button type="button" class="btn btn-round sm hint-btn" data-hint="${esc(key)}"
     aria-label="${t('common.hintTitle')}" title="${t('common.hintTitle')}">?</button>`;
 }
 
@@ -935,7 +935,7 @@ function hotkeyBlock() {
     const text = capturing === action ? t('cfg.hotkeyPress') : accel ? accelLabel(accel) : t('cfg.hotkeyNone');
     return `<div class="cfg-row">
       <label><b>${t(HOTKEY_LABEL[action])}</b>${bad ? `<small class="warn">${t('cfg.hotkeyTaken')}</small>` : ''}</label>
-      <button type="button" class="cfg-key${capturing === action ? ' on' : ''}${bad ? ' bad' : ''}"
+      <button type="button" class="btn cfg-key${capturing === action ? ' on' : ''}${bad ? ' bad' : ''}"
         data-hotkey="${esc(action)}">${esc(text)}</button>
     </div>`;
   };
@@ -1033,9 +1033,9 @@ function roomsPane() {
                   <label for="cfg-room-${i}">
                     <b>${esc(r.label)}</b><small>${esc(r.cwd ?? '')}</small>
                     <span class="cfg-marks">
-                      <button type="button" class="cfg-mark${cfg.pinned.includes(r.key) ? ' on' : ''}"
+                      <button type="button" class="btn btn-toggle cfg-mark${cfg.pinned.includes(r.key) ? ' on' : ''}"
                         data-pin="${esc(r.key)}" title="${t('cfg.roomPin')}">${cfg.pinned.includes(r.key) ? '★' : '☆'}</button>
-                      <button type="button" class="cfg-mark${cfg.collapsed.includes(r.key) ? ' on' : ''}"
+                      <button type="button" class="btn btn-toggle cfg-mark${cfg.collapsed.includes(r.key) ? ' on' : ''}"
                         data-collapse="${esc(r.key)}" title="${t('cfg.roomCollapse')}">${
                           cfg.collapsed.includes(r.key) ? '▤' : '▥'
                         }</button>
@@ -1043,7 +1043,7 @@ function roomsPane() {
                         // 부모 경로를 손으로 적지 않게 한다 — 이 방의 부모를 한 번에 등록한다.
                         // 부모가 드라이브 루트면 온 사무실이 한 방이 되므로 버튼을 안 만든다.
                         parentPath(r.cwd)
-                          ? `<button type="button" class="cfg-mark${
+                          ? `<button type="button" class="btn btn-toggle cfg-mark${
                               cfg.roomGroups.some((g) => samePath(g, parentPath(r.cwd))) ? ' on' : ''
                             }" data-group="${esc(parentPath(r.cwd))}" title="${t('cfg.roomGroup', {
                               parent: esc(parentPath(r.cwd)),
@@ -1072,7 +1072,7 @@ function roomsPane() {
               .join('')
           : `<p class="dim">${t('cfg.roomsEmpty')}</p>`
       }
-      <button class="cfg-reset" type="button"${picked ? '' : ' disabled'}>${t('cfg.roomsReset')}</button>
+      <button class="btn cfg-reset" type="button"${picked ? '' : ' disabled'}>${t('cfg.roomsReset')}</button>
     </section>
   `;
 }
@@ -1100,7 +1100,7 @@ function drawCfg() {
   cfgTabsEl.innerHTML =
     CFG_TABS.map(
       ([k]) => `<button type="button" role="tab" aria-selected="${k === pane[0]}"
-      class="${k === pane[0] ? 'on' : ''}" data-cfg-tab="${k}">${t(`cfg.tab.${k}`)}</button>`,
+      class="btn btn-toggle${k === pane[0] ? ' on' : ''}" data-cfg-tab="${k}">${t(`cfg.tab.${k}`)}</button>`,
     ).join('') + (TAB_HINT[pane[0]] ? hintBtn(TAB_HINT[pane[0]]) : '');
   cfgBody.innerHTML = pane[1]();
 }
@@ -1448,8 +1448,8 @@ function attWaits(s) {
 function rangeRow(s) {
   return `<div class="att-range-row">
     <div class="att-range-pick">
-      <button type="button" data-range="today"${attRange === 'today' ? ' class="on"' : ''}>${t('att.today')}</button>
-      <button type="button" data-range="week"${attRange === 'week' ? ' class="on"' : ''}>${t('att.week')}</button>
+      <button type="button" data-range="today" class="btn btn-toggle${attRange === 'today' ? ' on' : ''}">${t('att.today')}</button>
+      <button type="button" data-range="week" class="btn btn-toggle${attRange === 'week' ? ' on' : ''}">${t('att.week')}</button>
     </div>
     ${
       s
@@ -1521,7 +1521,7 @@ function drawAtt() {
   attTabsEl.innerHTML =
     ATT_TABS.map(
       ([k]) => `<button type="button" role="tab" aria-selected="${k === pane[0]}"
-      class="${k === pane[0] ? 'on' : ''}" data-att-tab="${k}">${t(`att.tab.${k}`)}</button>`,
+      class="btn btn-toggle${k === pane[0] ? ' on' : ''}" data-att-tab="${k}">${t(`att.tab.${k}`)}</button>`,
     ).join('') +
     (TAB_HINT[pane[0]] ? hintBtn(TAB_HINT[pane[0]], { days: attData.retainDays }) : '');
   attBody.innerHTML = pane[1]();
