@@ -46,6 +46,7 @@ export default {
     failed: 'failed',
     longest: 'longest {d}',
     tokens: '{n} tok',
+    waitChipTitle: 'Jump to the one waiting longest',
   },
 
   // ── The question mark in the bottom right
@@ -150,6 +151,7 @@ export default {
     pid: 'PID',
     mode: 'Mode',
     updated: 'Updated',
+    factsMore: 'Details',
     aides: 'Subagents attached: {n}',
     needTitle: 'Waiting on you',
     waited: 'Waiting for {d}',

@@ -13,7 +13,6 @@ import {
   fmtDur,
   fmtTime,
   fmtClock,
-  fmtDateLine,
   fmtDay,
   fmtWhen,
   fmtTokens,
@@ -26,6 +25,8 @@ const stage = document.getElementById('stage');
 const panel = document.getElementById('panel');
 const statsEl = document.getElementById('stats');
 const clockEl = document.getElementById('clock');
+const waitChip = document.getElementById('wait-chip');
+const usageMini = document.getElementById('usage-mini');
 const miniStatsEl = document.getElementById('mini-stats');
 const filterEl = document.getElementById('room-filter');
 const shownBtn = document.getElementById('room-shown');
@@ -361,16 +362,16 @@ function idlePanel() {
     : `<p class="dim">${t('usage.none')}</p>
        <p class="hint">${t('usage.noneHint')}</p>`;
 
-  // 버전을 패널 바닥에 붙이려면 패널이 flex 열이어야 한다. 그런데 내용을 flex item으로
+  // 버전을 패널 바닥에 붙이려면 스크롤 영역이 flex 열이어야 한다. 그런데 내용을 flex item으로
   // 흩어 놓으면 블록 사이 margin 병합이 사라져 간격이 벌어진다 — 그래서 내용은 한 덩어리로
   // 싸 두고(`idle-body`) 버전만 형제로 둔다. 미는 일은 CSS의 `margin-top: auto`가 한다.
+  //
+  // **큰 시계는 없다.** 30px 시계가 화면에서 가장 큰 글자였는데, OS 시계가 이미 있고
+  // 상단바에도 있다. 그 자리는 사무실 요약이 받는다 — 이 패널에서 유일하게 "지금 사무실이
+  // 어떤가"를 답하는 것이다.
   return `
+    <div class="panel-body idle">
     <div class="idle-body">
-    <div class="now">
-      <div class="now-time" id="p-clock">--:--:--</div>
-      <div class="now-date" id="p-date"></div>
-    </div>
-
     <section class="block">
       <h3>${t('idle.office')}</h3>
       <dl class="facts">
@@ -408,6 +409,7 @@ function idlePanel() {
       // 버전은 패널 바닥에. Electron 버전은 쓰는 사람에게 아무 뜻이 없어 적지 않는다.
       meta ? `<p class="version">Claude Office ${esc(meta.version)}</p>` : ''
     }
+    </div>
   `;
 }
 
@@ -456,17 +458,47 @@ function todoBlock(tasks) {
   </section>`;
 }
 
+// 자리 하나의 패널. **순서가 곧 위계다.**
+//
+// 전에는 섹션 제목 일곱아홉 개가 전부 같은 크기·같은 색이어서, 스크롤하는 동안
+// "나를 기다린다"와 "처음 지시"가 동등하게 지나갔다. 이제는 이 순서로만 읽힌다 —
+//   나를 기다림 → 컨텍스트 → 지금 상황 → 서브에이전트 → 요약(접힘) → 계획·할 일 → 지시 → 타임라인
+// 그리고 대기만 **카드**이고 나머지는 라벨이다. 위계를 색이 아니라 형태로 낸다.
 function workerPanel(w) {
   const cmd = attachCmd(w);
   const c = w.context;
   const u = usageOfSession(w);
   return `
+    <div class="panel-body">
     <header class="who">
       <span class="mood ${esc(w.mood)}">${esc(t(`mood.${w.mood}`))}</span>
       <h2>${esc(panelName(w))}</h2>
       ${w.title ? `<p class="subtitle">${esc(w.title)}</p>` : ''}
       <p class="cwd">${esc(w.cwd)}</p>
     </header>
+
+    ${
+      // 백그라운드 잡은 무엇을 기다리는지(needs)까지 남기지만 터미널 세션은 그게 없다 —
+      // 선택지가 떠 있는 동안 대화 파일에 아무것도 안 쓰이기 때문이다. 그래도 기다린다는
+      // 사실만은 알려야 하므로 mood만 보고 이 블록을 띄운다.
+      //
+      // **이름 바로 아래다.** 전에는 기본 정보 표와 서브에이전트 뒤였는데, 패널을 여는 이유가
+      // 대부분 이 한 블록이라 스크롤해서 찾게 두면 안 된다.
+      w.mood === 'waiting'
+        ? `<section class="block need"><h3>${t('panel.needTitle')}</h3>
+            <p class="waited" id="w-waited"></p>
+            <p>${esc(w.needs) || t('panel.needFallback')}</p>${
+              w.suggestedReply
+                ? // 읽을 수만 있고 쓸 수는 없어 손으로 다시 타야 했다. 클립보드까지가 끝이고
+                  // 붙여넣기는 사람이 한다 — 세션에 답을 써 넣지는 않는다.
+                  `<p class="reply">${t('panel.suggested', { reply: esc(w.suggestedReply) })}</p>
+                   <button class="btn btn-wide copy reply-copy" data-cmd="${esc(w.suggestedReply)}">
+                     <span>${t('panel.copyReply')}</span>
+                   </button>`
+                : ''
+            }</section>`
+        : ''
+    }
 
     ${
       c
@@ -479,6 +511,26 @@ function workerPanel(w) {
         : ''
     }
 
+    ${w.detail ? `<section class="block"><h3>${t('panel.detail')}</h3><p>${esc(w.detail)}</p></section>` : ''}
+
+    ${
+      w.aides?.length
+        ? `<section class="block"><h3>${t('panel.aides', { n: w.aides.length })}</h3><ul class="aides">${w.aides
+            .map((a) => `<li><b>${esc(a.kind)}</b>${a.label ? `<span>${esc(a.label)}</span>` : ''}</li>`)
+            .join('')}</ul></section>`
+        : ''
+    }
+
+    <!-- 값 열두 개가 2열 표로 여덟 줄을 차지했지만 늘 보는 것은 셋이다 —
+         터미널인가 · 얼마나 돌았나 · 살아 있나. 나머지는 접는다(없애지 않는다).
+         <details>라 JS 없이 열리고, 열어 둔 상태는 다시 그릴 때 초기화된다. -->
+    <details class="sum">
+      <summary>
+        <span>${t(w.kind === 'bg' ? 'kind.bg' : 'kind.terminal')}</span>
+        <span>${t('panel.uptime')} <b>${fmtAge(w.startedAt ? Date.now() - w.startedAt : null)}</b></span>
+        <span>${t('panel.updated')} <b>${fmtAgo(w.updatedAt ? Date.now() - w.updatedAt : null)}</b></span>
+        <em>${t('panel.factsMore')}</em>
+      </summary>
     <dl class="facts">
       <div><dt>${t('panel.kind')}</dt><dd>${t(w.kind === 'bg' ? 'kind.bg' : 'kind.terminal')}</dd></div>
       <div><dt>${t('panel.uptime')}</dt><dd>${fmtAge(w.startedAt ? Date.now() - w.startedAt : null)}</dd></div>
@@ -509,35 +561,8 @@ function workerPanel(w) {
       ${w.mode ? `<div><dt>${t('panel.mode')}</dt><dd>${esc(t(`mode.${w.mode}`))}</dd></div>` : ''}
       <div><dt>${t('panel.updated')}</dt><dd>${fmtAgo(w.updatedAt ? Date.now() - w.updatedAt : null)}</dd></div>
     </dl>
+    </details>
 
-    ${
-      w.aides?.length
-        ? `<section class="block"><h3>${t('panel.aides', { n: w.aides.length })}</h3><ul class="aides">${w.aides
-            .map((a) => `<li><b>${esc(a.kind)}</b>${a.label ? `<span>${esc(a.label)}</span>` : ''}</li>`)
-            .join('')}</ul></section>`
-        : ''
-    }
-
-    ${
-      // 백그라운드 잡은 무엇을 기다리는지(needs)까지 남기지만 터미널 세션은 그게 없다 —
-      // 선택지가 떠 있는 동안 대화 파일에 아무것도 안 쓰이기 때문이다. 그래도 기다린다는
-      // 사실만은 알려야 하므로 mood만 보고 이 블록을 띄운다.
-      w.mood === 'waiting'
-        ? `<section class="block need"><h3>${t('panel.needTitle')}</h3>
-            <p class="waited" id="w-waited"></p>
-            <p>${esc(w.needs) || t('panel.needFallback')}</p>${
-              w.suggestedReply
-                ? // 읽을 수만 있고 쓸 수는 없어 손으로 다시 타야 했다. 클립보드까지가 끝이고
-                  // 붙여넣기는 사람이 한다 — 세션에 답을 써 넣지는 않는다.
-                  `<p class="reply">${t('panel.suggested', { reply: esc(w.suggestedReply) })}</p>
-                   <button class="btn btn-wide copy reply-copy" data-cmd="${esc(w.suggestedReply)}">
-                     <span>${t('panel.copyReply')}</span>
-                   </button>`
-                : ''
-            }</section>`
-        : ''
-    }
-    ${w.detail ? `<section class="block"><h3>${t('panel.detail')}</h3><p>${esc(w.detail)}</p></section>` : ''}
     ${
       // 승인받은 계획. 제목은 트랜스크립트에 실려 온 plan 본문에서 뽑은 것이라 파일이 지워졌어도
       // 남는다. 그래서 파일이 있을 때만 버튼을 붙이고, 제목만 있으면 제목만 적는다.
@@ -592,13 +617,17 @@ function workerPanel(w) {
         : ''
     }
 
+    </div>
+
     ${
+      // 주 동작은 **스크롤 밖**이다. 전에는 내용 맨 끝이라 타임라인이 길면 묻혔고,
+      // 정작 이 자리에서 하고 싶은 일(터미널로 건너가기)이 안 보였다.
       cmd
-        ? `<div class="jump">
+        ? `<footer class="jump">
             <button class="btn btn-go go" type="button">${t('panel.open')}</button>
             <button class="btn btn-wide copy" data-cmd="${esc(cmd)}"><code>${esc(cmd)}</code><span>${t('panel.copy')}</span></button>
-          </div>
-          <p class="hint jump-msg" id="jump-msg"></p>`
+            <p class="hint jump-msg" id="jump-msg"></p>
+          </footer>`
         : ''
     }
   `;
@@ -650,8 +679,9 @@ function wireJump() {
 
 function drawPanel() {
   const w = selected ? findWorker(selected) : null;
-  // 기본 화면에서만 패널을 flex 열로 둔다 — 버전을 바닥으로 밀기 위해서다(style.css의 .version)
-  panel.classList.toggle('idle', !w);
+  // 패널은 늘 두 층이다 — 굴러가는 몸통(.panel-body)과 바닥에 붙는 주 동작(.jump).
+  // 몸통을 flex 열로 만드는 것은 기본 화면뿐이고(버전을 바닥으로 밀기 위해서다),
+  // 그 클래스는 idlePanel이 스스로 달고 온다.
   panel.innerHTML = w ? workerPanel(w) : idlePanel();
 
   // **querySelectorAll이어야 한다.** 복사 버튼이 둘(재접속 명령 · 추천 답)이 되면서
@@ -679,11 +709,7 @@ function drawPanel() {
 // 스크롤 위치가 튀고 텍스트 선택이 풀린다.
 function tickPanel() {
   const now = Date.now();
-  const clock = panel.querySelector('#p-clock');
-  if (clock) clock.textContent = fmtClock(now);
-  const date = panel.querySelector('#p-date');
-  if (date) date.textContent = fmtDateLine(now);
-  // 기다린 시간도 여기서만 갈아 끼운다 — statusAt이 절대 시각이라 스냅샷을 기다리지 않는다
+  // 기다린 시간은 여기서만 갈아 끼운다 — statusAt이 절대 시각이라 스냅샷을 기다리지 않는다
   const waited = panel.querySelector('#w-waited');
   if (waited) {
     const w = selected ? findWorker(selected) : null;
@@ -753,23 +779,55 @@ function drawStats() {
     return;
   }
   drawRoomBadge();
+
+  // 대기 — 유일하게 채워진 칩이다. 없으면 자리째 사라져 평소 상단바가 더 조용해진다.
+  const waiting = s.waiting ?? 0;
+  waitChip.hidden = waiting === 0;
+  if (waiting > 0) {
+    waitChip.innerHTML =
+      `❗ <b>${waiting}</b> ${t('topbar.waiting')}` +
+      (waitMin >= 1 ? ` <span class="t">${t('topbar.longest', { d: fmtDur(waitMin * 60_000) })}</span>` : '');
+    waitChip.title = t('topbar.waitChipTitle');
+  }
+
+  // 가운데는 **상태만**. 수치는 오른쪽에서 가라앉는다.
   statsEl.innerHTML = [
     `<b>${s.total ?? 0}</b> ${t('topbar.in')}`,
     s.typing ? `<span class="t">${s.typing}</span> ${t('topbar.typing')}` : '',
-    s.waiting ? `<span class="w">${s.waiting}</span> ${t('topbar.waiting')}` : '',
-    s.waiting && waitMin >= 1
-      ? `<span class="dim">${t('topbar.longest', { d: fmtDur(waitMin * 60_000) })}</span>`
-      : '',
     s.stuck ? `<span class="s">${s.stuck}</span> ${t('topbar.stuck')}` : '',
     s.failed ? `<span class="f">${s.failed}</span> ${t('topbar.failed')}` : '',
-    `<span class="dim">${t('topbar.tokens', { n: fmtTokens(s.tokens) })}</span>`,
-    u?.session ? `<span class="dim">5h ${u.session.pct}%</span>` : '',
-    u?.week ? `<span class="dim">wk ${u.week.pct}%</span>` : '',
   ]
     .filter(Boolean)
     .join('<i>·</i>');
-  document.title = s.waiting ? `(${s.waiting}) Claude Office` : 'Claude Office';
+
+  usageMini.innerHTML = [
+    `<span>${t('topbar.tokens', { n: fmtTokens(s.tokens) })}</span>`,
+    u?.session ? `<span>5h ${u.session.pct}%</span>` : '',
+    u?.week ? `<span>wk ${u.week.pct}%</span>` : '',
+  ]
+    .filter(Boolean)
+    .join('');
+
+  document.title = waiting ? `(${waiting}) Claude Office` : 'Claude Office';
 }
+
+// 대기 칩을 누르면 가장 오래 기다리는 자리를 연다. 방이 많으면 캔버스에서 그 자리를 찾는 것이
+// 곧 일이 되는데, 이 앱을 여는 이유가 바로 그 자리 하나다.
+function selectLongestWait() {
+  let worst = null;
+  for (const room of state.rooms ?? []) {
+    for (const w of room.workers) {
+      if (w.mood !== 'waiting') continue;
+      // statusAt이 없으면 언제부터인지 모르지만 대기이긴 하다 — 후보로는 남긴다
+      if (!worst || (w.statusAt ?? Infinity) < (worst.statusAt ?? Infinity)) worst = w;
+    }
+  }
+  if (!worst) return;
+  selected = worst.key;
+  drawPanel();
+}
+
+waitChip.addEventListener('click', selectLongestWait);
 
 // ── 설정 창
 //

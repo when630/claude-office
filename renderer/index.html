@@ -13,10 +13,18 @@
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
+    <!-- 상단바는 세 덩이다 — 왼쪽은 이름, 가운데는 상태, 오른쪽은 도구와 수치.
+         전에는 여덟 항목이 `·`로 이어진 한 줄이었고 전부 같은 크기여서, 이 앱의 존재
+         이유인 "입력 대기"가 토큰 총량과 같은 무게로 읽혔다. -->
     <header id="topbar">
       <h1>Claw'd Office</h1>
+      <!-- 대기만 **채워진 칩**으로 세운다. 워드마크도 노랑이지만 그건 글자색이라 형태가
+           다르고, 여기만 배경이 차 있어 눈이 먼저 온다. 대기가 없으면 사라진다. -->
+      <button id="wait-chip" type="button" hidden></button>
       <div id="stats"></div>
       <div class="right">
+        <!-- 수치는 늘 있지만 급하지 않다 — 모노스페이스로 가라앉혀 자리만 지킨다 -->
+        <div id="usage-mini"></div>
         <!-- 이름으로 거르기. 방이 서넛일 때는 쓸 일이 없어 눈에 안 띄게 두고,
              걸러진 방이 생기면 옆의 배지가 그 사실을 알린다. -->
         <input id="room-filter" type="search" autocomplete="off" spellcheck="false" data-i18n-ph="topbar.filter" />

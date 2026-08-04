@@ -141,17 +141,6 @@ export function fmtClock(at = Date.now()) {
   return new Date(at).toLocaleTimeString(locale(), { hour12: false });
 }
 
-// 기본 화면의 날짜 한 줄. 한국어는 `2026. 7. 31. (금)`, 영어는 `Fri, Jul 31, 2026` —
-// 로케일 기본 포맷을 그대로 쓰면 한국어가 "2026년 7월 31일 금요일"로 길어져 줄이 넘친다.
-export function fmtDateLine(at = Date.now()) {
-  const d = new Date(at);
-  if (getLang() === 'ko') {
-    const day = d.toLocaleDateString('ko-KR', { weekday: 'short' });
-    return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}. (${day})`;
-  }
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-}
-
 // 출근부의 구간 표시 — `7/31`. 짧아야 하고 앞뒤로 붙어 나오므로 두 언어가 같다.
 export function fmtDay(at) {
   const d = new Date(at);

@@ -105,6 +105,9 @@
 
   --shadow: 0 8px 24px rgba(4, 6, 10, 0.55);
 
+  /* 오른쪽 패널 폭. 우측 하단 물음표가 이 값을 보고 **사무실 위**에 서므로 한 곳에서 정한다. */
+  --panel-w: 330px;
+
   /* 본문 서체는 renderer/fonts/에 번들한 Pretendard Variable이다 (위 @font-face).
      **MonaS12가 뒤에 서 있는 이유가 있다.** Pretendard에는 `▭ ▣ ▤ ▥ ⊞`가 없다 —
      미니 모드 버튼과 방 표시(고정·접기·묶기)가 쓰는 글자다. Malgun Gothic이 첫 순위였을
@@ -230,17 +233,59 @@ select:focus-visible {
   background: var(--s1);
 }
 
+/* 워드마크. 노랑이지만 **글자색**이다 — 대기는 채워진 칩이라 형태로 갈린다 */
 #topbar h1 {
   margin: 0;
+  flex: none;
   font-size: var(--fs);
   letter-spacing: 0.04em;
   color: var(--acc);
 }
 
+/* ── 대기 칩. 상단바에서 유일하게 배경이 찬 것이고, 대기가 없으면 자리째 사라진다.
+   누르면 가장 오래 기다리는 자리가 열린다(app.mjs의 selectLongestWait) — 방이 많으면
+   캔버스에서 그 자리를 찾는 것이 곧 일이 된다. */
+#wait-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--acc-line);
+  border-radius: var(--r-pill);
+  background: var(--acc-bg);
+  color: var(--acc);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+/* **`display`를 정한 규칙에는 `[hidden]`을 같이 적어야 한다.** 브라우저가 hidden을 감추는
+   방법은 UA 스타일시트의 `[hidden] { display: none }`인데, 여기 ID 선택자가 그것을 이긴다 —
+   대기가 0이 돼서 `hidden`을 켜도 칩이 그대로 남아 있었다(입력 대기를 처리했는데도 계속
+   "2 입력 대기"가 붙어 있는 것으로 보였다). */
+#wait-chip[hidden] {
+  display: none;
+}
+#wait-chip:hover {
+  border-color: var(--acc);
+}
+#wait-chip b {
+  font-weight: 700;
+}
+/* 기다린 시간은 개수보다 한 겹 가라앉힌다 — 먼저 읽어야 하는 것은 "몇 건"이다 */
+#wait-chip .t {
+  color: var(--stuck);
+}
+
+/* 가운데는 **상태만**. 수치는 오른쪽에서 가라앉는다. */
 #stats {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
   color: var(--t2);
 }
 #stats b {
@@ -254,10 +299,6 @@ select:focus-visible {
   color: var(--work);
   font-weight: 700;
 }
-#stats .w {
-  color: var(--acc);
-  font-weight: 700;
-}
 #stats .s {
   color: var(--stuck);
   font-weight: 700;
@@ -266,10 +307,6 @@ select:focus-visible {
   color: var(--fail);
   font-weight: 700;
 }
-#stats .dim {
-  color: var(--t3);
-}
-
 #topbar .right {
   margin-left: auto;
   display: flex;
@@ -277,6 +314,16 @@ select:focus-visible {
   align-items: center;
   color: var(--t2);
   font-variant-numeric: tabular-nums;
+}
+
+/* 토큰 총량·사용률. 늘 있지만 급한 적이 없는 값이라 모노스페이스로 가라앉힌다 —
+   자리 폭이 고정이라 숫자가 바뀔 때 옆 버튼이 흔들리지 않는 이득도 같이 온다. */
+#usage-mini {
+  display: flex;
+  gap: 10px;
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: var(--fs-cap);
+  color: var(--t3);
 }
 #conn.ok {
   color: var(--done);
@@ -392,36 +439,36 @@ body.mini #stage::-webkit-scrollbar {
 }
 
 #panel {
-  width: 330px;
+  width: var(--panel-w);
   flex: none;
   border-left: 1px solid var(--b1);
   background: var(--s1);
+  /* 패널은 두 층이다 — 굴러가는 몸통과 바닥에 붙는 주 동작. 스크롤은 몸통이 맡으므로
+     여기서는 넘치는 것을 잘라 둔다. */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 굴러가는 몸통. 여백을 여기서 주므로 바닥 푸터는 자기 여백을 따로 갖는다. */
+.panel-body {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 14px;
+}
+/* 기본 화면만 flex 열이다 — 버전 한 줄을 바닥으로 밀기 위해서다(.version).
+   자리 하나를 고른 화면에서는 이걸 걸지 않는다. 섹션을 flex item으로 흩어 놓으면
+   블록 사이 margin 병합이 사라져 간격이 다 벌어진다. */
+.panel-body.idle {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
 }
 
 .empty p {
   color: var(--t2);
   line-height: 1.6;
-}
-
-/* ── 선택 전 기본 화면: 큰 시계 */
-.now {
-  margin: 2px 0 16px;
-}
-.now-time {
-  font-size: 30px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--t1);
-  font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-}
-.now-date {
-  margin-top: 2px;
-  font-size: var(--fs-sm);
-  color: var(--t2);
-  font-variant-numeric: tabular-nums;
 }
 
 /* ── 프로그레스 게이지 (컨텍스트 · 세션 · 주간) */
@@ -488,13 +535,9 @@ b.lv-na {
   color: var(--t3);
 }
 
-/* 패널 바닥에 붙는 버전 한 줄. 기본 화면에서만 패널이 flex 열이 되고(app.mjs가 .idle을 붙인다)
-   margin-top: auto가 남은 공간을 위로 몰아 버전을 맨 밑으로 내린다.
+/* 패널 바닥에 붙는 버전 한 줄. 기본 화면에서만 몸통이 flex 열이 되고(idlePanel이 .idle을
+   달고 온다) margin-top: auto가 남은 공간을 위로 몰아 버전을 맨 밑으로 내린다.
    내용이 길어 스크롤이 생기면 auto가 0이 되어 자연스럽게 내용 끝에 붙는다. */
-#panel.idle {
-  display: flex;
-  flex-direction: column;
-}
 .version {
   /* top이 auto — 간격은 padding으로 잡는다. 스크롤이 생기면 auto가 0이 되므로
      margin에 기대면 내용과 붙어 버린다. */
@@ -568,6 +611,51 @@ b.lv-na {
 .mood.done {
   background: var(--done-bg);
   color: var(--done-fg);
+}
+
+/* ── 기본 정보 요약. 값 열두 개 중 늘 보는 셋만 한 줄에 세우고 나머지는 접는다.
+   <details>라 JS가 없고, 요약 줄 전체가 손잡이다(summary 안에 다 들어 있다). */
+.sum {
+  margin: 14px 0;
+  border: 1px solid var(--b1);
+  border-radius: var(--r2);
+}
+.sum > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp1) 10px;
+  padding: var(--sp2) 10px;
+  font-size: var(--fs-sm);
+  color: var(--t2);
+  cursor: pointer;
+  /* 기본 삼각형을 지운다 — 오른쪽 끝의 "자세히"가 그 역할을 한다 */
+  list-style: none;
+}
+.sum > summary::-webkit-details-marker {
+  display: none;
+}
+.sum > summary:hover {
+  color: var(--t1);
+}
+.sum > summary b {
+  color: var(--t1);
+  font-variant-numeric: tabular-nums;
+}
+.sum > summary em {
+  margin-left: auto;
+  color: var(--work);
+  font-style: normal;
+  font-size: var(--fs-cap);
+  white-space: nowrap;
+}
+.sum[open] > summary {
+  border-bottom: 1px solid var(--b0);
+}
+/* 펼친 표는 요약 줄 아래 칸에 들어간다 — 테두리는 바깥 <details>가 이미 그렸다 */
+.sum > .facts {
+  margin: 0;
+  border: 0;
 }
 
 .facts {
@@ -724,9 +812,11 @@ b.lv-na {
 
 /* ── 도움말. 우측 하단 물음표를 누르면 캡션처럼 떠오른다.
    패널이 스크롤돼도 자리가 고정이어야 하므로 fixed로 띄운다. */
+/* **패널 위가 아니라 사무실 위에 선다.** 설명하는 대상이 캔버스의 말풍선이고,
+   패널 바닥에는 이제 주 동작이 고정으로 붙어 있어 그 위에 겹친다. */
 #help-open {
   position: fixed;
-  right: 14px;
+  right: calc(var(--panel-w) + 14px);
   bottom: 14px;
   z-index: 20;
   font-size: var(--fs);
@@ -741,7 +831,7 @@ b.lv-na {
 
 #help {
   position: fixed;
-  right: 14px;
+  right: calc(var(--panel-w) + 14px);
   bottom: 46px;
   z-index: 20;
   width: min(310px, calc(100vw - 28px));
@@ -918,16 +1008,28 @@ b.lv-na {
   background: var(--work);
 }
 
-/* ── 패널 맨 아래: 터미널 열기 + 명령 복사. 열기가 주 동작이라 왼쪽에 두고 초록으로 구분한다. */
+/* ── 패널 바닥에 **고정된** 주 동작: 터미널 열기 + 명령 복사.
+   열기가 주 동작이라 왼쪽에 두고 초록으로 구분한다.
+   전에는 내용 맨 끝이라 타임라인이 길면 스크롤 아래로 묻혔다 — 정작 이 자리에서 하고 싶은
+   일이 안 보였다. 지금은 스크롤 영역(.panel-body) **밖**의 형제라 늘 보인다. */
 .jump {
+  flex: none;
   display: flex;
-  gap: 8px;
-  margin-top: 16px;
+  flex-wrap: wrap;
+  gap: var(--sp2);
+  padding: 10px 14px;
+  border-top: 1px solid var(--b1);
+  background: var(--s0);
 }
 .jump .copy {
   flex: 1;
   min-width: 0;
   margin-top: 0;
+}
+/* 실패 안내가 뜨면 두 버튼 아래 줄을 통째로 쓴다 */
+.jump .jump-msg {
+  flex: 0 0 100%;
+  margin: 0;
 }
 /* 색은 .btn-go가 낸다 — 여기는 이 자리에서만 필요한 크기와 줄 유지뿐이다 */
 .go {
