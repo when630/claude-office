@@ -403,7 +403,14 @@ body.mini #stage-empty {
   overflow: hidden;
   white-space: nowrap;
 }
+/* **여기는 flex 상자여야 한다.** `.ico`는 `display: block`인 플렉스 아이템이고(위 정의),
+   아이콘을 쓰는 다른 자리는 다 그 부모가 flex다. 이 줄만 한 겹 더 깊어서(`#mini-stats` → `.w`
+   → svg) 아이콘이 블록 박스로 서고 글자를 **아래 줄로 밀어냈다** — 22px 손잡이에 두 줄이
+   들어앉아 아이콘이 위로 삐져나왔다. #wait-chip과 같은 모양으로 세운다. */
 #mini-stats .w {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   color: var(--acc);
   font-weight: 700;
 }
