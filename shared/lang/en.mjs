@@ -19,7 +19,6 @@ export default {
   },
 
   common: {
-    close: 'Close',
     ok: 'OK',
     cancel: 'Cancel',
     copyGuide: 'Copy guide',
@@ -159,7 +158,8 @@ export default {
     pid: 'PID',
     mode: 'Mode',
     updated: 'Updated',
-    factsMore: 'Details',
+    factsMore: 'Details',
+    tab: { session: 'Session' },
     aides: 'Subagents attached: {n}',
     needTitle: 'Waiting on you',
     waited: 'Waiting for {d}',
