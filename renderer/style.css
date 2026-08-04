@@ -419,6 +419,18 @@ body.mini #stage-empty {
   color: var(--b2);
   font-style: normal;
 }
+/* 마우스를 올린 게가 어느 방인지 — 숫자 대신 이 줄이 뜬다. 방이 먼저고 이름이 뒤로 물러난다 */
+#mini-stats .rm {
+  color: var(--t1);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#mini-stats .nm {
+  color: var(--t3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 #mini-stats .s {
   color: var(--stuck);
 }

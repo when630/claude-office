@@ -542,10 +542,12 @@ canvas.addEventListener('mousemove', (e) => {
   if (pan) return;
   const seat = seatAt(e.clientX, e.clientY);
   hover = seat?.worker.key ?? null;
+  if (MINI) setMiniHover(seat);
   setCursor();
 });
 canvas.addEventListener('mouseleave', () => {
   hover = null;
+  if (MINI) setMiniHover(null);
   setCursor();
 });
 // 자리를 고르는 **단 하나의 문**. 캔버스·목록·대기 칩·알림 클릭이 다 여기를 지나야
@@ -1071,10 +1073,36 @@ function longestWaitMin() {
 // 그러지 않으면 30분째 방치된 대기가 "최장 3분"에서 멈춘 채로 남는다.
 let shownWaitMin = -1;
 
+// 미니에서 마우스를 올린 게가 **어느 방인지**. 미니는 방을 안 그리므로 발판 색만으로는
+// 방을 짚을 수 없고, 좁은 창에 말풍선을 띄우면 그게 곧 옆 게를 덮는다 — 22px 손잡이는
+// 늘 숫자 몇 개뿐이고 캔버스를 하나도 가리지 않는 자리다.
+//
+// 이름은 **이름 가리기 설정을 따른다**(panelName) — 트레이 메뉴가 같은 규칙이다.
+// 방 이름은 가리지 않는다: 이름을 가렸을 때 대신 쓰는 것이 방 이름이다.
+let miniHover = null;
+
+function setMiniHover(seat) {
+  const next = seat ? { room: seat.room?.label ?? seat.worker.room ?? '', name: panelName(seat.worker) } : null;
+  // 같은 게 위를 지나는 동안 손잡이를 매 프레임 다시 짜지 않는다
+  if ((next?.room ?? null) === (miniHover?.room ?? null) && (next?.name ?? null) === (miniHover?.name ?? null)) return;
+  miniHover = next;
+  drawMiniStats();
+}
+
 // 미니의 한 줄. 곁눈질용이라 숫자만 남긴다 — 여기서 길어지면 창을 줄인 뜻이 없다.
 // 미니 모드의 한 줄. 큰 창과 **같은 위계**를 쓴다 — 대기가 먼저 서고 총원은 가라앉는다.
 // 전에는 총원이 맨 앞에 굵게 있었고 대기가 그 뒤에 섞여 있었다.
 function drawMiniStats() {
+  // 마우스를 올린 동안에는 숫자를 접고 그 게가 누구인지 적는다. 놓으면 숫자로 돌아온다.
+  if (miniHover) {
+    miniStatsEl.innerHTML = [
+      `<span class="rm">${esc(miniHover.room)}</span>`,
+      miniHover.name ? `<span class="nm">${esc(miniHover.name)}</span>` : '',
+    ]
+      .filter(Boolean)
+      .join('<i>·</i>');
+    return;
+  }
   const s = state.stats ?? {};
   miniStatsEl.innerHTML = [
     s.waiting ? `<span class="w">${icon('bang')}${s.waiting} ${t('topbar.waiting')}</span>` : '',
