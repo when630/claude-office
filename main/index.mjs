@@ -11,6 +11,7 @@ import {
   clipboard,
   dialog,
   globalShortcut,
+  screen,
 } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -68,6 +69,9 @@ const BLINK_MS = 700;
 
 let win = null;
 let mini = null; // 미니 모드 창 — 프레임을 나중에 못 바꾸므로 별도 창으로 둔다
+// 화면 구성이 바뀔 때 미니 자리를 다시 당기는 청취자. screen은 앱 수명 내내 살아 있으므로
+// 창을 닫을 때 떼어내야 여닫을 때마다 쌓이지 않는다.
+let miniFit = null;
 let tray = null;
 let timer = null;
 let lastSnapshot = null;
@@ -441,13 +445,35 @@ function showWindow() {
 // **창을 따로 만든다.** 프레임 유무는 BrowserWindow를 만들 때 정해지고 나중에 못 바꾸는데,
 // 미니의 값어치 절반은 테두리 없이 작게 뜨는 데 있다. 같은 index.html을 `?mini=1`로 열어
 // 렌더러가 상단바·패널을 접고 사무실만 그린다.
+// 미니가 들어갈 수 있는 가장 작은 크기. 세로는 **앞줄과 뒷줄이 같이 사는 문턱**이다 —
+// 이보다 낮으면 뒷줄이 통째로 접혀 미니가 대기 전용 창이 된다(`miniPlan`을 훑어 200을 찾았다).
+// 예전 설치본은 150까지 줄일 수 있었으므로 저장된 자리를 되살릴 때 같이 끌어올린다.
+const MINI_MIN_W = 220;
+const MINI_MIN_H = 200;
+
+// **창을 화면의 작업 영역 안으로 당긴다.** 미니의 alwaysOnTop 레벨을 작업 표시줄 위로 올렸으므로
+// (아래 참고) 자리를 그대로 두면 미니가 작업 표시줄을 덮는다. Electron이 주는 지렛대는 레벨
+// 하나뿐이라 "가라앉지 않음"과 "작업 표시줄 아래 있음"을 같이 만족시킬 수 없다 — 그러면
+// 자리를 우리가 정한다. 최소 크기도 여기서 같이 채운다.
+function fitToWorkArea(win) {
+  if (!win || win.isDestroyed()) return;
+  const b = win.getBounds();
+  const area = screen.getDisplayMatching(b).workArea;
+  const width = Math.min(Math.max(b.width, MINI_MIN_W), area.width);
+  const height = Math.min(Math.max(b.height, MINI_MIN_H), area.height);
+  const x = Math.min(Math.max(b.x, area.x), area.x + area.width - width);
+  const y = Math.min(Math.max(b.y, area.y), area.y + area.height - height);
+  if (x === b.x && y === b.y && width === b.width && height === b.height) return;
+  win.setBounds({ x, y, width, height });
+}
+
 function createMini() {
   mini = new BrowserWindow({
     width: 420,
     height: 300,
     ...(settings.bounds.mini ?? {}),
-    minWidth: 220,
-    minHeight: 150,
+    minWidth: MINI_MIN_W,
+    minHeight: MINI_MIN_H,
     frame: false,
     alwaysOnTop: true,
     skipTaskbar: true,
@@ -467,7 +493,21 @@ function createMini() {
   // `pop-up-menu`부터가 작업 표시줄 **위**라 그 이동이 아예 일어나지 않는다.
   //
   // 맥은 건드리지 않는다 — NSFloatingWindowLevel이 제대로 돌고, 레벨을 올리면 Dock을 덮는다.
-  if (process.platform === 'win32') mini.setAlwaysOnTop(true, 'pop-up-menu');
+  //
+  // 그 대신 작업 표시줄 위로 뜨게 되므로 자리를 작업 영역 안으로 당긴다.
+  if (process.platform === 'win32') {
+    mini.setAlwaysOnTop(true, 'pop-up-menu');
+    fitToWorkArea(mini);
+    // **`move`·`resize`가 아니라 `moved`·`resized`다.** 앞의 둘은 끌고 있는 **동안** 계속 뜨고,
+    // 그때 setBounds를 부르면 창이 손과 싸운다(Electron도 그 사이의 setBounds를 WM_EXITSIZEMOVE
+    // 까지 미뤄 둔다). 뒤의 둘은 끌기가 끝날 때 한 번 뜬다 — Linux에는 없지만 문제도 Windows 것이다.
+    mini.on('moved', () => fitToWorkArea(mini));
+    mini.on('resized', () => fitToWorkArea(mini));
+    // 모니터를 뽑거나 작업 표시줄이 옮겨지면 지금 자리가 작업 영역 밖이 된다.
+    // **창과 함께 떼어낸다** — screen은 앱 수명 내내 살아 있어서 미니를 여닫을 때마다 쌓인다.
+    miniFit = () => fitToWorkArea(mini);
+    screen.on('display-metrics-changed', miniFit);
+  }
 
   // 그래도 다른 앱이 topmost를 뺏어 가면 우리가 초점을 잃을 때 다시 올린다.
   // `moveTop`은 초점을 가져오지 않으므로 방금 누른 창을 방해하지 않는다.
@@ -487,6 +527,10 @@ function createMini() {
   mini.on('resize', remember);
   mini.on('move', remember);
   mini.on('closed', () => {
+    if (miniFit) {
+      screen.off('display-metrics-changed', miniFit);
+      miniFit = null;
+    }
     mini = null;
   });
 }
