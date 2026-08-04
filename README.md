@@ -181,9 +181,11 @@ Automatic installation is blocked for unsigned macOS builds, so there a new vers
   **gathered in one place**. The front row is whoever is waiting on you, stuck or failed, with a
   name and how long it has been like that; the back row is everyone working, unnamed. No waiting,
   no front row. Nobody wanders in this window — there is no reason to chase a moving target in a
-  view you only glance at. **Hover a crab and the one-line header tells you which room it is in**;
-  click it and the window grows back with that session selected. Size, position and mode are
-  remembered, so it comes back the way you left it
+  view you only glance at. **Hover a crab and the one-line header tells you which room it is in and
+  how full its context is**; click it and the window grows back with that session selected. The
+  right end of that line carries the session (5h) and weekly usage — it folds away first on a narrow
+  window so the waiting count never gets clipped. Size, position and mode are remembered, so it
+  comes back the way you left it
 - **Waiting on you** in the tray menu lists whatever is waiting, longest first — click one and
   **its terminal opens right there.** No need to open the window and hunt for the desk
 - Three **global shortcuts** (rebind them in Settings) — `Ctrl+Alt+O` shows and hides the window,
