@@ -14,17 +14,107 @@
   font-display: swap;
 }
 
+/* 껍데기(상단바·패널·창) 본문 서체 — Pretendard Variable (OFL 1.1, fonts/PretendardOFL.txt).
+   **선언만 두고 설치를 기대하면 안 된다.** 파일을 넣기 전에는 설치한 사람만 Pretendard를 보고
+   나머지는 조용히 Malgun Gothic으로 떨어졌다 — 자간과 숫자 폭이 달라 tabular-nums로 맞춰 둔
+   정렬까지 사람마다 어긋났다. 가변 폰트 한 파일이 100~900을 다 내므로 굵기별 파일은 없다
+   (합성 볼드가 아니라 실제 700 축을 쓴다).
+
+   시스템에 설치돼 있으면 local()이 먼저 걸려 파일을 읽지 않는다. */
+@font-face {
+  font-family: 'Pretendard Variable';
+  src:
+    local('Pretendard Variable'),
+    url('./fonts/PretendardVariable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-  --bg: #0b0d12;
-  --bg-soft: #12151c;
-  --line: #1e232d;
-  --text: #dde3ee;
-  --dim: #7b8698;
-  --accent: #ffcf5c;
-  --green: #4fbf7f;
-  --red: #e2624a;
-  --blue: #58a6e0;
-  font-family: 'Pretendard', 'Malgun Gothic', system-ui, sans-serif;
+  /* ── 바탕. 위로 갈수록 밝다 — s0(창 바닥) → s3(눌린 것·막대 트랙) */
+  --s0: #0b0d12;
+  --s1: #12151c;
+  --s2: #171b23;
+  --s3: #232936;
+
+  /* ── 선. b0는 줄 사이를 겨우 가르는 정도, b2는 초점·hover에서만 드러난다 */
+  --b0: #171c25;
+  --b1: #1e232d;
+  --b2: #39414f;
+
+  /* ── 글자. t1이 값, t2가 설명, t3가 라벨, t4는 있는 줄만 알면 되는 것 */
+  --t1: #dde3ee;
+  --t2: #7b8698;
+  --t3: #5d6779;
+  --t4: #4d5768;
+  --t-code: #8f9bb0;
+  --dot: #3d4553;
+
+  /* ── 뜻이 있는 색.
+     **노랑(--acc)은 "나를 기다린다"에만 쓴다.** 다른 것에 쓰면 이 앱에서 유일해야 하는
+     신호가 묻힌다 — 문턱 중간값처럼 노란 것이 또 필요하면 --warn을 쓴다. */
+  --acc: #ffcf5c;
+  --acc-line: #4a3c15;
+  --acc-bg: #3d3315;
+  --acc-card: #201b0d;
+  --acc-sunk: #191507;
+  --warn: #e7b24a;
+
+  --work: #58a6e0;
+  --work-fg: #7cc4f5;
+  --work-bg: #14304a;
+  --done: #4fbf7f;
+  --done-fg: #7fd6a0;
+  --done-bg: #17331f;
+  --stuck: #e0a95c;
+  --stuck-bg: #3d2c15;
+  --fail: #e2624a;
+  --fail-fg: #f18a72;
+  --fail-bg: #3d1d18;
+
+  /* 주 동작(터미널 열기) — 초록이지만 --done과 다른 축이다. 끝났다는 뜻이 아니라 누르라는 뜻이다 */
+  --go-line: #2d6a4a;
+  --go-bg: #142019;
+  --go-fg: #bfe3cd;
+
+  /* ── 캔버스 거울. render.mjs의 BUBBLE_STYLE과 **같은 값이어야 한다** —
+     도움말의 말풍선 범례가 실제로 그려지는 색을 가리키기 때문이다 */
+  --bubble-real: #f2f4f9;
+  --bubble-tag: #4d9ede;
+  --bubble-idle: #333b4a;
+  --bubble-idle-line: #596375;
+
+  /* ── 모서리·여백·글자 크기. 셋 다 단이 정해져 있고 그 사이 값은 쓰지 않는다.
+     예외는 **모양이 값을 정하는 곳**이다 — 15px 원 안의 `?`(9px), 24칸 시간대 축(10px),
+     원(50%). 단에 올리면 글자가 원을 넘치고 축 라벨이 서로 붙는다. */
+  --r0: 2px;
+  --r1: 4px;
+  --r2: 8px;
+  --r-pill: 999px;
+  --sp1: 4px;
+  --sp2: 8px;
+  --sp3: 12px;
+  --sp4: 16px;
+  --sp5: 24px;
+  --fs-cap: 11px;
+  --fs-sm: 12px;
+  --fs: 13px;
+  --fs-lg: 16px;
+  --fs-xl: 22px;
+
+  --shadow: 0 8px 24px rgba(4, 6, 10, 0.55);
+
+  /* 본문 서체는 renderer/fonts/에 번들한 Pretendard Variable이다 (위 @font-face).
+     **MonaS12가 뒤에 서 있는 이유가 있다.** Pretendard에는 `▭ ▣ ▤ ▥ ⊞`가 없다 —
+     미니 모드 버튼과 방 표시(고정·접기·묶기)가 쓰는 글자다. Malgun Gothic이 첫 순위였을
+     때는 그쪽이 대줬는데, Pretendard를 앞에 세우면 그 다섯 글자만 **글자별로** 대체 폰트를
+     찾아 내려가 사람마다 다른 모양(가끔 색까지 다른 기호 폰트)이 나온다.
+     사무실 픽셀 폰트에는 다 있으므로 그 다음 자리에 세워 대는 곳을 못 박아 둔다.
+     이 글자들은 11~13px로만 쓰여 12px 전용 폰트와 크기가 맞는다.
+
+     (제대로는 글자가 아니라 도형으로 그려야 한다 — #116에 적어 뒀다.) */
+  font-family: 'Pretendard Variable', 'Pretendard', 'MonaS12', 'Malgun Gothic', system-ui, sans-serif;
 }
 
 * {
@@ -35,10 +125,99 @@ html,
 body {
   margin: 0;
   height: 100%;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 13px;
+  background: var(--s0);
+  color: var(--t1);
+  font-size: var(--fs);
   overflow: hidden;
+}
+
+/* ── 버튼. 생김새는 셋뿐이다 — 보조(.btn) · 주 동작(.btn-go) · 켜고 끄는 것(.btn-toggle).
+   그 위에 모양만 바꾸는 조각(.btn-round·.btn-pill·.btn-wide·.btn-quiet)을 얹는다.
+
+   전에는 여덟 군데가 각자 padding·radius·배경을 적고 있었고 값이 조금씩 달랐다
+   (3px 9px / 4px 10px / 5px 10px …). 새 버튼을 만들 때 어느 것을 베껄지 알 수 없었던 것이
+   진짜 문제였다 — **동작을 가리키는 클래스(.copy·.go·.hint-btn 등)는 그대로 두고**
+   생김새만 여기로 모았다. JS가 잡는 선택자는 건드리지 않는다. */
+.btn {
+  padding: var(--sp1) 9px;
+  border: 1px solid var(--b1);
+  border-radius: var(--r1);
+  background: var(--s2);
+  color: var(--t2);
+  font: inherit;
+  font-size: var(--fs-sm);
+  line-height: 1.35;
+  cursor: pointer;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--b2);
+  color: var(--t1);
+}
+/* 키보드로 옮겨 다닐 때 지금 어디인지 — 전에는 표시가 아예 없었다.
+   노랑은 대기 전용이라 초점에는 파랑을 쓴다 */
+.btn:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--work);
+  outline-offset: 1px;
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* 주 동작 — 누르라는 뜻의 초록이다(--done의 "끝났다"와 다른 축이라 색을 따로 둔다).
+   :hover에서 글자색을 되돌려야 한다 — 위 .btn:hover가 t1로 덮기 때문이다 */
+.btn-go {
+  border-color: var(--go-line);
+  background: var(--go-bg);
+  color: var(--go-fg);
+}
+.btn-go:hover:not(:disabled) {
+  border-color: var(--done);
+  color: var(--go-fg);
+}
+
+/* 켜진 상태가 있는 것 — 탭 · 고정/접기 표시 */
+.btn-toggle.on {
+  border-color: var(--b2);
+  background: var(--s3);
+  color: var(--t1);
+}
+
+.btn-round {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: var(--r-pill);
+  text-align: center;
+  line-height: 1;
+}
+/* 제목 옆에 붙는 `?` — 원이 작아 글자 크기가 모양에 끌려간다(단에 올리면 원을 넘친다) */
+.btn-round.sm {
+  width: 15px;
+  height: 15px;
+  font-size: 9px;
+  vertical-align: middle;
+}
+.btn-pill {
+  padding: 2px 9px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-cap);
+}
+.btn-quiet {
+  border-color: transparent;
+  background: none;
+}
+/* 폭을 다 쓰고 양끝으로 벌리는 것 — 명령 복사처럼 안에 두 덩이가 서는 버튼 */
+.btn-wide {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp2);
+  width: 100%;
+  padding: var(--sp2) 10px;
+  border-radius: var(--r2);
 }
 
 #topbar {
@@ -47,48 +226,48 @@ body {
   gap: 16px;
   height: 42px;
   padding: 0 14px;
-  border-bottom: 1px solid var(--line);
-  background: var(--bg-soft);
+  border-bottom: 1px solid var(--b1);
+  background: var(--s1);
 }
 
 #topbar h1 {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs);
   letter-spacing: 0.04em;
-  color: var(--accent);
+  color: var(--acc);
 }
 
 #stats {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--dim);
+  color: var(--t2);
 }
 #stats b {
-  color: var(--text);
+  color: var(--t1);
 }
 #stats i {
-  color: #39414f;
+  color: var(--b2);
   font-style: normal;
 }
 #stats .t {
-  color: var(--blue);
+  color: var(--work);
   font-weight: 700;
 }
 #stats .w {
-  color: var(--accent);
+  color: var(--acc);
   font-weight: 700;
 }
 #stats .s {
-  color: #e0a95c;
+  color: var(--stuck);
   font-weight: 700;
 }
 #stats .f {
-  color: var(--red);
+  color: var(--fail);
   font-weight: 700;
 }
 #stats .dim {
-  color: #58616f;
+  color: var(--t3);
 }
 
 #topbar .right {
@@ -96,31 +275,14 @@ body {
   display: flex;
   gap: 12px;
   align-items: center;
-  color: var(--dim);
+  color: var(--t2);
   font-variant-numeric: tabular-nums;
 }
 #conn.ok {
-  color: var(--green);
+  color: var(--done);
 }
 #conn.bad {
-  color: var(--red);
-}
-
-#cfg-open,
-#att-open {
-  padding: 3px 9px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  background: #171b23;
-  color: var(--dim);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-#cfg-open:hover,
-#att-open:hover {
-  border-color: #39414f;
-  color: var(--text);
+  color: var(--fail);
 }
 
 main {
@@ -145,10 +307,10 @@ body.mini #mini-bar {
   gap: 8px;
   height: 22px;
   padding: 0 6px 0 9px;
-  border-bottom: 1px solid var(--line);
-  background: var(--bg-soft);
-  font-size: 11px;
-  color: var(--dim);
+  border-bottom: 1px solid var(--b1);
+  background: var(--s1);
+  font-size: var(--fs-cap);
+  color: var(--t2);
   /* 창을 끄는 자리 — 버튼만 빼고 전부 손잡이다 */
   -webkit-app-region: drag;
 }
@@ -164,29 +326,20 @@ body.mini #stage::-webkit-scrollbar {
   display: none;
 }
 #mini-stats .w {
-  color: var(--accent);
+  color: var(--acc);
 }
 #mini-stats .s {
-  color: #e0a95c;
+  color: var(--stuck);
 }
 #mini-stats .f {
-  color: var(--red);
+  color: var(--fail);
 }
+/* 미니 모드의 손잡이 위에 서므로 여기만 드래그에서 빼 준다 */
 #mini-grow {
   margin-left: auto;
   padding: 0 5px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: none;
-  color: var(--dim);
-  font: inherit;
   line-height: 18px;
-  cursor: pointer;
   -webkit-app-region: no-drag;
-}
-#mini-grow:hover {
-  border-color: var(--line);
-  color: var(--text);
 }
 
 #stage {
@@ -200,9 +353,9 @@ body.mini #stage::-webkit-scrollbar {
   margin: 40px auto;
   max-width: 380px;
   text-align: center;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.7;
-  color: #5d6779;
+  color: var(--t3);
 }
 
 /* 방 거르기. 평소엔 배경에 묻어 있다가 초점이 오면 드러난다 — 방이 서넛일 땐 쓸 일이 없다 */
@@ -210,32 +363,27 @@ body.mini #stage::-webkit-scrollbar {
   width: 108px;
   padding: 3px 8px;
   border: 1px solid transparent;
-  border-radius: 999px;
-  background: #141821;
-  color: var(--text);
+  border-radius: var(--r-pill);
+  background: var(--s2);
+  color: var(--t1);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 #room-filter:hover {
-  border-color: var(--line);
+  border-color: var(--b1);
 }
 #room-filter:focus {
-  outline: none;
-  border-color: #39414f;
-  background: #171b23;
+  border-color: var(--b2);
+  background: var(--s2);
 }
+/* 걸러진 방이 있다는 배지. "지금 화면이 다가 아니다"는 주의 신호여서 --warn을 쓴다 —
+   노랑 계열이지만 대기(--acc)와는 다른 축이다 */
 #room-shown {
-  padding: 2px 8px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: none;
-  color: var(--accent);
-  font: inherit;
-  font-size: 11px;
-  cursor: pointer;
+  color: var(--warn);
 }
 #room-shown:hover {
-  border-color: var(--accent);
+  border-color: var(--warn);
+  color: var(--warn);
 }
 
 #office {
@@ -246,14 +394,14 @@ body.mini #stage::-webkit-scrollbar {
 #panel {
   width: 330px;
   flex: none;
-  border-left: 1px solid var(--line);
-  background: var(--bg-soft);
+  border-left: 1px solid var(--b1);
+  background: var(--s1);
   overflow-y: auto;
   padding: 14px;
 }
 
 .empty p {
-  color: var(--dim);
+  color: var(--t2);
   line-height: 1.6;
 }
 
@@ -265,14 +413,14 @@ body.mini #stage::-webkit-scrollbar {
   font-size: 30px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  color: var(--text);
+  color: var(--t1);
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
 }
 .now-date {
   margin-top: 2px;
-  font-size: 12px;
-  color: var(--dim);
+  font-size: var(--fs-sm);
+  color: var(--t2);
   font-variant-numeric: tabular-nums;
 }
 
@@ -286,12 +434,12 @@ body.mini #stage::-webkit-scrollbar {
   align-items: baseline;
   gap: 8px;
   margin-bottom: 4px;
-  font-size: 12px;
-  color: var(--dim);
+  font-size: var(--fs-sm);
+  color: var(--t2);
 }
 .gauge-head b {
   font-variant-numeric: tabular-nums;
-  font-size: 13px;
+  font-size: var(--fs);
 }
 .gauge-foot {
   display: flex;
@@ -300,44 +448,44 @@ body.mini #stage::-webkit-scrollbar {
   margin-top: 3px;
 }
 .gauge-foot small {
-  font-size: 11px;
-  color: #5d6779;
+  font-size: var(--fs-cap);
+  color: var(--t3);
   font-variant-numeric: tabular-nums;
 }
 
 .bar {
   height: 6px;
-  border-radius: 3px;
-  background: #232936;
+  border-radius: var(--r-pill);
+  background: var(--s3);
   overflow: hidden;
 }
 .bar i {
   display: block;
   height: 100%;
-  border-radius: 3px;
-  background: #3d4553;
+  border-radius: var(--r-pill);
+  background: var(--dot);
   transition: width 0.4s ease;
 }
 .bar i.lv-ok {
-  background: var(--green);
+  background: var(--done);
 }
 .bar i.lv-mid {
-  background: #e7b24a;
+  background: var(--warn);
 }
 .bar i.lv-hi {
-  background: var(--red);
+  background: var(--fail);
 }
 b.lv-ok {
-  color: var(--green);
+  color: var(--done);
 }
 b.lv-mid {
-  color: #e7b24a;
+  color: var(--warn);
 }
 b.lv-hi {
-  color: var(--red);
+  color: var(--fail);
 }
 b.lv-na {
-  color: #5d6779;
+  color: var(--t3);
 }
 
 /* 패널 바닥에 붙는 버전 한 줄. 기본 화면에서만 패널이 flex 열이 되고(app.mjs가 .idle을 붙인다)
@@ -352,74 +500,74 @@ b.lv-na {
      margin에 기대면 내용과 붙어 버린다. */
   margin: auto 0 0;
   padding-top: 14px;
-  border-top: 1px solid #171c25;
-  font-size: 11px;
-  color: #4d5768;
+  border-top: 1px solid var(--b0);
+  font-size: var(--fs-cap);
+  color: var(--t4);
 }
 
 .hint {
   margin: 12px 0 0;
-  font-size: 11px;
+  font-size: var(--fs-cap);
   line-height: 1.6;
-  color: #5d6779;
+  color: var(--t3);
 }
 .hint.warn {
-  color: var(--accent);
+  color: var(--warn);
 }
 .hint code,
 .block code {
   font-family: 'Cascadia Code', Consolas, monospace;
-  font-size: 11px;
-  color: #8f9bb0;
+  font-size: var(--fs-cap);
+  color: var(--t-code);
   word-break: break-all;
 }
 
 .who h2 {
   margin: 6px 0 2px;
-  font-size: 15px;
+  font-size: var(--fs-lg);
   word-break: break-all;
 }
 .who .subtitle {
   margin: 0 0 3px;
-  font-size: 12px;
-  color: var(--dim);
+  font-size: var(--fs-sm);
+  color: var(--t2);
   line-height: 1.5;
 }
 .who .cwd {
   margin: 0;
-  font-size: 11px;
-  color: #5d6779;
+  font-size: var(--fs-cap);
+  color: var(--t3);
   word-break: break-all;
 }
 
 .mood {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-cap);
   font-weight: 700;
-  background: #232936;
-  color: var(--dim);
+  background: var(--s3);
+  color: var(--t2);
 }
 .mood.typing {
-  background: #14304a;
-  color: #7cc4f5;
+  background: var(--work-bg);
+  color: var(--work-fg);
 }
 .mood.waiting {
-  background: #3d3315;
-  color: var(--accent);
+  background: var(--acc-bg);
+  color: var(--acc);
 }
 .mood.stuck {
-  background: #3d2c15;
-  color: #e0a95c;
+  background: var(--stuck-bg);
+  color: var(--stuck);
 }
 .mood.failed {
-  background: #3d1d18;
-  color: #f18a72;
+  background: var(--fail-bg);
+  color: var(--fail-fg);
 }
 .mood.done {
-  background: #17331f;
-  color: #7fd6a0;
+  background: var(--done-bg);
+  color: var(--done-fg);
 }
 
 .facts {
@@ -428,8 +576,8 @@ b.lv-na {
   gap: 6px 10px;
   margin: 14px 0;
   padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  border: 1px solid var(--b1);
+  border-radius: var(--r2);
 }
 .facts div {
   display: flex;
@@ -440,7 +588,7 @@ b.lv-na {
   flex: none;
   /* 값이 길면 라벨이 눌려 "모/델"로 쪼개진다 — 라벨은 접지 않고 값을 흘린다 */
   white-space: nowrap;
-  color: #5d6779;
+  color: var(--t3);
 }
 .facts dd {
   margin: 0;
@@ -458,10 +606,10 @@ b.lv-na {
 }
 .block h3 {
   margin: 0 0 6px;
-  font-size: 11px;
+  font-size: var(--fs-cap);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #5d6779;
+  color: var(--t3);
 }
 .block p {
   margin: 0;
@@ -469,28 +617,28 @@ b.lv-na {
   word-break: break-word;
 }
 .block .dim {
-  color: var(--dim);
+  color: var(--t2);
 }
 
 .block.need {
   padding: 10px;
-  border: 1px solid #4a3c15;
-  border-radius: 6px;
-  background: #201b0d;
+  border: 1px solid var(--acc-line);
+  border-radius: var(--r2);
+  background: var(--acc-card);
 }
 .block.need h3 {
-  color: var(--accent);
+  color: var(--acc);
 }
 .block.need .reply {
   margin-top: 8px;
-  color: var(--dim);
-  font-size: 12px;
+  color: var(--t2);
+  font-size: var(--fs-sm);
 }
 /* 기다린 시간 — 1초마다 갈아 끼운다. 첫 tick 전에는 비어 있으므로 여백째로 접어둔다. */
 .block.need .waited {
   margin-bottom: 6px;
-  color: var(--accent);
-  font-size: 12px;
+  color: var(--acc);
+  font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
 }
 .block.need .waited:empty {
@@ -499,24 +647,16 @@ b.lv-na {
 
 /* ── 승인받은 계획. 제목 한 줄 + 파일 열기. */
 .block.plan p:first-of-type {
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
+/* 파일을 여는 버튼이라 글자는 파랑으로 둔다 — 링크와 같은 몸짓이다 */
 .plan-open {
-  margin-top: 8px;
-  padding: 4px 10px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  background: #151a22;
-  color: var(--blue);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
+  margin-top: var(--sp2);
+  color: var(--work);
 }
 .plan-open:hover:not(:disabled) {
-  border-color: var(--blue);
-}
-.plan-open:disabled {
-  opacity: 0.5;
+  border-color: var(--work);
+  color: var(--work);
 }
 /* 실패했을 때만 글자가 들어온다 — 빈 동안은 여백째로 접어 둔다 */
 .plan-msg:empty {
@@ -526,12 +666,12 @@ b.lv-na {
 /* ── 세션이 세운 할 일 목록. 진행 막대 + 아직 안 끝난 항목. */
 .block h3 .todo-count {
   margin-left: 6px;
-  color: var(--dim);
+  color: var(--t2);
   font-variant-numeric: tabular-nums;
 }
 /* 다 찬 것이 좋은 막대라서 문턱 색(lv-*)을 쓰지 않고 초록 한 색으로 둔다 */
 .bar.todo i {
-  background: var(--green);
+  background: var(--done);
 }
 .todos {
   list-style: none;
@@ -549,24 +689,24 @@ b.lv-na {
 }
 .todos p {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.5;
-  color: var(--dim);
+  color: var(--t2);
 }
 /* 진행 중인 항목만 또렷하다 — 목록에서 눈이 먼저 가야 하는 한 줄이다 */
 .todos li.in_progress p {
-  color: var(--text);
+  color: var(--t1);
 }
 .todos .mark {
   width: 7px;
   height: 7px;
-  border: 1px solid #3d4553;
-  border-radius: 2px;
+  border: 1px solid var(--dot);
+  border-radius: var(--r0);
   transform: translateY(-1px);
 }
 .todos li.in_progress .mark {
-  border-color: var(--blue);
-  background: var(--blue);
+  border-color: var(--work);
+  background: var(--work);
 }
 /* 막힌 항목은 **빨강으로 칠하지 않는다.** 이 앱에서 빨강은 실패·위험이고(실패 점, 컨텍스트 85%),
    순서를 기다리는 항목은 잘못된 게 아니라 아직 차례가 아닌 것이다. 목록에서 또렷해야 하는 것은
@@ -576,8 +716,8 @@ b.lv-na {
 }
 .todos em {
   margin-left: 6px;
-  color: #5d6779;
-  font-size: 11px;
+  color: var(--t3);
+  font-size: var(--fs-cap);
   font-style: normal;
   white-space: nowrap;
 }
@@ -589,23 +729,14 @@ b.lv-na {
   right: 14px;
   bottom: 14px;
   z-index: 20;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: #1b2029;
-  color: var(--dim);
-  font: inherit;
-  font-size: 13px;
-  line-height: 1;
-  cursor: pointer;
+  font-size: var(--fs);
 }
+/* 열려 있는 동안은 hover와 같은 모습으로 둔다 — 눌린 채라는 표시다 */
 #help-open:hover,
 #help-open.on {
-  border-color: #39414f;
-  background: #232936;
-  color: var(--text);
+  border-color: var(--b2);
+  background: var(--s3);
+  color: var(--t1);
 }
 
 #help {
@@ -615,23 +746,23 @@ b.lv-na {
   z-index: 20;
   width: min(310px, calc(100vw - 28px));
   padding: 12px 13px;
-  border: 1px solid #39414f;
-  border-radius: 8px;
-  background: #171c25;
-  box-shadow: 0 8px 24px rgba(4, 6, 10, 0.55);
+  border: 1px solid var(--b2);
+  border-radius: var(--r2);
+  background: var(--s2);
+  box-shadow: var(--shadow);
 }
 #help h3 {
   margin: 0 0 8px;
-  font-size: 11px;
+  font-size: var(--fs-cap);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #5d6779;
+  color: var(--t3);
 }
 #help p {
   margin: 10px 0 0;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.6;
-  color: var(--dim);
+  color: var(--t2);
 }
 
 /* 말풍선 두 종류 안내 — render.mjs의 BUBBLE_STYLE과 색을 맞춰 둔다 */
@@ -647,8 +778,8 @@ b.lv-na {
   display: flex;
   gap: 8px;
   align-items: flex-start;
-  font-size: 12px;
-  color: var(--dim);
+  font-size: var(--fs-sm);
+  color: var(--t2);
   line-height: 1.5;
 }
 .legend .chip {
@@ -656,15 +787,15 @@ b.lv-na {
   width: 16px;
   height: 12px;
   margin-top: 2px;
-  border-radius: 2px;
+  border-radius: var(--r0);
 }
 .legend .chip.real {
-  background: #f2f4f9;
-  box-shadow: inset 2px 0 0 #4d9ede;
+  background: var(--bubble-real);
+  box-shadow: inset 2px 0 0 var(--bubble-tag);
 }
 .legend .chip.idle {
-  background: #333b4a;
-  border: 1px solid #596375;
+  background: var(--bubble-idle);
+  border: 1px solid var(--bubble-idle-line);
 }
 
 .aides {
@@ -680,19 +811,19 @@ b.lv-na {
   gap: 8px;
   align-items: baseline;
   padding: 5px 8px;
-  border: 1px solid var(--line);
-  border-left: 2px solid var(--blue);
-  border-radius: 4px;
-  background: #151a22;
+  border: 1px solid var(--b1);
+  border-left: 2px solid var(--work);
+  border-radius: var(--r1);
+  background: var(--s2);
 }
 .aides b {
   flex: none;
-  font-size: 11px;
-  color: var(--blue);
+  font-size: var(--fs-cap);
+  color: var(--work);
 }
 .aides span {
-  font-size: 12px;
-  color: var(--dim);
+  font-size: var(--fs-sm);
+  color: var(--t2);
   line-height: 1.4;
 }
 
@@ -707,14 +838,14 @@ b.lv-na {
 .links a {
   display: inline-block;
   padding: 3px 8px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  color: var(--blue);
+  border: 1px solid var(--b1);
+  border-radius: var(--r1);
+  color: var(--work);
   text-decoration: none;
   font-variant-numeric: tabular-nums;
 }
 .links a:hover {
-  border-color: var(--blue);
+  border-color: var(--work);
 }
 
 .timeline,
@@ -737,52 +868,54 @@ b.lv-na {
   grid-template-columns: 8px 1fr;
 }
 .timeline time {
-  color: #5d6779;
+  color: var(--t3);
   font-variant-numeric: tabular-nums;
-  font-size: 11px;
+  font-size: var(--fs-cap);
 }
 .timeline p,
 .recent p {
   margin: 0;
-  font-size: 12px;
-  color: var(--dim);
+  font-size: var(--fs-sm);
+  color: var(--t2);
   line-height: 1.5;
 }
 .recent b {
   display: block;
-  font-size: 12px;
-  color: var(--text);
+  font-size: var(--fs-sm);
+  color: var(--t1);
 }
 .recent small {
-  color: #5d6779;
-  font-size: 11px;
+  color: var(--t3);
+  font-size: var(--fs-cap);
 }
 
 .dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #3d4553;
+  background: var(--dot);
   transform: translateY(-1px);
 }
 .dot.working {
-  background: var(--blue);
+  background: var(--work);
 }
 .dot.done {
-  background: var(--green);
+  background: var(--done);
 }
 .dot.failed {
-  background: var(--red);
+  background: var(--fail);
 }
 .dot.stopped {
-  background: #4a5262;
+  background: var(--dot);
 }
 /* 터미널 세션 타임라인 — 잡처럼 상태가 없으니 "받은 지시 / 한 말"로 구분한다 */
+/* 내가 친 지시. 노랑이었지만 그건 대기의 색이라 밝은 중립색으로 바꿨다 —
+   이 줄이 뜻하는 건 "내가 한 말"이지 "나를 기다린다"가 아니다 */
 .dot.prompt {
-  background: var(--accent);
+  background: var(--t1);
 }
 .dot.said {
-  background: var(--blue);
+  background: var(--work);
 }
 
 /* ── 패널 맨 아래: 터미널 열기 + 명령 복사. 열기가 주 동작이라 왼쪽에 두고 초록으로 구분한다. */
@@ -796,44 +929,23 @@ b.lv-na {
   min-width: 0;
   margin-top: 0;
 }
+/* 색은 .btn-go가 낸다 — 여기는 이 자리에서만 필요한 크기와 줄 유지뿐이다 */
 .go {
   flex: none;
-  padding: 8px 12px;
-  border: 1px solid #2d6a4a;
-  border-radius: 6px;
-  background: #142019;
-  color: #bfe3cd;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 11px;
+  padding: var(--sp2) var(--sp3);
+  border-radius: var(--r2);
+  font-size: var(--fs-cap);
   white-space: nowrap;
-}
-.go:hover {
-  border-color: var(--green);
-}
-.go:disabled {
-  opacity: 0.55;
-  cursor: default;
 }
 /* 실패 안내는 있을 때만 자리를 차지한다 */
 .jump-msg:empty {
   display: none;
 }
 
+/* 생김새는 .btn .btn-wide가 낸다 */
 .copy {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  margin-top: 16px;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: #171b23;
-  color: var(--text);
-  cursor: pointer;
-  font-family: inherit;
+  margin-top: var(--sp4);
+  color: var(--t1);
 }
 .copy code {
   flex: 1;
@@ -843,41 +955,38 @@ b.lv-na {
   white-space: nowrap;
   text-align: left;
   font-family: 'Cascadia Code', Consolas, monospace;
-  font-size: 11px;
-  color: #9fb0c8;
+  font-size: var(--fs-cap);
+  color: var(--t-code);
 }
 .copy span {
   flex: none;
   white-space: nowrap;
-  font-size: 11px;
-  color: #5d6779;
-}
-.copy:hover {
-  border-color: #39414f;
+  font-size: var(--fs-cap);
+  color: var(--t3);
 }
 /* 눌렀다는 표시는 색만 여기서 낸다 — 글자는 app.mjs가 갈아 끼운다.
    CSS의 content로 "됨"을 덧붙이던 방식은 한국어에서만 말이 된다(Copy + 됨). */
 .copy.done span {
-  color: var(--green);
+  color: var(--done);
 }
 /* 추천 답 복사는 "나를 기다리는 중" 블록 안에 들어간다 — 그 블록의 노란 톤을 따르고,
    재접속 명령 버튼처럼 폭을 다 쓰지 않는다(주 동작이 아니다). */
 .block.need .reply-copy {
   width: auto;
-  margin-top: 8px;
-  padding: 4px 10px;
-  border-color: #4a3c15;
-  background: #191507;
+  margin-top: var(--sp2);
+  padding: var(--sp1) 10px;
+  border-color: var(--acc-line);
+  background: var(--acc-sunk);
   justify-content: center;
 }
 .block.need .reply-copy span {
-  color: var(--accent);
+  color: var(--acc);
 }
 .block.need .reply-copy:hover {
-  border-color: var(--accent);
+  border-color: var(--acc);
 }
 .block.need .reply-copy.done span {
-  color: var(--green);
+  color: var(--done);
 }
 
 /* ── 설정 창·출근부. 방이 많으면 목록만 길어지므로 창 높이를 묶고 안에서 스크롤한다. */
@@ -886,12 +995,12 @@ b.lv-na {
   width: min(420px, calc(100vw - 32px));
   max-height: calc(100vh - 64px);
   padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--bg-soft);
-  color: var(--text);
+  border: 1px solid var(--b1);
+  border-radius: var(--r2);
+  background: var(--s1);
+  color: var(--t1);
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--fs);
   overflow: hidden;
 }
 #cfg::backdrop,
@@ -904,31 +1013,19 @@ b.lv-na {
   align-items: center;
   gap: 12px;
   padding: 11px 14px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--b1);
 }
+/* 창 제목은 노랑이 아니다 — 노랑은 "나를 기다린다" 하나뿐이어야 하고, 제목은 상태가 아니다 */
 #cfg header h2,
 #att header h2 {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs);
   letter-spacing: 0.04em;
-  color: var(--accent);
+  color: var(--t1);
 }
 #cfg-close,
 #att-close {
   margin-left: auto;
-  padding: 3px 9px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  background: #171b23;
-  color: var(--dim);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-#cfg-close:hover,
-#att-close:hover {
-  border-color: #39414f;
-  color: var(--text);
 }
 #att-body {
   max-height: calc(100vh - 124px);
@@ -963,55 +1060,31 @@ b.lv-na {
 .att-range-pick {
   display: inline-flex;
   flex: none;
-  border: 1px solid var(--line);
-  border-radius: 999px;
+  border: 1px solid var(--b1);
+  border-radius: var(--r-pill);
   overflow: hidden;
 }
+/* 켜짐·꺼짐은 .btn-toggle이 낸다 — 여기는 이어붙이는 데 필요한 것만 지운다.
+   조각들이 한 알약 안에 맞물려야 하므로 테두리와 모서리를 없애고 사이에만 선을 세운다. */
 .att-range-pick button {
   padding: 3px 11px;
   border: 0;
   border-radius: 0;
-  background: #151a22;
-  color: var(--dim);
-  font: inherit;
-  font-size: 11px;
-  cursor: pointer;
+  font-size: var(--fs-cap);
 }
 .att-range-pick button + button {
-  border-left: 1px solid var(--line);
-}
-.att-range-pick button.on {
-  background: #232b3a;
-  color: var(--text);
-}
-.att-range-pick button:hover:not(.on) {
-  color: var(--text);
+  border-left: 1px solid var(--b1);
 }
 
-/* `:not(.hint-btn)`가 중요하다. 이 규칙이 ?에도 걸려 padding 4px 10px·radius 5px·font 12px가
-   먹으면 15px 원이 22px 뭉툭한 사각이 된다 — 탭 바 안의 ?가 깨져 보였던 원인이다. */
-#cfg-tabs button:not(.hint-btn),
-#att-tabs button:not(.hint-btn) {
-  padding: 4px 10px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  background: #171b23;
-  color: var(--dim);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-#cfg-tabs button.on:not(.hint-btn),
-#att-tabs button.on:not(.hint-btn) {
-  border-color: #3d4a5f;
-  background: #1d2431;
-  color: var(--text);
-}
+/* 탭 버튼의 생김새는 .btn .btn-toggle이 낸다.
+   전에는 `#cfg-tabs button:not(.hint-btn)`처럼 **선택자로 ?를 피해야** 했다 — 탭 바 안의
+   물음표에 탭 모양이 먹어 15px 원이 22px 뭉툭한 사각이 됐기 때문이다. 이제는 각 버튼이
+   자기 생김새를 클래스로 들고 오므로 피할 것이 없다. */
 /* 구간을 적는 문장. 토글과 한 줄에 서므로 margin 없이 둔다. */
 .att-range {
   margin: 0;
-  font-size: 11px;
-  color: #5d6779;
+  font-size: var(--fs-cap);
+  color: var(--t3);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1023,12 +1096,12 @@ b.lv-na {
 }
 .att-rooms th {
   padding: 4px 6px;
-  border-bottom: 1px solid var(--line);
-  font-size: 11px;
+  border-bottom: 1px solid var(--b1);
+  font-size: var(--fs-cap);
   font-weight: 400;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #5d6779;
+  color: var(--t3);
   text-align: right;
 }
 .att-rooms th:first-child {
@@ -1036,8 +1109,8 @@ b.lv-na {
 }
 .att-rooms td {
   padding: 5px 6px;
-  border-bottom: 1px solid #171c25;
-  font-size: 12px;
+  border-bottom: 1px solid var(--b0);
+  font-size: var(--fs-sm);
   text-align: right;
 }
 .att-rooms td:first-child {
@@ -1048,11 +1121,11 @@ b.lv-na {
   white-space: nowrap;
 }
 .att-rooms .w {
-  color: var(--accent);
+  color: var(--acc);
 }
 /* 0인 칸은 눈에서 빼 준다 — 숫자가 있는 칸만 읽히게 */
 .att-rooms .z {
-  color: #454d5c;
+  color: var(--t4);
 }
 
 .att-waits {
@@ -1068,15 +1141,15 @@ b.lv-na {
   gap: 8px;
   align-items: baseline;
   padding: 5px 8px;
-  border: 1px solid var(--line);
-  border-left: 2px solid var(--accent);
-  border-radius: 4px;
-  background: #151a22;
-  font-size: 12px;
+  border: 1px solid var(--b1);
+  border-left: 2px solid var(--acc);
+  border-radius: var(--r1);
+  background: var(--s2);
+  font-size: var(--fs-sm);
 }
 .att-waits b {
   flex: none;
-  color: var(--accent);
+  color: var(--acc);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1095,11 +1168,11 @@ b.lv-na {
   gap: 8px;
   align-items: baseline;
   padding: 5px 8px;
-  border: 1px solid var(--line);
-  border-left: 2px solid var(--blue);
-  border-radius: 4px;
-  background: #151a22;
-  font-size: 12px;
+  border: 1px solid var(--b1);
+  border-left: 2px solid var(--work);
+  border-radius: var(--r1);
+  background: var(--s2);
+  font-size: var(--fs-sm);
 }
 .att-mine span {
   flex: 1;
@@ -1110,7 +1183,7 @@ b.lv-na {
 }
 .att-mine b {
   flex: none;
-  color: var(--blue);
+  color: var(--work);
   font-variant-numeric: tabular-nums;
 }
 .att-waits span {
@@ -1119,11 +1192,11 @@ b.lv-na {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--dim);
+  color: var(--t2);
 }
 .att-waits time {
   flex: none;
-  color: #5d6779;
+  color: var(--t3);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1134,7 +1207,7 @@ b.lv-na {
   padding: 7px 0;
 }
 .cfg-row + .cfg-row {
-  border-top: 1px solid #171c25;
+  border-top: 1px solid var(--b0);
 }
 .cfg-row label {
   min-width: 0;
@@ -1150,8 +1223,8 @@ b.lv-na {
 .cfg-row label small {
   display: block;
   margin-top: 1px;
-  font-size: 11px;
-  color: #5d6779;
+  font-size: var(--fs-cap);
+  color: var(--t3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1162,16 +1235,16 @@ b.lv-na {
   flex: none;
   width: 132px;
   padding: 4px 6px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  background: #171b23;
-  color: var(--text);
+  border: 1px solid var(--b1);
+  border-radius: var(--r1);
+  background: var(--s2);
+  color: var(--t1);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 .cfg-row select:hover {
-  border-color: #39414f;
+  border-color: var(--b2);
 }
 
 /* 방 행은 종류와 알림 세기 두 칸이 나란히 선다 — 이름이 설 자리를 남기려면 좁아야 한다 */
@@ -1185,24 +1258,13 @@ b.lv-na {
   gap: 4px;
   margin-top: 3px;
 }
+/* 켜짐은 .btn-toggle이 낸다. 전에는 켜진 표시를 **노랑**으로 냈는데, 이 앱에서 노랑은
+   "나를 기다린다" 하나여야 한다 — 방을 고정해 둔 것과 대기가 같은 색으로 반짝이면
+   사무실을 훑을 때 눈이 헛돈다. */
 .cfg-mark {
   padding: 0 5px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: #171b23;
-  color: #5d6779;
-  font: inherit;
-  font-size: 11px;
+  font-size: var(--fs-cap);
   line-height: 17px;
-  cursor: pointer;
-}
-.cfg-mark:hover {
-  border-color: #39414f;
-  color: var(--text);
-}
-.cfg-mark.on {
-  border-color: var(--accent);
-  color: var(--accent);
 }
 
 /* 알림 종류 — 켜고 끄는 것뿐이라 한 줄에 체크박스와 이름만 둔다 */
@@ -1214,7 +1276,7 @@ b.lv-na {
   cursor: pointer;
 }
 .cfg-check + .cfg-check {
-  border-top: 1px solid #171c25;
+  border-top: 1px solid var(--b0);
 }
 .cfg-check span {
   min-width: 0;
@@ -1223,12 +1285,13 @@ b.lv-na {
   white-space: nowrap;
 }
 .cfg-check + .cfg-row {
-  border-top: 1px solid #171c25;
+  border-top: 1px solid var(--b0);
 }
 
+/* 켜진 체크박스는 "나를 기다린다"가 아니라 "켜져 있다"다 — 파랑을 쓴다 */
 input[type='checkbox'] {
   flex: none;
-  accent-color: var(--accent);
+  accent-color: var(--work);
   cursor: pointer;
 }
 
@@ -1237,66 +1300,51 @@ input[type='checkbox'] {
   flex: none;
   width: 118px;
   padding: 4px 6px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  background: #171b23;
-  color: var(--text);
+  border: 1px solid var(--b1);
+  border-radius: var(--r1);
+  background: var(--s2);
+  color: var(--t1);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .cfg-row input[type='time']:hover {
-  border-color: #39414f;
+  border-color: var(--b2);
 }
 .cfg-sep {
   flex: none;
-  color: #5d6779;
+  color: var(--t3);
 }
 
 /* 단축키 칸 — 누르면 조합을 받는다. select와 같은 폭이라 줄이 흔들리지 않는다 */
+/* 값을 보여주는 칸이라 셀렉트와 같은 폭·같은 글자색으로 둔다 (생김새의 나머지는 .btn) */
 .cfg-key {
   flex: none;
   width: 132px;
-  padding: 4px 6px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  background: #171b23;
-  color: var(--text);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
+  padding: var(--sp1) 6px;
+  color: var(--t1);
 }
-.cfg-key:hover {
-  border-color: #39414f;
+/* 키를 받는 중 — 앱이 내 입력을 기다리는 순간이라 노랑이 맞다.
+   :hover까지 같이 적어야 한다. .btn:hover가 더 구체적이어서 글자색을 되돌려 버린다. */
+.cfg-key.on,
+.cfg-key.on:hover {
+  border-color: var(--acc);
+  color: var(--acc);
 }
-.cfg-key.on {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.cfg-key.bad {
-  border-color: var(--red);
-  color: #f18a72;
+.cfg-key.bad,
+.cfg-key.bad:hover {
+  border-color: var(--fail);
+  color: var(--fail-fg);
 }
 .cfg-row label small.warn {
-  color: #f18a72;
+  color: var(--fail-fg);
 }
 
-/* 설명 접기. 우측 하단 물음표(#help-open)와 같은 모양이라 몸짓이 이어진다 */
 /* ── `?` 설명. 자기가 설명하는 것 **옆에** 붙는다 — 제목 안이거나 탭 바 끝이다.
-   눌러도 아래 내용이 밀리지 않는다(아코디언이 아니라 떠오르는 캡션이다). */
+   눌러도 아래 내용이 밀리지 않는다(아코디언이 아니라 떠오르는 캡션이다).
+   크기와 원 모양은 .btn .btn-round.sm이 낸다 — 우측 하단 물음표(#help-open)와 같은 몸짓이다. */
 .hint-btn {
-  width: 15px;
-  height: 15px;
   margin-left: 6px;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: #1b2029;
-  color: #5d6779;
-  font: inherit;
-  font-size: 9px;
-  line-height: 1;
-  vertical-align: middle;
-  cursor: pointer;
+  color: var(--t3);
 }
 /* 탭 바의 ?는 탭과 **같은 줄** 오른쪽 끝에 붙는다 — 그 판 전체에 관한 설명이다.
    자리가 모자라면 `flex-wrap: wrap`이 알아서 다음 줄로 내린다. */
@@ -1311,49 +1359,30 @@ input[type='checkbox'] {
   z-index: 30;
   width: min(300px, calc(100vw - 28px));
   padding: 10px 12px;
-  border: 1px solid #39414f;
-  border-radius: 8px;
-  background: #171c25;
-  box-shadow: 0 8px 24px rgba(4, 6, 10, 0.55);
-  font-size: 11px;
+  border: 1px solid var(--b2);
+  border-radius: var(--r2);
+  background: var(--s2);
+  box-shadow: var(--shadow);
+  font-size: var(--fs-cap);
   line-height: 1.6;
-  color: var(--dim);
+  color: var(--t2);
 }
 .caption code {
   font-family: 'Cascadia Code', Consolas, monospace;
-  font-size: 11px;
-  color: #8f9bb0;
+  font-size: var(--fs-cap);
+  color: var(--t-code);
 }
 .caption b {
-  color: var(--text);
+  color: var(--t1);
 }
 .hint-btn:hover,
 .hint-btn.on {
-  border-color: #39414f;
-  background: #232936;
-  color: var(--text);
+  border-color: var(--b2);
+  background: var(--s3);
+  color: var(--t1);
 }
-/* 버튼 바로 아래 붙는 설명이라 위 여백은 버튼이 만든다 */
-
-
 .cfg-reset {
-  margin-top: 12px;
-  padding: 5px 10px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  background: #171b23;
-  color: var(--dim);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-.cfg-reset:hover {
-  border-color: #39414f;
-  color: var(--text);
-}
-.cfg-reset:disabled {
-  opacity: 0.45;
-  cursor: default;
+  margin-top: var(--sp3);
 }
 
 ::-webkit-scrollbar {
@@ -1361,8 +1390,8 @@ input[type='checkbox'] {
   height: 9px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #232936;
-  border-radius: 5px;
+  background: var(--s3);
+  border-radius: var(--r1);
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -1374,16 +1403,16 @@ input[type='checkbox'] {
 }
 .att-code h3 {
   margin: 0 0 6px;
-  font-size: 11px;
+  font-size: var(--fs-cap);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #5d6779;
+  color: var(--t3);
 }
 .att-code h4 {
   margin: 14px 0 6px;
-  font-size: 11px;
+  font-size: var(--fs-cap);
   font-weight: 400;
-  color: #5d6779;
+  color: var(--t3);
 }
 
 /* 막대 그래프. 패널의 .bar는 가로로 차지만 이쪽은 세로로 자란다 — 높이는 app.mjs의
@@ -1406,8 +1435,8 @@ input[type='checkbox'] {
 }
 .spark i {
   width: 100%;
-  background: var(--blue);
-  border-radius: 1px;
+  background: var(--work);
+  border-radius: var(--r0);
   opacity: 0.75;
 }
 .spark li:hover i {
@@ -1419,12 +1448,12 @@ input[type='checkbox'] {
   gap: 4px;
 }
 .spark.trend i {
-  background: var(--accent);
+  background: var(--acc);
   opacity: 0.85;
 }
 /* 앱을 안 켠 날 — 막대 대신 점선 바닥만. 0으로 그리면 "아무도 안 기다렸다"는 거짓말이 된다 */
 .spark.trend li.unseen {
-  border-bottom: 1px dashed #39414f;
+  border-bottom: 1px dashed var(--b2);
 }
 .spark.trend li.unseen i {
   background: none;
@@ -1436,7 +1465,7 @@ input[type='checkbox'] {
   display: flex;
   gap: 4px;
   font-size: 10px;
-  color: #4d5768;
+  color: var(--t4);
   font-variant-numeric: tabular-nums;
 }
 .spark-axis li {
@@ -1451,24 +1480,24 @@ input[type='checkbox'] {
   gap: 1px;
 }
 .spark.hours i {
-  background: #6b7688;
+  background: var(--t2);
 }
 
 /* 방 별칭 칸. 종류·세기 셀렉트와 한 줄에 서므로 좁게 둔다. */
 .cfg-alias {
   width: 92px;
   padding: 3px 6px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  background: #171b23;
-  color: var(--text);
+  border: 1px solid var(--b1);
+  border-radius: var(--r1);
+  background: var(--s2);
+  color: var(--t1);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .cfg-alias:focus {
   outline: none;
-  border-color: #39414f;
+  border-color: var(--b2);
 }
 .cfg-alias::placeholder {
-  color: #4d5768;
+  color: var(--t4);
 }

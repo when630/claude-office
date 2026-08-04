@@ -20,11 +20,11 @@
         <!-- 이름으로 거르기. 방이 서넛일 때는 쓸 일이 없어 눈에 안 띄게 두고,
              걸러진 방이 생기면 옆의 배지가 그 사실을 알린다. -->
         <input id="room-filter" type="search" autocomplete="off" spellcheck="false" data-i18n-ph="topbar.filter" />
-        <button id="room-shown" type="button" hidden></button>
+        <button id="room-shown" class="btn btn-pill" type="button" hidden></button>
         <span id="clock"></span>
-        <button id="mini-open" type="button" data-i18n-title="topbar.mini">▭</button>
-        <button id="att-open" type="button" data-i18n="topbar.attendance" data-i18n-title="topbar.attendance"></button>
-        <button id="cfg-open" type="button" data-i18n="topbar.settings" data-i18n-title="topbar.settings"></button>
+        <button id="mini-open" class="btn" type="button" data-i18n-title="topbar.mini">▭</button>
+        <button id="att-open" class="btn" type="button" data-i18n="topbar.attendance" data-i18n-title="topbar.attendance"></button>
+        <button id="cfg-open" class="btn" type="button" data-i18n="topbar.settings" data-i18n-title="topbar.settings"></button>
       </div>
     </header>
 
@@ -32,7 +32,7 @@
          큰 창으로 돌아가는 길도 여기 있다. 평소에는 style.css가 감춰 둔다. -->
     <header id="mini-bar">
       <span id="mini-stats"></span>
-      <button id="mini-grow" type="button" data-i18n-title="mini.grow">▣</button>
+      <button id="mini-grow" class="btn btn-quiet" type="button" data-i18n-title="mini.grow">▣</button>
     </header>
 
     <main>
@@ -43,7 +43,7 @@
 
     <!-- 한 번 읽으면 되는 안내는 기본 화면에서 빼고 여기 접어둔다.
          뼈대는 고정이고 문구만 app.mjs가 채운다(data-i18n) — 언어를 바꾸면 다시 채워진다. -->
-    <button id="help-open" type="button" data-i18n-title="help.button" aria-expanded="false" aria-controls="help">?</button>
+    <button id="help-open" class="btn btn-round" type="button" data-i18n-title="help.button" aria-expanded="false" aria-controls="help">?</button>
     <div id="help" hidden>
       <h3 data-i18n="help.title"></h3>
       <ul class="legend">
@@ -58,7 +58,7 @@
     <dialog id="cfg">
       <header>
         <h2 data-i18n="cfg.title"></h2>
-        <button id="cfg-close" type="button" data-i18n="common.close" data-i18n-title="common.close"></button>
+        <button id="cfg-close" class="btn" type="button" data-i18n="common.close" data-i18n-title="common.close"></button>
       </header>
       <!-- 설정이 다섯 갈래로 늘어 한 두루마리에 다 세우면 찾는 데 스크롤이 필요하다.
            탭 바는 헤더 아래 고정이고, 아래 몸통만 굴러간다. -->
@@ -73,7 +73,7 @@
     <dialog id="att">
       <header>
         <h2 data-i18n="att.title"></h2>
-        <button id="att-close" type="button" data-i18n="common.close" data-i18n-title="common.close"></button>
+        <button id="att-close" class="btn" type="button" data-i18n="common.close" data-i18n-title="common.close"></button>
       </header>
       <!-- 내용이 여섯 갈래로 늘어 한 두루마리에 다 세우면 찾는 데 스크롤이 필요하다.
            탭은 **무엇을 보나**이고 구간(오늘/최근 7일)은 그 안의 토글이다 — 두 축을 한 줄에
