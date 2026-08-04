@@ -385,13 +385,9 @@ body.mini #mini-bar {
 body.mini main {
   height: calc(100% - 22px);
 }
-/* 좁은 창에서 스크롤바까지 서면 그만큼 사무실이 줄어든다 — 스크롤은 되되 막대는 감춘다 */
+/* 좁은 창에서는 여백도 아끼운다 — 스크롤바는 애초에 없다(#stage는 overflow: hidden) */
 body.mini #stage {
   padding: 6px;
-  scrollbar-width: none;
-}
-body.mini #stage::-webkit-scrollbar {
-  display: none;
 }
 /* 미니 모드도 큰 창과 같은 위계다 — 대기가 먼저 서고 총원은 가라앉는다.
    22px 줄에 칩을 세울 자리는 없으니 굵기와 색으로만 낸다. */
@@ -433,10 +429,19 @@ body.mini #stage::-webkit-scrollbar {
   -webkit-app-region: no-drag;
 }
 
+/* 사무실은 스크롤이 아니라 **우리가 놓는다.** 스크롤은 0보다 작아질 수 없어 왼쪽 위 꼭짓점에
+   갇히는데, 확대해 놓고 나면 바로 그 모서리 근처를 화면 가운데로 데려올 수 없다.
+   캔버스는 보이는 창만큼이고 그 안에서 사무실이 움직인다(app.mjs의 panX·panY).
+   absolute로 띄우는 것은 **자리를 옮기려는 게 아니라** 안내(#stage-empty)를 밀어내지 않기
+   위해서다 — 좌표를 주지 않으므로 여백 안쪽에 그대로 선다. */
 #stage {
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
+  position: relative;
   padding: 12px;
+}
+#stage > canvas {
+  position: absolute;
 }
 
 /* 전부 걸러졌을 때의 안내 — 빈 캔버스는 고장으로 읽힌다 */

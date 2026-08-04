@@ -410,13 +410,20 @@ export function clearTextCache() {
   fitCache.clear();
 }
 
-function drawFloor(ctx, w, h, tint = { l: 1, s: 1 }) {
+// 바닥은 **보이는 범위를 그대로 채운다**(사무실 크기가 아니다) — 끌어 옮겼을 때 바닥이 끝나고
+// 껍데기 배경이 드러나면 사무실이 종이처럼 잘려 보인다. 사무실은 세계 좌표 어디로든 옮겨지므로
+// 격자는 8px 세계 격자에 맞춰 시작한다 — 화면 기준으로 그으면 끌 때마다 격자가 떨린다.
+function drawFloor(ctx, area, tint = { l: 1, s: 1 }) {
+  const x0 = Math.floor(area.x);
+  const y0 = Math.floor(area.y);
+  const x1 = Math.ceil(area.x + area.w);
+  const y1 = Math.ceil(area.y + area.h);
   // 방만 어둡게 하면 바깥 바닥이 떠 보인다 — 같은 배율로 함께 내린다.
   // 회색(채도 0)이라 채도 배율은 뜻이 없어 명도만 쓴다.
-  rect(ctx, 0, 0, w, h, shade(COLORS.floor, tint.l));
+  rect(ctx, x0, y0, x1 - x0, y1 - y0, shade(COLORS.floor, tint.l));
   ctx.fillStyle = shade(COLORS.floorLine, tint.l);
-  for (let gx = 0; gx < w; gx += 8) ctx.fillRect(gx, 0, 1, h);
-  for (let gy = 0; gy < h; gy += 8) ctx.fillRect(0, gy, w, 1);
+  for (let gx = Math.floor(x0 / 8) * 8; gx < x1; gx += 8) ctx.fillRect(gx, y0, 1, y1 - y0);
+  for (let gy = Math.floor(y0 / 8) * 8; gy < y1; gy += 8) ctx.fillRect(x0, gy, x1 - x0, 1);
 }
 
 // 방 종류별 바닥 무늬. 러그 하나로는 개발실과 라운지가 구분되지 않는다.
@@ -1851,8 +1858,11 @@ function findChats(walkers) {
   return chats;
 }
 
+// 캔버스는 **보이는 창**이고 사무실이 그 안에서 움직인다(app.mjs의 panX·panY).
+// 세계 좌표 → 화면은 `world * scale + pan`이다. 전에는 캔버스가 사무실만큼 컸는데,
+// 그러면 8배로 확대했을 때 수천만 픽셀짜리 비트맵을 매 프레임 다시 그리고 바닥도 거기서 끝난다.
 export function render(ctx, view, opts) {
-  const { scale, dpr, t, hover, selected } = opts;
+  const { scale, dpr, t, hover, selected, pan = { x: 0, y: 0 } } = opts;
   const labels = [];
 
   // 자리·바닥 전환 단계를 먼저 정한다 — 아래 그리는 순서가 전부 이걸 본다.
@@ -1883,9 +1893,14 @@ export function render(ctx, view, opts) {
   // 방마다 다르다 — 퇴근한 방은 그 위에 한 번 더 어두워진다
   for (const box of view.boxes) box.tint = roomTint(box.room, tint);
 
-  ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+  ctx.setTransform(scale * dpr, 0, 0, scale * dpr, pan.x * dpr, pan.y * dpr);
   ctx.imageSmoothingEnabled = false;
-  drawFloor(ctx, view.width, view.height, tint);
+  // 보이는 창을 세계 좌표로 되돌려 그만큼만 바닥을 깐다
+  drawFloor(
+    ctx,
+    { x: -pan.x / scale, y: -pan.y / scale, w: ctx.canvas.width / (scale * dpr), h: ctx.canvas.height / (scale * dpr) },
+    tint,
+  );
   for (const box of view.boxes) drawRoom(ctx, box, labels, t);
 
   // 자리 줄 먼저, 그다음 바닥의 게들을 y 순으로 — 앞에 선 게가 뒤를 가린다.
@@ -1987,7 +2002,8 @@ export function render(ctx, view, opts) {
     ctx.fillStyle = l.color;
     const shift = l.align === 'center' ? ctx.measureText(l.text).width / 2 : l.align === 'right' ? ctx.measureText(l.text).width : 0;
     if (l.alpha != null) ctx.globalAlpha = l.alpha;
-    ctx.fillText(l.text, Math.round(l.x * scale - shift), Math.round(l.y * scale));
+    // 확대 변환 밖이므로 사무실이 놓인 자리를 여기서 더해 준다
+    ctx.fillText(l.text, Math.round(l.x * scale + pan.x - shift), Math.round(l.y * scale + pan.y));
     if (l.alpha != null) ctx.globalAlpha = 1;
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
