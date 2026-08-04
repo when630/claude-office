@@ -1082,9 +1082,11 @@ let shownWaitMin = -1;
 let miniHover = null;
 
 function setMiniHover(seat) {
-  const next = seat ? { room: seat.room?.label ?? seat.worker.room ?? '', name: panelName(seat.worker) } : null;
+  const next = seat
+    ? { key: seat.worker.key, room: seat.room?.label ?? seat.worker.room ?? '', name: panelName(seat.worker) }
+    : null;
   // 같은 게 위를 지나는 동안 손잡이를 매 프레임 다시 짜지 않는다
-  if ((next?.room ?? null) === (miniHover?.room ?? null) && (next?.name ?? null) === (miniHover?.name ?? null)) return;
+  if (next?.key === miniHover?.key) return;
   miniHover = next;
   drawMiniStats();
 }
@@ -1094,10 +1096,17 @@ function setMiniHover(seat) {
 // 전에는 총원이 맨 앞에 굵게 있었고 대기가 그 뒤에 섞여 있었다.
 function drawMiniStats() {
   // 마우스를 올린 동안에는 숫자를 접고 그 게가 누구인지 적는다. 놓으면 숫자로 돌아온다.
+  //
+  // 경과 시간을 **여기서 다시 잰다.** 좁은 창에서는 그 줄이 화면에서 접히는데(miniPlan의 상세도가
+  // 뒷줄을 살리려 내려간다), 접힌 글자는 올려 보면 나와야 그 거래가 손실이 아니다.
+  // 그래서 miniHover는 키만 들고 있고 값은 그릴 때 살아 있는 워커에서 가져온다 — 값을 담아 두면
+  // 스냅샷이 안 올 동안 분이 멈춘다.
   if (miniHover) {
+    const w = findWorker(miniHover.key);
     miniStatsEl.innerHTML = [
       `<span class="rm">${esc(miniHover.room)}</span>`,
       miniHover.name ? `<span class="nm">${esc(miniHover.name)}</span>` : '',
+      w ? esc(miniNote(w)) : '',
     ]
       .filter(Boolean)
       .join('<i>·</i>');
@@ -2274,6 +2283,9 @@ setInterval(() => {
   tickRail();
   // 분이 넘어갈 때만 다시 그린다 — 매초 innerHTML을 갈면 상단바 텍스트 선택이 계속 풀린다
   if (longestWaitMin() !== shownWaitMin) drawStats();
+  // 미니에서 마우스를 올려 둔 동안에는 그 게의 경과 시간이 손잡이에 적혀 있다. 그 분은 최장
+  // 대기와 다르게 넘어가므로 따로 갱신한다 — 스냅샷은 statusAt이 그대로면 다시 오지 않는다.
+  else if (MINI && miniHover) drawMiniStats();
 }, 1000);
 
 window.addEventListener('resize', () => {
