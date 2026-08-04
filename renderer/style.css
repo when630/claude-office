@@ -105,7 +105,9 @@
 
   --shadow: 0 8px 24px rgba(4, 6, 10, 0.55);
 
-  /* 오른쪽 패널 폭. 우측 하단 물음표가 이 값을 보고 **사무실 위**에 서므로 한 곳에서 정한다. */
+  /* 양쪽 열의 폭. 우측 하단 물음표가 --panel-w를 보고 **사무실 위**에 서므로 한 곳에서
+     정한다 — 패널을 접으면 이 값이 0이 되고 물음표가 따라 움직인다(body.panel-off). */
+  --rail-w: 200px;
   --panel-w: 330px;
 
   /* 본문 서체는 renderer/fonts/에 번들한 Pretendard Variable이다 (위 @font-face).
@@ -343,6 +345,7 @@ main {
   display: none;
 }
 body.mini #topbar,
+body.mini #rail,
 body.mini #panel,
 body.mini #help-open,
 body.mini #help {
@@ -406,10 +409,12 @@ body.mini #stage::-webkit-scrollbar {
 }
 
 /* 방 거르기. 평소엔 배경에 묻어 있다가 초점이 오면 드러난다 — 방이 서넛일 땐 쓸 일이 없다 */
+/* 거르기 칸은 목록 머리에 있다 — 찾는 도구가 찾을 것 위에 서야 한다.
+   상단바에 있을 때는 108px로 눈에 안 띄게 두었지만, 이제 자기 열의 폭을 다 쓴다. */
 #room-filter {
-  width: 108px;
-  padding: 3px 8px;
-  border: 1px solid transparent;
+  width: 100%;
+  padding: 4px 9px;
+  border: 1px solid var(--b1);
   border-radius: var(--r-pill);
   background: var(--s2);
   color: var(--t1);
@@ -436,6 +441,115 @@ body.mini #stage::-webkit-scrollbar {
 #office {
   display: block;
   image-rendering: pixelated;
+}
+
+/* ── 왼쪽 세션 목록. 캔버스와 같은 것을 보고(거르기·접기를 지난 방), 급한 순서로 묶는다. */
+#rail {
+  width: var(--rail-w);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--b1);
+  background: var(--s1);
+}
+.rail-head {
+  flex: none;
+  padding: var(--sp2) 10px;
+}
+#rail-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 0 var(--sp3);
+}
+
+/* 묶음 머리. 대기만 노랑이고 나머지는 라벨 색이다 — 목록에서도 노랑은 하나뿐이어야 한다. */
+.rail-group {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: var(--sp3) 10px var(--sp1);
+  font-size: var(--fs-cap);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+.rail-group.waiting {
+  color: var(--acc);
+}
+.rail-group .c {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+/* 행. 버튼이라 키보드로도 지나간다 — 목록이 길어도 Tab으로 닿는다. */
+.rail-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp2);
+  width: 100%;
+  padding: 5px 10px;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: none;
+  color: var(--t2);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.rail-row:hover {
+  background: var(--s2);
+  color: var(--t1);
+}
+/* 고른 행. 왼쪽 띠는 노랑이다 — 여기서는 "대기"가 아니라 **지금 보고 있는 것**을 뜻하고,
+   한 화면에 하나뿐이라 대기 신호와 헷갈릴 여지가 없다. */
+.rail-row.on {
+  background: var(--s2);
+  color: var(--t1);
+  border-left-color: var(--acc);
+}
+.rail-row .nm {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rail-row time {
+  flex: none;
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: var(--fs-cap);
+  color: var(--t3);
+  font-variant-numeric: tabular-nums;
+}
+/* 기다린 시간만 색이 있다 */
+.rail-row time.t {
+  color: var(--acc);
+}
+.rail-empty {
+  margin: var(--sp5) 10px;
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  color: var(--t3);
+}
+.rail-empty small {
+  color: var(--t4);
+  font-size: var(--fs-cap);
+}
+
+/* ── 접기. 열을 없애면 사무실이 그만큼 넓어진다. 둘 다 접으면 창 전체가 사무실이다.
+   폭 토큰을 0으로 돌리는 것이 중요하다 — 우측 하단 `?`가 --panel-w를 보고 서기 때문이다. */
+body.rail-off #rail {
+  display: none;
+}
+body.panel-off #panel {
+  display: none;
+}
+body.panel-off {
+  --panel-w: 0px;
 }
 
 #panel {
@@ -988,6 +1102,21 @@ b.lv-na {
 }
 .dot.working {
   background: var(--work);
+}
+/* 목록의 점은 **mood 어휘**를 쓴다(waiting·typing·stuck·idle) — 타임라인의 잡 상태
+   어휘(working·done·failed·stopped)와 다른 축이라 둘 다 있어야 한다.
+   말풍선·이름표와 같은 뜻을 같은 색으로 낸다. */
+.dot.waiting {
+  background: var(--acc);
+}
+.dot.typing {
+  background: var(--work);
+}
+.dot.stuck {
+  background: var(--stuck);
+}
+.dot.idle {
+  background: var(--dot);
 }
 .dot.done {
   background: var(--done);

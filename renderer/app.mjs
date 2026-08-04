@@ -26,6 +26,9 @@ const panel = document.getElementById('panel');
 const statsEl = document.getElementById('stats');
 const clockEl = document.getElementById('clock');
 const waitChip = document.getElementById('wait-chip');
+const railList = document.getElementById('rail-list');
+const railToggle = document.getElementById('rail-toggle');
+const panelToggle = document.getElementById('panel-toggle');
 const usageMini = document.getElementById('usage-mini');
 const miniStatsEl = document.getElementById('mini-stats');
 const filterEl = document.getElementById('room-filter');
@@ -86,6 +89,9 @@ function buildAliases() {
   for (const room of state.rooms ?? []) {
     for (const w of room.workers) aliases.set(w.key, t('names.alias', { n: ++n }));
   }
+  // 퇴근한 작업도 이름이 있고 목록·패널 양쪽에 적힌다. 번호를 안 주면 이름을 가려 둔 채로
+  // 화면을 보여줄 때 여기만 실제 이름이 남는다.
+  for (const r of state.recent ?? []) aliases.set(r.key, t('names.alias', { n: ++n }));
 }
 
 function aliasOf(w) {
@@ -101,6 +107,7 @@ function canvasName(w) {
 
 // 패널 제목. 이름표를 없앤 경우에도 제목은 있어야 하니 대체 이름으로 돈다 —
 // 캔버스에서 부르던 이름과 패널 제목이 어긋나면 누구를 눌렀는지 알 수 없다.
+// 퇴근한 작업(`state.recent`의 항목)도 `{ key, name }`이라 그대로 넘길 수 있다.
 function panelName(w) {
   return cfg.names === 'show' ? w.name : aliasOf(w);
 }
@@ -282,6 +289,14 @@ canvas.addEventListener('mousemove', (e) => {
 canvas.addEventListener('mouseleave', () => {
   hover = null;
 });
+// 자리를 고르는 **단 하나의 문**. 캔버스·목록·대기 칩·알림 클릭이 다 여기를 지나야
+// 목록의 표시와 패널이 어긋나지 않는다 (전에는 각자 selected를 만지고 drawPanel만 불렀다).
+function selectKey(key) {
+  selected = key ?? null;
+  drawPanel();
+  drawRail();
+}
+
 canvas.addEventListener('click', (e) => {
   const seat = seatAt(e.clientX, e.clientY);
   // 미니에는 패널이 없다 — 자리를 누르면 큰 창으로 올라가며 그 자리가 펼쳐진다
@@ -289,8 +304,7 @@ canvas.addEventListener('click', (e) => {
     if (seat) window.office?.miniSelect?.(seat.worker.key);
     return;
   }
-  selected = seat?.worker.key ?? null;
-  drawPanel();
+  selectKey(seat?.worker.key ?? null);
 });
 
 // ── 패널
@@ -319,7 +333,7 @@ function recentBlock() {
           (r) => `<li>
             <span class="dot ${esc(r.state)}"></span>
             <div>
-              <b>${esc(r.name)}</b>
+              <b>${esc(panelName(r))}</b>
               <small>${fmtTime(r.at)} · ${fmtTokens(r.tokens)}</small>
               <p>${esc(r.detail)}</p>
             </div>
@@ -822,12 +836,121 @@ function selectLongestWait() {
       if (!worst || (w.statusAt ?? Infinity) < (worst.statusAt ?? Infinity)) worst = w;
     }
   }
-  if (!worst) return;
-  selected = worst.key;
-  drawPanel();
+  if (worst) selectKey(worst.key);
 }
 
 waitChip.addEventListener('click', selectLongestWait);
+
+// ── 왼쪽 세션 목록
+//
+// 캔버스와 **같은 것을 본다** — 거르기·접기를 지난 방만 담는다(roomsToDraw). 목록에만 보이는
+// 세션이 있으면 눌렀는데 캔버스에서 자리를 못 찾는 일이 생기고, 그때 어느 쪽이 맞는지 알 수 없다.
+//
+// 급한 순서로 묶는다. **헤매는 중을 작업 중에 섞지 않는다** — 섞으면 "작업 중 5"가 되고
+// 구분해 둔 뜻이 사라진다(main/collect.mjs의 같은 판단).
+const RAIL_GROUPS = [
+  ['waiting', 'topbar.waiting', (w) => w.mood === 'waiting'],
+  ['stuck', 'topbar.stuck', (w) => w.mood === 'stuck'],
+  ['failed', 'topbar.failed', (w) => w.mood === 'failed'],
+  ['typing', 'topbar.typing', (w) => w.mood === 'typing'],
+  ['rest', 'rail.rest', (w) => ['idle', 'done', 'stopped'].includes(w.mood)],
+];
+
+// 행 오른쪽에 적을 것. 묶음마다 알고 싶은 시간이 다르다 —
+// 대기는 **얼마나 기다렸나**, 도는 것은 **얼마나 돌았나**, 퇴근은 **언제 끝났나**.
+function railMeta(w) {
+  if (w.mood === 'waiting') {
+    // 1초마다 갈아 끼운다(tickRail). statusAt이 절대 시각이라 스냅샷을 기다리지 않는다.
+    return w.statusAt ? `<time class="t" data-since="${w.statusAt}">${fmtDur(Date.now() - w.statusAt)}</time>` : '';
+  }
+  if (w.mood === 'typing' || w.mood === 'stuck') {
+    return w.startedAt ? `<time>${fmtAge(Date.now() - w.startedAt)}</time>` : '';
+  }
+  return '';
+}
+
+function railRow(key, mood, name, meta) {
+  return `<button type="button" class="rail-row${key === selected ? ' on' : ''}" data-key="${esc(key)}"
+    title="${esc(name)}"><span class="dot ${esc(mood)}"></span><span class="nm">${esc(name)}</span>${meta}</button>`;
+}
+
+function drawRail() {
+  if (MINI) return;
+  const rooms = roomsToDraw();
+  const workers = rooms.flatMap((r) => r.workers ?? []);
+  const recent = state.recent ?? [];
+
+  const parts = [];
+  for (const [key, label, pick] of RAIL_GROUPS) {
+    const list = workers.filter(pick);
+    if (!list.length) continue;
+    parts.push(`<div class="rail-group ${esc(key)}">${t(label)}<span class="c">${list.length}</span></div>`);
+    parts.push(list.map((w) => railRow(w.key, w.mood, panelName(w), railMeta(w))).join(''));
+  }
+  // 퇴근한 작업은 캔버스에 없다(자리를 안 차지한다) — 목록에서만 만난다.
+  if (recent.length) {
+    parts.push(`<div class="rail-group">${t('idle.recent')}<span class="c">${recent.length}</span></div>`);
+    parts.push(
+      recent
+        .map((r) => railRow(r.key, r.state, panelName(r), `<time>${fmtTime(r.at)}</time>`))
+        .join(''),
+    );
+  }
+
+  railList.innerHTML = parts.length
+    ? parts.join('')
+    : `<p class="rail-empty">${t('rail.empty')}<br /><small>${t('rail.emptyHint')}</small></p>`;
+}
+
+// 대기 시간만 1초마다 갈아 끼운다 — 목록을 통째로 다시 그리면 스크롤 자리가 튄다.
+function tickRail() {
+  for (const el of railList.querySelectorAll('time[data-since]')) {
+    el.textContent = fmtDur(Date.now() - Number(el.dataset.since));
+  }
+}
+
+railList.addEventListener('click', (e) => {
+  const row = e.target.closest?.('.rail-row');
+  if (row) selectKey(row.dataset.key);
+});
+
+// ── 양쪽 열 접기
+//
+// 3열이 되면서 사무실이 좁아진 것을 **그때그때 되돌릴 수 있게** 한다. 둘 다 접으면 창 전체가
+// 사무실이다. 접힌 상태는 설정에 저장되므로 껐다 켜도 그대로다.
+//
+// **왼쪽을 접어도 대기 신호는 남는다** — 상단바의 대기 칩이 그 역할을 한다(#113).
+function applyPanes() {
+  document.body.classList.toggle('rail-off', !cfg.railOpen);
+  document.body.classList.toggle('panel-off', !cfg.panelOpen);
+  railToggle.classList.toggle('on', cfg.railOpen);
+  panelToggle.classList.toggle('on', cfg.panelOpen);
+  railToggle.setAttribute('aria-pressed', String(cfg.railOpen));
+  panelToggle.setAttribute('aria-pressed', String(cfg.panelOpen));
+}
+
+// 접고 펴면 사무실 폭이 바뀐다 — 리사이즈와 **같은 경로**를 타야 방 줄 나누기가 다시 잡힌다.
+function togglePane(which) {
+  saveView(which === 'rail' ? { railOpen: !cfg.railOpen } : { panelOpen: !cfg.panelOpen });
+}
+
+railToggle.addEventListener('click', () => togglePane('rail'));
+panelToggle.addEventListener('click', () => togglePane('panel'));
+
+// 창이 떠 있을 때만 뜻이 있는 동작이라 **전역 단축키로 잡지 않는다** — 트레이에 들어가 있는
+// 동안에도 조합을 먹는 것은 이 일에 과하다. 편집기의 사이드바 토글과 같은 자리를 쓴다.
+window.addEventListener('keydown', (e) => {
+  if (MINI || !(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+  // 글자를 치는 중이거나 단축키를 받는 중이면 손대지 않는다
+  if (e.target?.closest?.('input, select, textarea')) return;
+  if (e.key === '[') {
+    e.preventDefault();
+    togglePane('rail');
+  } else if (e.key === ']') {
+    e.preventDefault();
+    togglePane('panel');
+  }
+});
 
 // ── 설정 창
 //
@@ -874,6 +997,9 @@ function normalizeView(v) {
     collapsed: list(v?.collapsed),
     roomGroups: list(v?.roomGroups),
     roomAlias: v?.roomAlias && typeof v.roomAlias === 'object' ? { ...v.roomAlias } : {},
+    // 양쪽 열이 열려 있는지. 기본이 열림이라 옛 설정에도 값이 없어도 된다.
+    railOpen: v?.railOpen !== false,
+    panelOpen: v?.panelOpen !== false,
   };
 }
 
@@ -1692,8 +1818,12 @@ function applyLang(payload) {
 // ── main 프로세스에서 오는 스냅샷
 function refresh() {
   buildAliases();
+  // **applyPanes가 relayout보다 먼저다.** 접힘이 폭을 바꾸므로, 먼저 반영하지 않으면
+  // 캔버스가 옛 폭으로 줄을 나눈다.
+  applyPanes();
   relayout();
   drawStats();
+  drawRail();
   drawPanel();
   if (cfgDialog.open && cfgRooms !== roomSig()) drawCfg();
 }
@@ -1713,10 +1843,7 @@ function connect() {
   }
   window.office.onState(applyState);
   // 알림을 눌러 들어온 경우 해당 자리를 펼쳐준다
-  window.office.onSelect((key) => {
-    selected = key;
-    drawPanel();
-  });
+  window.office.onSelect((key) => selectKey(key));
   // 트레이 메뉴에서 언어를 바꾼 경우 — 설정 창을 거치지 않고도 화면이 따라와야 한다
   window.office.onLang?.(applyLang);
   window.office.meta().then((m) => {
@@ -1740,6 +1867,7 @@ function connect() {
 setInterval(() => {
   clockEl.textContent = fmtClock();
   tickPanel();
+  tickRail();
   // 분이 넘어갈 때만 다시 그린다 — 매초 innerHTML을 갈면 상단바 텍스트 선택이 계속 풀린다
   if (longestWaitMin() !== shownWaitMin) drawStats();
 }, 1000);
@@ -1768,8 +1896,7 @@ window.__office = {
     refresh();
   },
   select(key) {
-    selected = key;
-    drawPanel();
+    selectKey(key);
   },
   // 표시 설정을 저장 없이 바꿔 본다 — 헤드리스로 화면을 굽어 확인할 때 쓴다
   view(patch) {

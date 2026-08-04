@@ -25,11 +25,13 @@
       <div class="right">
         <!-- 수치는 늘 있지만 급하지 않다 — 모노스페이스로 가라앉혀 자리만 지킨다 -->
         <div id="usage-mini"></div>
-        <!-- 이름으로 거르기. 방이 서넛일 때는 쓸 일이 없어 눈에 안 띄게 두고,
-             걸러진 방이 생기면 옆의 배지가 그 사실을 알린다. -->
-        <input id="room-filter" type="search" autocomplete="off" spellcheck="false" data-i18n-ph="topbar.filter" />
+        <!-- 걸러진 방이 있다는 배지. 거르기 칸은 목록 위로 옮겼지만 이건 상단바에 남는다 —
+             목록을 접어 둔 동안에도 "화면이 다가 아니다"는 알려야 하고, 여기가 푸는 문이다. -->
         <button id="room-shown" class="btn btn-pill" type="button" hidden></button>
         <span id="clock"></span>
+        <!-- 양쪽 열 접기. 캔버스를 침범하지 않게 도구 묶음에 둔다. -->
+        <button id="rail-toggle" class="btn" type="button" data-i18n-title="topbar.railToggle">◧</button>
+        <button id="panel-toggle" class="btn" type="button" data-i18n-title="topbar.panelToggle">◨</button>
         <button id="mini-open" class="btn" type="button" data-i18n-title="topbar.mini">▭</button>
         <button id="att-open" class="btn" type="button" data-i18n="topbar.attendance" data-i18n-title="topbar.attendance"></button>
         <button id="cfg-open" class="btn" type="button" data-i18n="topbar.settings" data-i18n-title="topbar.settings"></button>
@@ -44,6 +46,15 @@
     </header>
 
     <main>
+      <!-- 왼쪽 세션 목록. 방이 열 개를 넘으면 캔버스를 눈으로 훑는 것이 느려지는데,
+           상태별로 묶인 목록은 "지금 나를 기다리는 것"을 늘 맨 위에 세운다.
+           거르기 칸도 여기로 올라왔다 — 목록을 찾는 도구가 목록 위에 있어야 한다. -->
+      <aside id="rail">
+        <div class="rail-head">
+          <input id="room-filter" type="search" autocomplete="off" spellcheck="false" data-i18n-ph="topbar.filter" />
+        </div>
+        <div id="rail-list"></div>
+      </aside>
       <!-- 전부 걸러지거나 접히면 빈 화면이 남는데, 그건 고장으로 읽힌다 — 이유를 적어 둔다 -->
       <div id="stage"><canvas id="office"></canvas><p id="stage-empty" hidden></p></div>
       <aside id="panel"></aside>
