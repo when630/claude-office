@@ -515,6 +515,92 @@ test('완료·헤맴·컨텍스트 제목도 같은 이름을 쓴다', () => {
   assert.match(lost[0].title, /^프론트/);
 });
 
+// ── 이름을 가릴 때 (#110)
+//
+// 사무실 화면과 트레이는 이름 가리기를 지키는데 **토스트만 세션 이름을 그대로 불렀다.**
+// 토스트는 트레이 메뉴보다 화면 공유에 더 잘 잡힌다 — 화면 한쪽에 크게 떠서 녹화·캡처에
+// 그대로 남는다. 가리려고 켠 설정인데 정작 가장 잘 보이는 자리가 안 지키고 있었다.
+//
+// 제목만 바꿔서는 반쪽이다. 몸통에도 선택지 문구(needs)와 마지막으로 한 말(detail)이 실려
+// 경로·지시문이 그대로 나간다 — 그래서 몸통까지 일반 문구로 돌린다.
+
+test('가리면 별칭이 붙은 방도 아닌 방도 방 이름으로 부른다', () => {
+  // 별칭이 있으면 원래도 방 이름이었다 — 새던 자리는 **별칭이 없는 방**이다
+  assert.equal(nameOf({ name: 'sess' }, { key: 'room', label: 'room' }, true), 'room');
+  assert.equal(nameOf({ name: 'sess' }, { key: 'room', label: '프론트' }, true), '프론트');
+  // 방 key는 작업 디렉터리 이름이고 어느 모드에서도 가리지 않는 값이다(트레이도 같은 규칙)
+  assert.equal(nameOf({ name: 'sess' }, null, true), '클로드');
+  assert.equal(nameOf({ name: 'sess' }, null, false), 'sess');
+});
+
+test('가려도 방이 없으면 세션 이름으로 흘리지 않는다', () => {
+  // 부르는 쪽이 늘 방을 들고 있다고 믿지 않는다. 여기서 w.name으로 떨어지면 가린 것이 샌다.
+  assert.equal(nameOf({ name: 'sess', room: 'src' }, null, true), 'src');
+  assert.equal(nameOf({ name: 'sess' }, undefined, true), '클로드');
+});
+
+test('가리면 대기 제목·몸통이 프로젝트 사정을 말하지 않는다', () => {
+  const w = waiter('w1', T0, { needs: 'main/notify.mjs 를 수정할까요?' });
+  const out = decideNotifications(primed(), aliased('room', [w]), T0, null, true);
+  assert.deepEqual(kinds(out), ['waiting']);
+  assert.match(out[0].title, /^room/);
+  assert.doesNotMatch(out[0].title, /w1/);
+  // 몸통은 "무엇을 기다리는지"만 남는다 — 비우지는 않는다
+  assert.equal(out[0].body, '터미널에 선택지나 확인이 떠 있습니다');
+  assert.doesNotMatch(out[0].body, /notify\.mjs/);
+});
+
+test('가리지 않으면 대기 몸통에 선택지 문구가 그대로 실린다', () => {
+  const w = waiter('w1', T0, { needs: 'main/notify.mjs 를 수정할까요?' });
+  const out = decideNotifications(primed(), aliased('room', [w]), T0);
+  assert.equal(out[0].body, 'main/notify.mjs 를 수정할까요?');
+});
+
+test('가리면 재알림 몸통도 같이 가려진다', () => {
+  // 재알림은 대기와 몸통을 공유한다 — 한쪽만 가리면 5분 뒤에 새어 나간다
+  const state = primed();
+  const w = () => waiter('w1', T0, { needs: '배포를 진행할까요?' });
+  decideNotifications(state, aliased('room', [w()]), T0, null, true);
+  const later = decideNotifications(state, aliased('room', [w()]), T0 + 6 * MIN, null, true);
+  assert.deepEqual(kinds(later), ['escalate']);
+  assert.equal(later[0].body, '터미널에 선택지나 확인이 떠 있습니다');
+});
+
+test('가리면 완료 몸통에서 마지막으로 한 말만 떨어진다', () => {
+  // 걸린 시간은 프로젝트 사정이 아니다 — 그것까지 지우면 알림이 아무 말도 안 하게 된다
+  const state = createNotifyState();
+  decideNotifications(state, aliased('room', [busy('w1', T0)]), T0, null, true);
+  decideNotifications(state, aliased('room', [busy('w1', T0)]), T0 + 5 * MIN, null, true);
+  const done = ended('w1', 'idle', T0 + 5 * MIN, { detail: '알림 문턱 판정 리팩터링' });
+  const out = decideNotifications(state, aliased('room', [done]), T0 + 5 * MIN, null, true);
+  assert.deepEqual(kinds(out), ['done']);
+  assert.equal(out[0].body, '5분 걸렸습니다');
+  assert.doesNotMatch(out[0].body, /리팩터링/);
+});
+
+test('가리면 헤맴 몸통도 일반 문구로 돈다', () => {
+  const state = primed();
+  decideNotifications(state, aliased('room', [busy('w1', T0)]), T0, null, true);
+  const lost = ended('w1', 'stuck', T0, { detail: 'npm test 가 연달아 실패' });
+  const out = decideNotifications(state, aliased('room', [lost]), T0 + MIN, null, true);
+  assert.deepEqual(kinds(out), ['stuck']);
+  assert.equal(out[0].body, '도구가 연달아 실패하거나 한동안 진전이 없습니다');
+});
+
+test('컨텍스트·사용량은 가려도 몸통이 그대로다', () => {
+  // 토큰 수와 초기화 시각뿐이라 가릴 것이 없다. 제목의 이름만 방 이름으로 온다.
+  const ctx = decideNotifications(primed(), aliased('프론트', [ctxWorker('w2', 90)]), T0, null, true);
+  assert.deepEqual(kinds(ctx), ['context']);
+  assert.match(ctx[0].title, /^프론트 컨텍스트 90%/);
+  assert.match(ctx[0].body, /900K \/ 1M/);
+
+  const state = primed();
+  const usage = { session: { pct: 90, resetsAt: T0 + 30 * MIN }, week: null, stale: false };
+  const out = decideNotifications(state, snap([], usage), T0, null, true);
+  assert.deepEqual(kinds(out), ['usage']);
+  assert.match(out[0].body, /30분/);
+});
+
 test('방 이름으로 불러도 어느 방인지는 그대로 실린다', () => {
   // room은 방별 알림 세기(levelOf)가 읽는 값이다 — 이름을 바꾼 것이 그 판정을 건드리면 안 된다
   const out = decideNotifications(primed(), aliased('프론트', [waiter('w1', T0)]), T0);
