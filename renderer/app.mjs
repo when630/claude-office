@@ -40,6 +40,7 @@ const railToggle = document.getElementById('rail-toggle');
 const panelToggle = document.getElementById('panel-toggle');
 const usageMini = document.getElementById('usage-mini');
 const miniStatsEl = document.getElementById('mini-stats');
+const miniUsageEl = document.getElementById('mini-usage');
 const filterEl = document.getElementById('room-filter');
 const shownBtn = document.getElementById('room-shown');
 const stageEmpty = document.getElementById('stage-empty');
@@ -1089,6 +1090,8 @@ function setMiniHover(seat) {
   if (next?.key === miniHover?.key) return;
   miniHover = next;
   drawMiniStats();
+  // 호버 줄은 숫자 줄보다 길다 — 사용률이 그 줄을 자르지 않는지 다시 잰다
+  drawMiniUsage();
 }
 
 // 미니의 한 줄. 곁눈질용이라 숫자만 남긴다 — 여기서 길어지면 창을 줄인 뜻이 없다.
@@ -1097,16 +1100,19 @@ function setMiniHover(seat) {
 function drawMiniStats() {
   // 마우스를 올린 동안에는 숫자를 접고 그 게가 누구인지 적는다. 놓으면 숫자로 돌아온다.
   //
-  // 경과 시간을 **여기서 다시 잰다.** 좁은 창에서는 그 줄이 화면에서 접히는데(miniPlan의 상세도가
-  // 뒷줄을 살리려 내려간다), 접힌 글자는 올려 보면 나와야 그 거래가 손실이 아니다.
-  // 그래서 miniHover는 키만 들고 있고 값은 그릴 때 살아 있는 워커에서 가져온다 — 값을 담아 두면
-  // 스냅샷이 안 올 동안 분이 멈춘다.
+  // **컨텍스트는 여기서 다시 읽는다.** 화면에는 막대로만 있어서(칸마다 24px) 몇 퍼센트인지는
+  // 알 수 없고, 그 값이 이 앱에서 가장 자주 궁금해지는 수치다. 그래서 miniHover는 키만 들고
+  // 있고 값은 그릴 때 살아 있는 워커에서 가져온다 — 담아 두면 스냅샷이 안 올 동안 멈춘다.
   if (miniHover) {
     const w = findWorker(miniHover.key);
+    const pct = w?.context?.pct;
     miniStatsEl.innerHTML = [
       `<span class="rm">${esc(miniHover.room)}</span>`,
       miniHover.name ? `<span class="nm">${esc(miniHover.name)}</span>` : '',
-      w ? esc(miniNote(w)) : '',
+      // 라벨을 붙이지 않는다 — `컨텍스트`라는 말이 220px 줄의 절반을 먹어 방 이름을 밀어낸다.
+      // 대신 캔버스 막대와 **같은 문턱 색**으로 낸다(level). 오른쪽 계정 사용률은 회색이라
+      // 색만으로 종류가 갈린다 — 세션 값과 계정 값을 섞지 않는다.
+      pct != null ? `<span class="ct ${level(pct)}">${Math.round(pct)}%</span>` : '',
     ]
       .filter(Boolean)
       .join('<i>·</i>');
@@ -1121,6 +1127,27 @@ function drawMiniStats() {
   ]
     .filter(Boolean)
     .join('<i>·</i>');
+}
+
+// 손잡이 오른쪽의 계정 사용률(5시간·주간). 큰 창의 #usage-mini와 **같은 문구**를 쓴다 —
+// 같은 값을 두 이름으로 부르지 않는다. tap이 없으면(사용량을 못 읽으면) 자리째 사라진다.
+//
+// 좁은 창에서는 **대기 숫자를 자르지 않는 만큼만** 보인다. 잘린 `❗2 대…`는 이 창의 존재
+// 이유를 지우기 때문이다. 판정은 늘 "보이는 상태"에서 재고 시작한다 — 접은 뒤에 다시 재면
+// 자리가 남아 보여서 켜고, 켜면 또 잘려 스냅샷마다 깜빡인다.
+function drawMiniUsage() {
+  const u = state.usage;
+  const parts = [u?.session ? `5h ${u.session.pct}%` : '', u?.week ? `wk ${u.week.pct}%` : ''].filter(Boolean);
+  miniUsageEl.innerHTML = parts.map((p) => `<span>${p}</span>`).join('');
+  miniUsageEl.hidden = parts.length === 0;
+  if (miniUsageEl.hidden) return;
+  // 왼쪽 줄이 잘리고 있으면 사용률부터 접는다. **상자만 보면 안 된다** — 방·이름은 줄어들 수 있는
+  // 플렉스 아이템이라 상자를 넘치는 대신 **자기가 줄어들며** 안에서 `…`로 잘린다. 그러면 상자의
+  // scrollWidth는 멀쩡해 보이고, 실제로는 방 이름이 `w…`가 되어 있었다.
+  const tight =
+    miniStatsEl.scrollWidth > miniStatsEl.clientWidth + 1 ||
+    [...miniStatsEl.children].some((el) => el.scrollWidth > el.clientWidth + 1);
+  if (tight) miniUsageEl.hidden = true;
 }
 
 // 안 보이는 방이 몇인지, 그리고 거기서 빠져나오는 길. 걸러 놓은 것을 잊고 "방이 사라졌다"고
@@ -1159,6 +1186,7 @@ function drawStats() {
   drawStageEmpty();
   if (MINI) {
     drawMiniStats();
+    drawMiniUsage();
     return;
   }
   drawRoomBadge();
@@ -2291,6 +2319,8 @@ setInterval(() => {
 window.addEventListener('resize', () => {
   dpr = Math.min(window.devicePixelRatio || 1, 2);
   relayout();
+  // 손잡이가 좁아지면 사용률이 접혀야 한다 — 그 판정은 폭을 재서 하므로 여기서 다시 부른다
+  if (MINI) drawMiniUsage();
 });
 
 // 캔버스는 DOM 텍스트가 아니라서 @font-face 선언만으로는 폰트가 로드되지 않는다.
