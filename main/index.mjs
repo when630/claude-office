@@ -45,7 +45,6 @@ import {
 } from './notify.mjs';
 import { openTerminal, reasonText as terminalReason } from './terminal.mjs';
 import { t, fmtDur, fmtWhen, setLang, resolveLang, LANGS, LANG_NAMES } from '../shared/i18n.mjs';
-import { accelLabel } from '../shared/accel.mjs';
 import {
   diffEvents,
   bootEvent,
@@ -248,9 +247,14 @@ function sanitizeHotkeys(v) {
 // 잡아 둔 단축키를 다 놓고 지금 설정대로 다시 잡는다. 실패한 것은 그대로 돌려준다 —
 // globalShortcut.register()는 이미 남이 쓰는 조합이면 조용히 false를 낼 뿐이라,
 // 알려주지 않으면 사용자는 눌러 보고 아무 일도 안 일어나는 것만 겪는다.
+//
+// **알리는 자리는 설정 창뿐이다.** 앱을 켤 때 토스트로도 알렸는데, 이건 켤 때마다 같은 말을
+// 하는 알림이면서(조합을 물고 있는 앱이 바뀌지 않으니 상태가 그대로다) 정작 그 자리에서
+// 할 수 있는 일이 없다 — 고치려면 설정 창을 열어야 하고, 열면 그 칸이 빨갛게 적혀 있다.
+// 이 앱의 알림은 "세션이 나를 기다린다"에 쓰는 자리다.
 let hotkeyFailed = [];
 
-function applyHotkeys({ announce = false } = {}) {
+function applyHotkeys() {
   globalShortcut.unregisterAll();
   // 미니는 지금 상태를 뒤집는다 — 곁눈질하려고 내리는 일이 잦은데 그때마다 창을 앞으로
   // 꺼내 버튼을 찾아야 한다면 곁눈질용이라는 목적과 어긋난다
@@ -268,12 +272,6 @@ function applyHotkeys({ announce = false } = {}) {
     if (!ok) failed.push(accel);
   }
   hotkeyFailed = failed;
-  if (announce && failed.length) {
-    // 알림에도 설정 창과 같은 표기로 적는다 — 날것의 Accelerator(`CommandOrControl+Alt+O`)를
-    // 보여 주면 어느 칸을 고치라는 것인지 사용자가 옮겨 읽어야 한다
-    const keys = failed.map((accel) => accelLabel(accel, process.platform === 'darwin')).join(' · ');
-    notify(t('notify.hotkeyFailTitle'), t('notify.hotkeyFailBody', { keys }));
-  }
   return failed;
 }
 
@@ -1186,8 +1184,8 @@ if (!app.requestSingleInstanceLock()) {
 
     quietNow = isQuiet(settings.quiet);
     createTray();
-    // 못 잡은 조합은 알려 준다. 눌러 보고 아무 일도 안 일어나는 것으로 알게 하지 않는다.
-    applyHotkeys({ announce: true });
+    // 못 잡은 조합은 hotkeyFailed에 담기고 설정 창의 그 칸에 빨갛게 적힌다 (알림은 안 보낸다)
+    applyHotkeys();
     // 맥은 로그인 시작에 인자를 못 넘긴다 — 로그인으로 뜬 실행인지(wasOpenedAtLogin)로 대신한다
     const hidden = process.argv.includes('--hidden') || app.getLoginItemSettings().wasOpenedAtLogin === true;
     // 큰 창은 미니로 쓰던 사람에게도 만들어 둔다(숨긴 채로) — 자리를 눌러 올라올 때

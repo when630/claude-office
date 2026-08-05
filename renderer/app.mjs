@@ -1444,7 +1444,7 @@ function accelOf(e) {
   return parts.join('+');
 }
 
-// 보여줄 때만 눌러 펴는 일은 shared/accel.mjs가 한다 — main의 등록 실패 알림도 같은 표기를 쓴다.
+// 보여줄 때만 눌러 펴는 일은 shared/accel.mjs가 한다 (맥은 키캡 기호, 윈도는 글자).
 const IS_MAC = /Mac/i.test(navigator.userAgent);
 
 // main이 없으면(브라우저로 직접 연 경우) 이 탭들은 채울 값이 없다 — 빈 화면 대신 이유를 적는다
