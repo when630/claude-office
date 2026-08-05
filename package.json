@@ -11,6 +11,7 @@
     "start": "electron .",
     "test": "node --test \"test/**/*.test.mjs\"",
     "icons": "node tools/make-icons.mjs",
+    "shots": "electron tools/bake-readme.mjs",
     "usage-tap": "node tools/install-usage-tap.mjs",
     "usage-tap:remove": "node tools/install-usage-tap.mjs --remove",
     "build": "electron-builder --win",
