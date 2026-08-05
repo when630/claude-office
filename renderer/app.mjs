@@ -997,7 +997,8 @@ function drawPanelView() {
 }
 
 // 탭을 옮기면 캡션은 허공에 남는다 — 같이 닫는다.
-// 패널이 접혀 있으면 먼저 펴 준다: 상단바의 설정·출근부 버튼을 눌렀는데 아무 일도 없으면 안 된다.
+// 패널이 접혀 있으면 먼저 펴 준다: 접어 둔 채 자리를 눌렀는데 아무 일도 없으면 안 된다
+// (탭 자체는 패널 안에 있으니 접혀 있으면 보이지 않는다 — 이 길로 오는 것은 자리 클릭이다).
 function setPanelTab(next) {
   panelTab = next;
   closeCaption();
@@ -1006,9 +1007,16 @@ function setPanelTab(next) {
   drawPanelView();
 }
 
+// 출근부·설정은 **열 때 main에서 값을 다시 받아 와야** 화면이 실제와 맞는다(스냅샷과 달리
+// 밀려 오지 않는다 — 알림·언어는 트레이 메뉴에서도 바뀐다). 그 길을 상단바 버튼이 쥐고
+// 있었는데 버튼을 걷어냈으므로 탭이 유일한 문이다 — `setPanelTab`을 바로 부르면 아직 아무것도
+// 받아 오지 않은 첫 진입에서 설정 판이 "Electron이 아닙니다"로 뜬다.
 panelTabsEl.addEventListener('click', (e) => {
   const tab = e.target?.dataset?.panelTab;
-  if (tab && tab !== panelTab) setPanelTab(tab);
+  if (!tab || tab === panelTab) return;
+  if (tab === 'att') openAttTab();
+  else if (tab === 'cfg') openCfgTab();
+  else setPanelTab(tab);
 });
 
 function drawPanel() {
@@ -1708,7 +1716,6 @@ async function openCfgTab() {
   capturing = null;
   setPanelTab('cfg');
 }
-document.getElementById('cfg-open').addEventListener('click', openCfgTab);
 
 cfgTabsEl.addEventListener('click', (e) => {
   if (handleHintClick(e.target)) return;
@@ -2137,8 +2144,6 @@ shownBtn.addEventListener('click', () => {
 // ── 미니 모드 여닫기. 창을 갈아 끼우는 일이라 main이 한다(별도 창이다).
 document.getElementById('mini-open').addEventListener('click', () => window.office?.setMini?.(true));
 document.getElementById('mini-grow').addEventListener('click', () => window.office?.setMini?.(false));
-
-document.getElementById('att-open').addEventListener('click', openAttTab);
 
 // 캡션은 눌린 버튼 자리에 고정돼 있으므로, 그 자리가 움직이면 닫는다 —
 // 판이 스크롤될 때, 창 크기가 바뀔 때. (탭을 옮길 때는 setPanelTab이 닫는다.)
