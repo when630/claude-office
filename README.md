@@ -236,22 +236,32 @@ that stays **always on top**. No rooms here — just the crabs, **gathered in on
 
 | | |
 |---|---|
+| Move a room | **drag its name strip** (`Esc` cancels) |
 | Zoom | `Ctrl+wheel`, or pinch on a trackpad |
 | Move it | `Space+drag`, or a middle-button drag |
 | Scroll | the wheel vertically, `Shift+wheel` horizontally |
 | Back to the middle | tap `Space` |
-| Fit the window width and centre | `Ctrl+0` (`Ctrl+=` · `Ctrl+-` step the scale) |
+| Back to auto scale and centre | `Ctrl+0` (`Ctrl+=` · `Ctrl+-` step the scale) |
 | Fold either side column | `Ctrl+[` · `Ctrl+]`, or the two buttons in the top bar |
 
 `⌘` stands in for `Ctrl` on macOS.
 
-Whatever sat under the cursor **stays** under it, and zooming never re-wraps the rooms, so you
-don't lose the one you were watching. Tapping `Space` to recentre is the same reflex as the
-spacebar in StarCraft. Dragging isn't pinned to the top-left corner, so any room can be brought to
-the centre of the screen — and it stops there, so the office can never be dragged off-screen.
+**The layout does not follow the window size.** Rooms sit in a grid of cells, so shrinking the
+window only draws them smaller — the number of rows and the shape of each room stay put, and a
+small resize can't re-shuffle the office out from under the room you were watching. You place the
+rooms yourself by dragging the name strip (they snap to cells, and dropping one on an occupied cell
+swaps the two), and where you put them is saved. To start over: **Settings > Rooms > Reset room
+layout**.
 
-Scale steps go in halves from 2× to 8×, as fine as stays crisp, and are **not** saved. Folded
-columns are: fold both and the window is all office, across restarts.
+Whatever sat under the cursor **stays** under it, so you don't lose the one you were watching.
+Tapping `Space` to recentre is the same reflex as the spacebar in StarCraft. Dragging isn't pinned
+to the top-left corner, so any room can be brought to the centre of the screen — and it stops
+there, so the office can never be dragged off-screen.
+
+Scale steps go in halves from 2× to 8×, as fine as stays crisp. Left alone it picks the largest
+step that **fits the office in the window** (between 3× and 4×); past that you drag to look around.
+The scale is **not** saved. Folded columns are: fold both and the window is all office, across
+restarts.
 
 ### Once there are a lot of rooms
 
