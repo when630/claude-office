@@ -55,7 +55,7 @@ const MEET_LONE_H = MEET_TOP + MEET_TABLE_H + 5; // 가까운 쪽이 비는 블�
 
 // 자리 안의 세로 오프셋. 회의실은 마주 앉은 줄이 앞을 막아 이름표를 바닥에 둘 수 없어
 // 먼 쪽은 상판 위 명패로 올라간다. 그리는 쪽은 seat.dy만 보고 여기서만 값을 정한다.
-// aide는 비서의 **발** 높이다 — 비서 키가 바뀌면 머리가 상판 선을 넘지 않게 같이 옮긴다.
+// aide는 비서의 **발** 높이다 — 비서 키가 바뀌면 같이 옮긴다.
 //
 // aide가 34인 이유 — 위아래로 1px씩밖에 여유가 없는 값이다.
 //   아래에서: 자리 모양마다 책상 다리의 아래끝이 다르다(책상·서버실·연구실·자료실 +33,
@@ -65,8 +65,12 @@ const MEET_LONE_H = MEET_TOP + MEET_TABLE_H + 5; // 가까운 쪽이 비는 블�
 //     아래면 이름표가 두 번째 비서 몸통 위에 겹쳐 찍힌다 → +34 이하여야 한다.
 // 그래서 정확히 34. 비서 키나 이름표 위치를 바꾸면 이 값을 다시 재야 한다.
 const DY_DESK = { name: 37, bar: 40, aide: 34, mark: 2, markH: 32 };
-const DY_MEET_FAR = { name: MEET_TOP + MEET_RIM + 9, bar: MEET_TOP + MEET_RIM + 12, aide: 18, mark: 2, markH: 18 };
-const DY_MEET_NEAR = { name: 28, bar: 30, aide: 26, mark: 6, markH: 22 };
+//
+// 회의실의 aide는 셈법이 다르다 — 옆이 비어 있지 않아 **게 뒤에** 서기 때문에(drawAides),
+// 발이 그 게의 발보다 MEET_AIDE_BACK만큼 위다. 마주 앉은 두 줄 다 게가 seat.y + SEAT_HEAD에
+// 앉으므로 값이 같다: 11(SEAT_HEAD) + 12(게 키) - 6 = 17.
+const DY_MEET_FAR = { name: MEET_TOP + MEET_RIM + 9, bar: MEET_TOP + MEET_RIM + 12, aide: 17, mark: 2, markH: 18 };
+const DY_MEET_NEAR = { name: 28, bar: 30, aide: 17, mark: 6, markH: 22 };
 
 const COLORS = {
   floor: '#101319',
@@ -1096,17 +1100,28 @@ function aideShadow(ctx, x, feet, spr) {
   ctx.globalAlpha = 1;
 }
 
+// 회의실은 자리 옆이 비어 있지 않다 — 테이블 하나를 마주 앉으므로 옆으로 비켜 세우면
+// 옆자리 앞이거나 테이블 위다. 그래서 **게 뒤에** 어깨만 보이게 세운다: 좌우로 어깨너비만큼
+// 어긋나고(MEET_AIDE_DX), 발은 게 발보다 조금 위다(MEET_AIDE_BACK — 이 그림에서 위가 뒤다).
+// 뒤라는 것은 곧 **먼저 그린다**는 뜻이고 그건 부르는 쪽(drawSeatBody)이 맡는다.
+const MEET_AIDE_BACK = 6; // 게 발보다 이만큼 위 = 한 걸음 뒤 (DY_MEET_*.aide에 이미 반영돼 있다)
+const MEET_AIDE_DX = 8; // 게 몸통(16px) 뒤에서 어깨가 삐져나오는 만큼
+
 function drawAides(ctx, seat, t) {
   const n = Math.min(AIDE_MAX_DRAW, seat.worker.aides.length);
-  const feet = seat.y + seat.dy.aide; // 책상 앞에 서 있는 높이 — 이름표 줄 위로 올라오지 않게
+  const feet = seat.y + seat.dy.aide; // 책상 앞(회의실은 게 뒤)에 서 있는 높이
+  const meet = !!seat.side; // 회의실 자리만 side가 있다 (far · near)
+  const cx = seatCx(seat);
   for (let i = 0; i < n; i++) {
-    const x = seat.x + AIDE_X - i * AIDE_GAP();
+    // 회의실은 뒤에서 좌우로 갈라 세운다 — 한쪽에 쌓으면 둘째가 옆자리 게 뒤로 넘어간다
+    const x = meet ? cx + (i % 2 ? -MEET_AIDE_DX : MEET_AIDE_DX) : seat.x + AIDE_X - i * AIDE_GAP();
     // 고개를 들었다 내리는 두 프레임 — 보고하는 티를 낸다
     const spr = Math.floor(t / 540 + i) % 2 ? SPR.aideUp : SPR.aide;
     aideShadow(ctx, x, feet, spr);
     drawSprite(ctx, spr, x - spr.w / 2, feet - spr.h);
-    // 말풍선은 본인 것과 같은 높이(머리 위)로 띄운다 — 여기서 띄우면 게를 덮어버린다
-    if (i === 0) seat.aideAnchor = { x, top: seat.y + SEAT_HEAD };
+    // 말풍선은 본인 것과 같은 높이(머리 위)로 띄운다 — 여기서 띄우면 게를 덮어버린다.
+    // 회의실에서는 비서가 게보다 뒤(=위)에 서므로 그 머리 위로 올려야 말풍선이 안 겹친다.
+    if (i === 0) seat.aideAnchor = { x, top: Math.min(seat.y + SEAT_HEAD, feet - spr.h) };
   }
 }
 
@@ -1676,8 +1691,12 @@ function drawSeatBody(ctx, seat, t, hover, selected) {
 
   const station = seat.box.theme.station;
   const sit = station === 'lowtable' ? drawCushion : drawChair;
+  // 회의실 비서는 게 **뒤**에 선다 — 그러려면 게(와 의자)보다 먼저 그려야 한다.
+  // 나중에 그리면 게를 덮어 앞으로 나오고, 그게 "위로 비어져 나온" 모습이었다.
+  const aidesBehind = !!seat.side && seated && worker.aides?.length;
 
   if (dim) ctx.globalAlpha = 0.45;
+  if (aidesBehind) drawAides(ctx, seat, t);
   // 가까운 쪽은 등받이가 뷰어 쪽이라 게보다 나중에 그린다 (아래쪽 drawChairBack)
   if (!near) sit(ctx, cx, seat.y + 15, !seated); // 어깨 높이 — 더 올리면 등받이가 눈 뒤 액자처럼 보인다
 
@@ -1703,7 +1722,8 @@ function drawSeatBody(ctx, seat, t, hover, selected) {
   // 대기로 앞에 나설 때·걸어 나갈 때·자리로 돌아올 때 다 그랬다.
   // 보고 말풍선이 붙는 자리(seat.aideAnchor)도 두 함수가 서로 덮어써서 그리는 순서에
   // 달려 있었는데, 한쪽만 그리게 되면서 그것도 하나로 정해진다.
-  if (seated && worker.aides?.length) drawAides(ctx, seat, t);
+  // (회의실은 게보다 먼저 그렸다 — 위쪽 aidesBehind)
+  if (seated && worker.aides?.length && !aidesBehind) drawAides(ctx, seat, t);
 
   if (seated) seat.actor = { x: cx, y: seat.y + 20, seated: true };
 }
