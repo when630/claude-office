@@ -346,8 +346,6 @@ export default {
     doneBody: 'took {d}',
     stuckTitle: '{name} looks stuck',
     stuckBody: 'Tools failing one after another, or no progress for a while',
-    hotkeyFailTitle: 'Could not register a shortcut',
-    hotkeyFailBody: '{keys} — another app already holds it. Pick a different combination in Settings.',
     updateReadyTitle: 'Claude Office {v} is ready',
     updateReadyBody: 'Restart from the tray menu to apply it, or leave it and it installs when you quit.',
     updateManualTitle: 'Claude Office {v} is out',
