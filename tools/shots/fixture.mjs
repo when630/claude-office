@@ -221,7 +221,7 @@ export function buildFixture(lang) {
 
   return {
     state,
-    meta: { version: '0.5.0', claudeDir: 'C:\\Users\\you\\.claude', lang, pref: lang, platform: 'win32' },
+    meta: { version: '1.0.0', claudeDir: 'C:\\Users\\you\\.claude', lang, pref: lang, platform: 'win32' },
     view: {
       names: 'show',
       roomThemes: {},
