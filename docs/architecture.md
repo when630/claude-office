@@ -55,6 +55,8 @@ renderer/fonts/     번들 폰트 둘 — 사무실 픽셀 폰트(Mona S 12px)�
 shared/pixels.mjs   픽셀 데이터 — 렌더러와 아이콘 생성기가 공유
 shared/i18n.mjs     화면에 나가는 문구 — t()·언어 정하기, 기간·시각 셈법(언어별로 분기하는 것만)
 shared/lang/*.mjs   언어별 사전 (순수 데이터 — UI 문구 · 방 이름 · 캐릭터 대사)
+shared/accel.mjs    단축키를 보여주는 꼴 — 맥은 키캡 기호(⌥⌘O), 윈도는 글자(Ctrl+Alt+O).
+                    설정 창과 등록 실패 알림이 같은 표기를 써야 해서 shared에 있다
 tools/make-icons.mjs        캐릭터 픽셀 → PNG (의존성 없이 직접 인코딩) — 맥 메뉴바용 16px 변형도 굽는다
 tools/install-usage-tap.mjs 위 로직의 CLI 껍데기 (npm run usage-tap)
 test/               `npm test` (node --test, 의존성 없음) — 알림 문턱 판정 · attach 명령 조립

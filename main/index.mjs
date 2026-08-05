@@ -45,6 +45,7 @@ import {
 } from './notify.mjs';
 import { openTerminal, reasonText as terminalReason } from './terminal.mjs';
 import { t, fmtDur, fmtWhen, setLang, resolveLang, LANGS, LANG_NAMES } from '../shared/i18n.mjs';
+import { accelLabel } from '../shared/accel.mjs';
 import {
   diffEvents,
   bootEvent,
@@ -268,7 +269,10 @@ function applyHotkeys({ announce = false } = {}) {
   }
   hotkeyFailed = failed;
   if (announce && failed.length) {
-    notify(t('notify.hotkeyFailTitle'), t('notify.hotkeyFailBody', { keys: failed.join(' · ') }));
+    // 알림에도 설정 창과 같은 표기로 적는다 — 날것의 Accelerator(`CommandOrControl+Alt+O`)를
+    // 보여 주면 어느 칸을 고치라는 것인지 사용자가 옮겨 읽어야 한다
+    const keys = failed.map((accel) => accelLabel(accel, process.platform === 'darwin')).join(' · ');
+    notify(t('notify.hotkeyFailTitle'), t('notify.hotkeyFailBody', { keys }));
   }
   return failed;
 }

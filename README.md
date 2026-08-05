@@ -189,7 +189,8 @@ Automatic installation is blocked for unsigned macOS builds, so there a new vers
 - **Waiting on you** in the tray menu lists whatever is waiting, longest first — click one and
   **its terminal opens right there.** No need to open the window and hunt for the desk
 - Three **global shortcuts** (rebind them in Settings) — `Ctrl+Alt+O` shows and hides the window,
-  `Ctrl+Alt+W` opens the terminal of the longest wait, `Ctrl+Alt+M` toggles the mini window. If
+  `Ctrl+Alt+W` opens the terminal of the longest wait, `Ctrl+Alt+M` toggles the mini window
+  (`⌥⌘O` · `⌥⌘W` · `⌥⌘M` on macOS). If
   another app already holds the combination you get told, rather than a shortcut that quietly
   does nothing
 - The tray icon carries the state — Clawd normally, a yellow dot when something is waiting on
