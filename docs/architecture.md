@@ -237,7 +237,20 @@ README의 캡처(`docs/images/en`·`docs/images/ko`)도 그렇게 구운 것이�
 숨긴 창은 컴포지터가 프레임을 제시하지 않아 애니메이션 순간이 잡히지 않는다.
 두 언어 캡처는 같은 시각(로드 후 경과 ms)에 찍어야 배치가 겹친다.
 
-굽는 스크립트를 새로 짤 때 걸리는 것들:
+```powershell
+npm run shots              # 여섯 장 × 두 언어 → docs/images/{en,ko}/
+npm run shots -- --cand    # 후보를 몇 장 더 남긴다 (눈으로 고를 때)
+```
+
+- `tools/bake-readme.mjs` — 굽는 쪽. Electron 진입점이라 `node`가 아니라 `electron`으로 돈다
+- `tools/shots/fixture.mjs` — 가짜 스냅샷. **두 언어를 한 곳에서 낸다**(`s(ko, en)`) —
+  파일을 나눠 두면 한쪽만 고치고 잊는다. 픽스처의 "지금"은 고정값이다
+- `tools/shots/preload.cjs` — `window.office` 대역
+
+껍데기를 고쳤으면 다시 굽는다. UI가 바뀌었는데 README의 그림만 옛것으로 남는 것이
+이 저장소에서 제일 자주 나던 문서 결함이다.
+
+굽는 스크립트를 만지거나 새로 짤 때 걸리는 것들:
 
 - **DOM 레이어만 낡은 프레임으로 남는다.** 캔버스는 별도 합성 레이어라 새로 그려지는데,
   창이 뜬 직후의 좁은 뷰포트로 잡힌 `#topbar`·`#rail`·`#panel`이 그대로 합성되는 일이 있다
