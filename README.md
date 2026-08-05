@@ -41,7 +41,7 @@ work is all finished has **its lights turned down.**
 around in the small hours hums to itself with a ♪.
 
 App text and character lines come in **English and Korean** — it follows your OS language by
-default, and you can switch it in **Settings** in the top bar or under tray menu > Language.
+default, and you can switch it in the panel's **Settings** tab or under tray menu > Language.
 No restart needed.
 
 ## It will not let you miss a session waiting on you
@@ -110,8 +110,7 @@ explains how to read the bubbles.
 
 ## Attendance
 
-The panel's **Attendance** tab (the top-bar button goes there too). The office shows you how many
-are waiting right now,
+The panel's **Attendance** tab. The office shows you how many are waiting right now,
 but **without a record there is no way to know how many minutes you left them waiting today.**
 
 <img src="docs/images/en/attendance.png" width="330" alt="Attendance — today and the last 7 days, by room, longest waits" align="right" />
@@ -221,8 +220,8 @@ Automatic installation is blocked for unsigned macOS builds, so there a new vers
   **Attendance log** ([Attendance](docs/attendance.md)) are all in the tray menu too — including
   the item that clears the log you have collected
 - Settings live in `%APPDATA%\claude-office\settings.json`
-  (`~/Library/Application Support/claude-office/settings.json` on macOS) — the tray menu and
-  **Settings** in the top bar write the same file
+  (`~/Library/Application Support/claude-office/settings.json` on macOS) — the tray menu and the
+  panel's **Settings** tab write the same file
 
 ## What it does not do
 

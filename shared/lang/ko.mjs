@@ -28,8 +28,6 @@ export default {
 
   // ── 상단바
   topbar: {
-    attendance: '출근부',
-    settings: '설정',
     mini: '작게 띄우기',
     filter: '방 이름',
     hidden: '{n}개 숨김',

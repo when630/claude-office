@@ -31,8 +31,6 @@ export default {
 
   // ── Top bar
   topbar: {
-    attendance: 'Attendance',
-    settings: 'Settings',
     mini: 'Shrink to a corner',
     filter: 'Room name',
     hidden: '{n} hidden',
