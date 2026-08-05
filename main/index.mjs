@@ -122,6 +122,9 @@ const defaults = {
     collapsed: [],
     roomGroups: [],
     roomAlias: {},
+    // 방을 앉힌 칸 — `{ 방 이름: [열, 행] }`. 사무실 배치는 창 크기가 아니라 이 값이 정한다
+    // (renderer/render.mjs의 GRID_COLS). 비어 있으면 방 순서대로 자동으로 채운다.
+    roomSlots: {},
     railOpen: true,
     panelOpen: true,
   },
@@ -316,6 +319,9 @@ function sanitizeView(v) {
     roomThemes,
     pinned: keyList(v?.pinned),
     collapsed: keyList(v?.collapsed),
+    // 방을 앉힌 칸. 열 수의 상한은 렌더러가 알고 있으므로(GRID_COLS) 여기서는 모양만 본다 —
+    // 열 밖을 가리키는 칸은 그쪽에서 자동 배정으로 떨어진다(assignSlots).
+    roomSlots: slotMap(v?.roomSlots),
     // 방 묶기·별칭 (main/rooms.mjs). 묶기는 부모 경로 목록이고 별칭은 방 이름 → 부를 이름이다.
     roomGroups: sanitizeGroups(v?.roomGroups),
     roomAlias: sanitizeAlias(v?.roomAlias),
@@ -323,6 +329,20 @@ function sanitizeView(v) {
     railOpen: v?.railOpen !== false,
     panelOpen: v?.panelOpen !== false,
   };
+}
+
+// 방 → 칸(`[열, 행]`). 손으로 고친 settings.json도 이 문을 지나므로 모양이 깨진 항목만
+// 버리고 나머지는 살린다 — 하나가 이상해서 배치를 통째로 날리면 짜 둔 사무실이 사라진다.
+// 사라진 방의 칸도 들고 있어야 다시 떴을 때 제자리로 돌아온다(방 종류와 같은 규칙).
+function slotMap(v) {
+  const out = {};
+  if (!v || typeof v !== 'object') return out;
+  for (const [key, at] of Object.entries(v).slice(0, 200)) {
+    if (typeof key !== 'string' || !key || !Array.isArray(at) || at.length !== 2) continue;
+    const [c, r] = at;
+    if (Number.isInteger(c) && Number.isInteger(r) && c >= 0 && r >= 0) out[key] = [c, r];
+  }
+  return out;
 }
 
 // 방 이름 목록(고정·접기). 중복을 걷어내고 길이를 막는다 — 사라진 방의 이름도 그대로

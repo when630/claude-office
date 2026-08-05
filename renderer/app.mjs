@@ -4,6 +4,8 @@ import {
   render,
   renderMini,
   pickAt,
+  pickRoomAt,
+  cellAt,
   clearTextCache,
   OFFICE_FONT_PX,
   OFFICE_FONT_FAMILY,
@@ -63,7 +65,15 @@ const MINI = new URLSearchParams(location.search).get('mini') === '1';
 let state = { rooms: [], recent: [], stats: {}, usage: null, ts: 0 };
 let meta = null;
 // 표시 설정 — main의 settings.json(view)에 저장된다. 상태(state)와 달리 스냅샷마다 오지 않는다.
-let cfg = { names: 'show', roomThemes: {}, pinned: [], collapsed: [], roomGroups: [], roomAlias: {} };
+let cfg = {
+  names: 'show',
+  roomThemes: {},
+  pinned: [],
+  collapsed: [],
+  roomGroups: [],
+  roomAlias: {},
+  roomSlots: {},
+};
 // 이름으로 거르기. **저장하지 않는다** — 다시 켰을 때 걸러진 채로 뜨면 그건 "방이 안 보인다"가 된다.
 let roomFilter = '';
 let view = { boxes: [], seats: [], width: 100, height: 100 };
@@ -183,6 +193,7 @@ function gauge({ label, pct, right, note, id }) {
 }
 
 // ── 캔버스
+// 미니의 자동 배율. 미니는 사무실을 창 크기에 맞춰 다시 세우므로(layoutMini) 창 폭 구간으로 족하다.
 function pickScale(width) {
   if (width >= 1500) return 4;
   if (width >= 880) return 3;
@@ -202,11 +213,41 @@ const STAGE_PAD = MINI ? 12 : 24; // style.css의 #stage padding 상하좌우 (�
 // 1배까지 줄이면 방보다 글자가 커져 이름표·방 이름·말풍선이 서로 덮어 아무것도 읽히지 않는다 —
 // 굽어서 확인했다. 사무실 전체를 한 장에 보는 것은 **글자를 끄는 축소판**이 따로 있어야 한다.
 const SCALES = [2, 2.5, 3, 3.5, 4, 4.5, 5, 6, 7, 8];
+// 자동 배율의 범위.
+//
+// 위 끝: 사무실이 작다고 8배로 들이대면 방 하나가 화면을 가득 메운다 — 확대는 사람이 하는
+// 것이고(Ctrl+휠) 자동은 "한눈에 들어오는가"만 맞춘다.
+//
+// 아래 끝이 **2배가 아니라 3배인 이유**: 2배에서는 회의실에서 마주 앉은 두 줄의 이름표가
+// 서로 겹친다(굽어서 확인했다). 글자는 확대 밖에서 12px 고정이라 배율을 내릴수록 자리 간격만
+// 좁아지기 때문이다 — 자리 줄 간격이 24px이므로 3배(72px)부터 안전하다. 손으로는 2배까지
+// 내려갈 수 있게 두었다(SCALES) — 겹치더라도 전체를 한눈에 보려는 것은 사람의 선택이다.
+const AUTO_SCALE_MAX = 4;
+const AUTO_SCALE_MIN = 3;
+
+// **큰 창의 자동 배율은 사무실이 무대에 들어가는 가장 큰 칸이다.**
+//
+// 배치가 창을 따르지 않으므로(칸 그리드) 창을 줄였을 때 사무실을 화면에 남겨 줄 수 있는 것은
+// 배율뿐이다. 창 폭 구간으로 정하면 사무실이 커진 뒤에 화면 밖으로 나가 방이 거기 있는지도 모른다.
+// 아래 끝에서도 안 들어가면 그때는 끌어서 본다(panX·panY) — 자리를 사람이 정했으니 어디에
+// 무엇이 있는지는 알고 있다.
+function fitScale(w, h, office) {
+  const usable = SCALES.filter((s) => s >= AUTO_SCALE_MIN && s <= AUTO_SCALE_MAX);
+  if (!office.width || !office.height) return usable[0];
+  const fits = usable.filter((s) => office.width * s <= w && office.height * s <= h);
+  return fits.at(-1) ?? usable[0];
+}
 // null이면 창 폭에 맡긴다. **저장하지 않는다** — 다시 켰을 때 8배로 확대된 채 뜨면
 // 그건 "방이 안 보인다"가 된다(이름 거르기와 같은 판단이다).
 let zoomScale = null;
-// 창 폭이 정한 배율. 확대해도 **방 줄 나누기는 이걸로** 재므로 따로 들고 있는다.
+// 창 폭이 정한 배율. 손으로 정한 배율(zoomScale)을 풀면 여기로 돌아온다.
+// **배치는 이걸 보지 않는다** — 방이 서는 자리는 칸이 정한다(render.mjs의 GRID_COLS).
 let baseScale = scale;
+// 지금 끌고 있는 방 — `{ key, from: [c,r], to: [c,r], moved }`. 배치를 다시 잴 때
+// (relayout) 이 값이 있으면 놓을 칸을 한 칸 더 펼친다.
+let roomDrag = null;
+// 방이 있는 화면을 한 번이라도 가운데로 놓았는가 (relayout 끝의 주석 참고)
+let centeredOnce = false;
 
 // 방이 열 개를 넘어가면 사무실이 그냥 벽지가 된다. 이름으로 거르고, 자주 보는 방을 앞에 고정하고,
 // 관심 없는 방은 접는다. 세 가지가 다 **보기만** 건드린다 — 알림도 근태도 그대로 돈다.
@@ -276,11 +317,6 @@ function markMoveIn(rooms) {
 }
 
 function relayout() {
-  // clientWidth는 padding을 포함한다 — 빼지 않으면 사무실이 여백만큼 넘쳐 가장자리가 잘린다
-  const avail = Math.max(120, (stage.clientWidth || 800) - STAGE_PAD);
-  baseScale = pickScale(avail);
-  scale = zoomScale ?? baseScale;
-
   // 캔버스는 **보이는 창만큼**이다(사무실만큼이 아니다). 사무실은 그 안에서 움직이고 바닥은
   // 보이는 범위를 늘 채운다 — 사무실 크기로 잡으면 끌었을 때 바닥이 끝나 종이처럼 잘려 보이고,
   // 8배에서는 수천만 픽셀짜리 비트맵을 매 프레임 다시 그리게 된다.
@@ -290,6 +326,7 @@ function relayout() {
     // 미니는 확대도 이동도 없다 — 사무실이 보이는 창을 그대로 채우므로 배율은 창 폭에 맡기고,
     // 레이아웃에 창 크기를 통째로 넘겨 그 안에서 줄을 나누게 한다(pan은 늘 0이다).
     // 입주 박스(markMoveIn)는 방을 그리는 연출이라 여기서는 세지 않는다.
+    baseScale = pickScale(cssW);
     scale = baseScale;
     view = layoutMini(roomsForCanvas(), Math.floor(cssW / scale), Math.floor(cssH / scale), {
       scale,
@@ -297,10 +334,18 @@ function relayout() {
     });
   } else {
     const rooms = markMoveIn(roomsForCanvas());
-    // 줄 나누기는 **자동 배율로** 잰다 — 배율마다 방이 다시 접히면 확대할 때 보고 있던 방이
-    // 다른 줄로 튄다. 늘린 만큼 캔버스가 무대보다 커지고, 그 캔버스를 끌어 옮기는 것이 화면 이동이다.
-    const logicalW = Math.max(120, Math.floor(avail / baseScale));
-    view = layout(rooms, logicalW, { themes: cfg.roomThemes, nameOf: canvasName });
+    // **창 폭을 넘기지 않는다.** 방이 서는 자리는 칸이 정하고 그 칸은 설정에 남는다
+    // (`view.roomSlots`) — 창을 줄여도 배치는 그대로다.
+    view = layout(rooms, {
+      themes: cfg.roomThemes,
+      nameOf: canvasName,
+      slots: cfg.roomSlots,
+      spread: Boolean(roomDrag),
+    });
+    // **배치를 재고 나서 배율을 정한다.** 배치가 창을 안 따르므로, 창을 줄였을 때 사무실을
+    // 화면에 남겨 두는 일은 배율이 한다(fitScale) — 순서가 뒤바뀌면 배율이 옛 사무실 크기를 본다.
+    baseScale = fitScale(cssW, cssH, view);
+    scale = zoomScale ?? baseScale;
   }
 
   canvas.style.width = `${cssW}px`;
@@ -309,11 +354,19 @@ function relayout() {
   canvas.height = Math.round(cssH * dpr);
   // 사무실 크기가 바뀌면 끌 수 있는 범위도 바뀐다 — 놓인 자리를 그 안으로 다시 당긴다
   applyPan();
+
+  // 방이 처음 생긴 화면은 가운데에서 시작한다 — 사무실이 무대보다 좁을 수 있게 되었으므로
+  // (배치가 창을 안 따른다) 왼쪽 위에 붙여 두면 오른쪽에 빈 바닥만 남아 잘린 것으로 읽힌다.
+  // **한 번만** 한다 — 매번 하면 끌어 옮긴 자리가 스냅샷마다 되돌려진다.
+  if (!MINI && !centeredOnce && view.boxes.length) {
+    centeredOnce = true;
+    recenterIfFits();
+  }
 }
 
 function frame(t) {
   if (MINI) renderMini(ctx, view, { scale, dpr, t, hover, selected, noteOf: miniNote });
-  else render(ctx, view, { scale, dpr, t, hover, selected, pan: { x: panX, y: panY } });
+  else render(ctx, view, { scale, dpr, t, hover, selected, pan: { x: panX, y: panY }, drag: roomDrag });
   requestAnimationFrame(frame);
 }
 
@@ -355,6 +408,18 @@ function applyPan() {
   // 기기 픽셀에 맞춰 놓는다 — 반 픽셀 어긋난 자리에서는 픽셀 아트 경계가 흐려진다
   panX = Math.round(panX * dpr) / dpr;
   panY = Math.round(panY * dpr) / dpr;
+}
+
+// 사무실이 무대에 다 들어갈 때만 가운데로 다시 놓는다.
+//
+// **무대 크기가 바뀌는 순간에만 부른다**(창 크기 · 양쪽 열 접기). 배치가 창을 따르지 않게 된
+// 뒤로는 창을 키웠을 때 사무실이 왼쪽에 붙어 있고 오른쪽에 빈 바닥만 남는다 — 다 들어가는데도
+// 한쪽에 몰려 있을 이유가 없다. 넘칠 때는 보고 있던 자리를 지킨다(가운데로 몰면 좌우가 반씩
+// 잘려 어느 방도 온전히 안 보인다). 스냅샷마다 부르면 끌어 둔 자리가 그때마다 되돌려진다.
+function recenterIfFits() {
+  if (MINI) return;
+  const { w, h } = stageInner();
+  if (view.width && view.width * scale <= w && view.height * scale <= h) centerOffice();
 }
 
 // 미니는 확대도 이동도 없다 — 사무실이 창을 그대로 채우므로 옮길 여지가 없고, 실수로
@@ -445,8 +510,12 @@ let pan = null;
 // 끌어 옮긴 뒤에 오는 click은 자리 선택이 아니다 — 한 번 삼킨다
 let swallowClick = false;
 
+// 방 이름 띠 위에 커서가 있는가 — 잡을 수 있다는 것을 커서 모양으로 알린다
+let hoverRoom = false;
+
 function setCursor() {
-  const c = pan ? 'grabbing' : spaceHeld ? 'grab' : hover ? 'pointer' : 'default';
+  const c =
+    pan || roomDrag ? 'grabbing' : spaceHeld ? 'grab' : hover ? 'pointer' : hoverRoom ? 'grab' : 'default';
   // 인라인 style 속성은 CSP에 막혀 있지만 CSSOM은 대상이 아니다(막대 채우기와 같은 이유)
   stage.style.cursor = c;
   canvas.style.cursor = c;
@@ -459,8 +528,65 @@ function endPan() {
   setCursor();
 }
 
+// ── 방을 끌어 옮긴다. 배치를 창 크기가 정하지 않으니(칸 그리드) 자리는 사람이 정한다.
+//
+// 손잡이는 **방 이름 띠 하나**다. 방 안을 아무 데나 잡게 하면 게를 집어 끄는 것으로 읽히고,
+// 자리를 고르는 클릭과도 겹친다. 화면을 옮기는 손짓(스페이스·가운데 버튼)과는 애초에 안 겹친다.
+function worldAt(clientX, clientY) {
+  const r = canvas.getBoundingClientRect();
+  return { x: (clientX - r.left - panX) / scale, y: (clientY - r.top - panY) / scale };
+}
+
+function roomAt(clientX, clientY) {
+  const w = worldAt(clientX, clientY);
+  return pickRoomAt(view, w.x, w.y);
+}
+
+function startRoomDrag(e) {
+  const box = roomAt(e.clientX, e.clientY);
+  if (!box) return false;
+  e.preventDefault();
+  roomDrag = { key: box.room.key, from: [...box.slot], to: [...box.slot], x: e.clientX, y: e.clientY, moved: false };
+  // 끌기 시작하면 격자가 오른쪽·아래로 한 칸 펼쳐진다 — 새 열·새 줄에도 놓을 수 있어야 한다
+  relayout();
+  stage.setPointerCapture(e.pointerId);
+  setCursor();
+  return true;
+}
+
+// 칸을 맞바꾼다. 놓을 칸이 비어 있으면 그냥 옮기고, 방이 있으면 그 방을 내가 있던 칸으로 보낸다 —
+// 밀어내기로 하면 옆방이 연쇄로 딸려 움직여 어디로 갈지 예측할 수 없다.
+//
+// **화면에 있는 모든 방의 칸을 같이 굳힌다.** 옮긴 방 하나만 적어 두면 자동으로 채워지던
+// 나머지가 다음 배치에서 빈 칸을 앞에서부터 다시 메우며 같이 움직인다 — 하나를 옮겼는데
+// 옆 방이 따라오는 것으로 보인다. 걸러져 화면에 없는 방의 칸은 건드리지 않는다.
+function moveRoomTo(key, to, from) {
+  const next = { ...cfg.roomSlots };
+  for (const b of view.boxes) next[b.room.key] = [...b.slot];
+  const sitting = view.boxes.find((b) => b.room.key !== key && b.slot[0] === to[0] && b.slot[1] === to[1]);
+  if (sitting) next[sitting.room.key] = [...from];
+  next[key] = [...to];
+  // saveView가 화면을 먼저 바꾸고(refresh → relayout) 저장이 뒤따른다 — 손을 뗀 자리에
+  // 방이 늦게 가면 안 먹은 줄 안다
+  saveView({ roomSlots: next });
+}
+
+function endRoomDrag(commit) {
+  if (!roomDrag) return;
+  const drag = roomDrag;
+  roomDrag = null;
+  // 끌어 옮긴 뒤에 오는 click은 선택을 지우는 것이 아니다 — 한 번 삼킨다
+  swallowClick = drag.moved;
+  const [c, r] = drag.to;
+  if (commit && drag.moved && (c !== drag.from[0] || r !== drag.from[1])) moveRoomTo(drag.key, drag.to, drag.from);
+  else relayout(); // 펼쳐 둔 격자를 접는다
+  setCursor();
+}
+
 stage.addEventListener('pointerdown', (e) => {
   swallowClick = false;
+  // 방 이름 띠를 잡았다 — 화면이 아니라 방을 옮긴다
+  if (!MINI && e.button === 0 && !spaceHeld && startRoomDrag(e)) return;
   // 스페이스를 누른 채로, 또는 가운데 버튼으로 끈다 (둘 다 Figma와 같다)
   if (!(e.button === 1 || (e.button === 0 && spaceHeld))) return;
   e.preventDefault(); // 가운데 버튼의 자동 스크롤을 막는다
@@ -472,6 +598,13 @@ stage.addEventListener('pointerdown', (e) => {
   setCursor();
 });
 stage.addEventListener('pointermove', (e) => {
+  if (roomDrag) {
+    // 손떨림은 클릭으로 남긴다 — pan과 같은 문턱이다
+    if (Math.abs(e.clientX - roomDrag.x) > 2 || Math.abs(e.clientY - roomDrag.y) > 2) roomDrag.moved = true;
+    const w = worldAt(e.clientX, e.clientY);
+    roomDrag.to = cellAt(view, w.x, w.y) ?? roomDrag.to;
+    return;
+  }
   if (!pan) return;
   const dx = e.clientX - pan.x;
   const dy = e.clientY - pan.y;
@@ -483,10 +616,26 @@ stage.addEventListener('pointermove', (e) => {
   pan.y = e.clientY;
   panBy(dx, dy);
 });
-stage.addEventListener('pointerup', endPan);
-stage.addEventListener('pointercancel', endPan);
+stage.addEventListener('pointerup', () => {
+  endRoomDrag(true);
+  endPan();
+});
+stage.addEventListener('pointercancel', () => {
+  endRoomDrag(false);
+  endPan();
+});
+// **안전망.** 무대의 pointerup을 놓치면 방이 손에 붙은 채로 남는데, 그 상태는 화면이 격자로
+// 덮이고 클릭이 다 삼켜져 고장으로 읽힌다(끌던 것을 놓을 문이 사라진다). 포인터 캡처가 걸려
+// 있으면 위의 핸들러가 먼저 돌고 여기서는 할 일이 없다 — 두 번 불려도 roomDrag가 이미 null이다.
+window.addEventListener('pointerup', () => endRoomDrag(true));
 
 window.addEventListener('keydown', (e) => {
+  // 끌던 방을 제자리에 돌려놓는다 — 놓을 칸을 잘못 짚었을 때 손을 떼기 전에 물릴 수 있어야 한다
+  if (e.key === 'Escape' && roomDrag) {
+    e.preventDefault();
+    endRoomDrag(false);
+    return;
+  }
   // 글자를 치는 중이면 손대지 않는다 — 거르기 칸에 공백이 안 들어가는 것으로 드러난다
   const typing = Boolean(e.target?.closest?.('input, select, textarea'));
   if (e.code === 'Space') {
@@ -528,6 +677,7 @@ window.addEventListener('keyup', (e) => {
 window.addEventListener('blur', () => {
   spaceHeld = false;
   spaceTap = false;
+  endRoomDrag(false);
   endPan();
   setCursor();
 });
@@ -541,14 +691,17 @@ function seatAt(clientX, clientY) {
 
 canvas.addEventListener('mousemove', (e) => {
   // 끌어 옮기는 중에는 히트 테스트를 하지 않는다 — 지나간 자리마다 이름표가 켜진다
-  if (pan) return;
+  if (pan || roomDrag) return;
   const seat = seatAt(e.clientX, e.clientY);
   hover = seat?.worker.key ?? null;
   if (MINI) setMiniHover(seat);
+  // 방 이름 띠는 자리가 없는 줄이라 둘이 동시에 잡히지 않는다
+  else hoverRoom = Boolean(roomAt(e.clientX, e.clientY));
   setCursor();
 });
 canvas.addEventListener('mouseleave', () => {
   hover = null;
+  hoverRoom = false;
   if (MINI) setMiniHover(null);
   setCursor();
 });
@@ -1335,9 +1488,9 @@ function applyPanes() {
   panelToggle.setAttribute('aria-pressed', String(cfg.panelOpen));
 }
 
-// 접고 펴면 사무실 폭이 바뀐다 — 리사이즈와 **같은 경로**를 타야 방 줄 나누기가 다시 잡힌다.
+// 접고 펴면 무대 폭이 바뀐다 — 리사이즈와 **같은 경로**를 타야 배율과 놓인 자리가 다시 잡힌다.
 function togglePane(which) {
-  saveView(which === 'rail' ? { railOpen: !cfg.railOpen } : { panelOpen: !cfg.panelOpen });
+  saveView(which === 'rail' ? { railOpen: !cfg.railOpen } : { panelOpen: !cfg.panelOpen }).then(recenterIfFits);
 }
 
 railToggle.addEventListener('click', () => togglePane('rail'));
@@ -1396,6 +1549,18 @@ function roomSig() {
 // main도 같은 값을 걸러내지만(sanitizeView), 렌더러는 IPC 없이도 돌아야 하므로 여기서도 본다.
 function normalizeView(v) {
   const list = (x) => (Array.isArray(x) ? x.filter((k) => typeof k === 'string' && k) : []);
+  // 방을 앉힌 칸 — `{ 방 이름: [열, 행] }`. 모양이 깨진 항목만 버리고 나머지는 살린다
+  // (하나가 이상해서 배치를 통째로 날리면 손으로 짜 둔 사무실이 사라진다).
+  const slots = (x) => {
+    const out = {};
+    if (!x || typeof x !== 'object') return out;
+    for (const [key, at] of Object.entries(x)) {
+      if (!Array.isArray(at) || at.length !== 2) continue;
+      const [c, r] = at;
+      if (Number.isInteger(c) && Number.isInteger(r) && c >= 0 && r >= 0) out[key] = [c, r];
+    }
+    return out;
+  };
   return {
     names: NAME_MODES.includes(v?.names) ? v.names : 'show',
     roomThemes: v?.roomThemes && typeof v.roomThemes === 'object' ? { ...v.roomThemes } : {},
@@ -1403,6 +1568,7 @@ function normalizeView(v) {
     collapsed: list(v?.collapsed),
     roomGroups: list(v?.roomGroups),
     roomAlias: v?.roomAlias && typeof v.roomAlias === 'object' ? { ...v.roomAlias } : {},
+    roomSlots: slots(v?.roomSlots),
     // 양쪽 열이 열려 있는지. 기본이 열림이라 옛 설정에도 값이 없어도 된다.
     railOpen: v?.railOpen !== false,
     panelOpen: v?.panelOpen !== false,
@@ -1662,6 +1828,9 @@ function roomsPane() {
           : `<p class="dim">${t('cfg.roomsEmpty')}</p>`
       }
       <button class="btn cfg-reset" type="button"${picked ? '' : ' disabled'}>${t('cfg.roomsReset')}</button>
+      <button class="btn cfg-slots-reset" type="button"${
+        Object.keys(cfg.roomSlots).length ? '' : ' disabled'
+      }>${t('cfg.slotsReset')}</button>
     </section>
   `;
 }
@@ -1825,6 +1994,11 @@ cfgBody.addEventListener('click', (e) => {
   if (handleHintClick(e.target)) return;
   if (e.target.classList?.contains('cfg-reset')) {
     saveView({ roomThemes: {} }).then(drawCfg);
+    return;
+  }
+  // 손으로 옮겨 둔 칸을 다 버린다 — 배치를 엉망으로 만들었을 때 돌아올 자리가 있어야 한다
+  if (e.target.classList?.contains('cfg-slots-reset')) {
+    saveView({ roomSlots: {} }).then(drawCfg);
     return;
   }
   // 고정·접기는 목록에 그대로 남아야 하므로(사라지면 되돌릴 자리가 없다) 표시만 갈아 끼운다
@@ -2325,6 +2499,8 @@ setInterval(() => {
 window.addEventListener('resize', () => {
   dpr = Math.min(window.devicePixelRatio || 1, 2);
   relayout();
+  // 무대가 커졌는데 사무실이 왼쪽에 붙어 있으면 오른쪽에 빈 바닥만 남는다 — 다 들어가면 가운데로
+  recenterIfFits();
   // 손잡이가 좁아지면 사용률이 접혀야 한다 — 그 판정은 폭을 재서 하므로 여기서 다시 부른다
   if (MINI) drawMiniUsage();
 });
@@ -2354,7 +2530,10 @@ window.__office = {
       pan: { x: panX, y: panY },
       width: view.width,
       height: view.height,
-      boxes: view.boxes.map((b) => ({ key: b.room.key, x: b.x, y: b.y, w: b.w, h: b.h })),
+      // 칸(slot)까지 같이 낸다 — 창을 줄여도 배치가 그대로인지는 좌표가 아니라 칸으로 봐야
+      // 확실하다(배율이 바뀌면 좌표는 같아도 화면에서는 다른 크기로 보인다).
+      boxes: view.boxes.map((b) => ({ key: b.room.key, slot: b.slot, x: b.x, y: b.y, w: b.w, h: b.h })),
+      grid: view.grid,
     };
   },
   push(next) {

@@ -32,6 +32,24 @@ const ROOM_GAP = 8;
 const MAX_COLS = 5; // 책상 줄이 겹쳐 쌓이는 것보다 방이 옆으로 넓은 편이 낫다
 // 한 명뿐인 방도 "사무실"로 보여야 한다 — 벽 소품 한두 개가 들어갈 폭까지 넓혀 둔다
 const MIN_ROOM_W = 168;
+
+// ── 방을 앉히는 칸 그리드. **창 크기를 보지 않는다.**
+//
+// 전에는 창 폭에 맞춰 방을 좌→우로 흘려 줄바꿈했다. 그러면 창을 줄일 때 줄 수가 바뀌는
+// 것으로 끝나지 않는다 — 한 줄에 들어가는 자리 수(그때의 `fitCols`)까지 창 폭을 타서
+// **방 자체의 폭과 높이가 달라졌다.** 창을 조금 줄인 것만으로 사무실이 통째로 다시 짜인다.
+//
+// 지금은 방마다 칸 하나(col·row)를 갖고 그 자리는 설정에 남는다(`view.roomSlots`) —
+// 창이 좁으면 덜 보일 뿐 배치는 그대로다(안 보이면 끌어 옮기거나 축소한다).
+//
+// 열 수는 **고정값**이다. 방 개수로 정하면 세션이 하나 뜰 때마다 열이 늘어 배치가 다시
+// 짜이고, 그건 창 폭에 맡기던 것과 같은 문제다.
+export const GRID_COLS = 3;
+// 비어 있는 칸도 자리를 남긴다 — 칸이 접혀 사라지면 손으로 비워 둔 자리에 다시 놓을 수 없고,
+// 화면에 보이는 격자와 놓을 칸을 짚는 격자가 어긋난다. 방 최소 크기보다 훨씬 작게 둔다
+// (빈 칸이 방만큼 넓으면 사무실에 구멍이 뚫린 것으로 읽힌다).
+const EMPTY_COL_W = 64;
+const EMPTY_ROW_H = 40;
 const FLOOR_BASE = 46; // 돌아다닐 바닥 높이 (인원수만큼 더 넓어진다)
 const MAX_BUBBLE_W = 96;
 const LABEL_L = 62; // 왼쪽 방 이름이 쓰는 폭 (벽 소품이 침범하지 않게)
@@ -211,35 +229,79 @@ function placeWallDecor(box, theme) {
   return out;
 }
 
-// ── 레이아웃: 방을 가로로 흘려 배치하고, 방마다 책상 줄 + 걸어 다닐 바닥을 만든다.
+// ── 칸 배정. 손으로 옮겨 둔 자리(slots)가 먼저고, 나머지는 읽는 순서(왼→오른, 위→아래)로
+// 가장 앞의 빈 칸을 채운다.
+//
+// 같은 칸을 두 방이 가리키면 앞선 방이 이기고 뒤는 자동 배정으로 떨어진다 — 설정 파일을
+// 손으로 고쳤을 때 방이 겹쳐 한쪽이 보이지 않게 되는 것을 막는다. 열 밖(col ≥ cols)이나
+// 음수도 같은 이유로 버린다.
+//
+// 순수 함수라 test/grid.test.mjs가 node로 훑는다.
+export function assignSlots(keys, slots, cols = GRID_COLS) {
+  const src = slots && typeof slots === 'object' ? slots : {};
+  const taken = new Set();
+  const out = new Map();
+
+  for (const key of keys) {
+    const at = src[key];
+    if (!Array.isArray(at)) continue;
+    const [c, r] = at;
+    if (!Number.isInteger(c) || !Number.isInteger(r) || c < 0 || c >= cols || r < 0) continue;
+    if (taken.has(`${c},${r}`)) continue;
+    taken.add(`${c},${r}`);
+    out.set(key, [c, r]);
+  }
+
+  let c = 0;
+  let r = 0;
+  for (const key of keys) {
+    if (out.has(key)) continue;
+    while (taken.has(`${c},${r}`)) {
+      c += 1;
+      if (c >= cols) {
+        c = 0;
+        r += 1;
+      }
+    }
+    taken.add(`${c},${r}`);
+    out.set(key, [c, r]);
+  }
+  return out;
+}
+
+const EMPTY_GRID = { cols: 0, rows: 0, colX: [], colW: [], rowY: [], rowH: [] };
+
+// ── 레이아웃: 방을 칸 그리드에 앉히고, 방마다 책상 줄 + 걸어 다닐 바닥을 만든다.
+//
+// **창 크기를 인자로 받지 않는다**(GRID_COLS 머리말 참고). 방이 서는 자리는 칸이 정하고,
+// 칸은 설정에 남는다 — 창을 줄여도 배치가 그대로여야 하기 때문이다.
 //
 // opts는 설정(app.mjs)에서 온다. `themes`는 방 key → 손으로 고른 종류 key,
 // `nameOf`는 자리에 붙일 이름을 정하는 함수다 — 빈 문자열을 주면 이름표를 아예 달지 않는다.
 // 이름 규칙을 여기서 판단하지 않는 건 오른쪽 패널도 같은 규칙을 써야 하기 때문이다.
-export function layout(rooms, maxWidth, opts = {}) {
-  const usable = Math.max(MIN_ROOM_W, maxWidth);
+// `slots`는 손으로 옮겨 둔 칸, `spread`는 지금 방을 끌고 있는가다 — 끌고 있을 때만
+// 오른쪽·아래로 한 칸씩 더 펼쳐 **새 열·새 줄에 놓을 자리**를 만든다.
+export function layout(rooms, opts = {}) {
   const boxes = [];
   const seats = [];
   const hues = assignHues(rooms);
   const themes = assignThemes(rooms, hashStr, opts.themes);
-  // ── 1걸음: 크기만 재고 줄을 나눈다.
+  // ── 1걸음: 크기만 재고 칸을 배정한다.
   //
   // 방마다 자리 줄 높이가 다르다 — 회의실은 테이블을 놓고 마주 앉히느라(MEET_BLOCK_H)
   // 보통 자리 줄(SLOT_H)과 어긋나고, 바닥도 인원수를 탄다. 그대로 놓으면 한 줄에 선
-  // 방들의 아래가 들쭉날쭉하다. 그래서 **줄을 먼저 나누고 그 줄의 최대 높이를 안 뒤에**
-  // 박스를 만든다. 한 걸음으로는 지금 방이 어느 줄의 몇 번째인지 알 수 없다.
+  // 방들의 아래가 들쭉날쭉하다. 그래서 **칸을 먼저 배정해 그 행의 최대 높이를 안 뒤에**
+  // 박스를 만든다. 한 걸음으로는 지금 방과 같은 행에 무엇이 서는지 알 수 없다.
   const deskTop = ROOM_HEAD + DESK_PAD;
-  const fitCols = Math.max(1, Math.floor((usable - ROOM_PAD * 2) / SLOT_W));
-  const lines = [];
-  let line = [];
-  let lineW = 0;
+  const plans = [];
 
   for (const room of rooms) {
     const theme = themes.get(room.key) ?? THEMES[0];
     const meet = theme.station === 'table';
     const n = Math.max(1, room.workers.length);
-    // 회의실은 한 줄에 절반만 앉힌다 — 나머지 절반이 테이블 반대편에 마주 앉는다
-    const cols = Math.min(meet ? Math.ceil(n / 2) : n, MAX_COLS, fitCols);
+    // 회의실은 한 줄에 절반만 앉힌다 — 나머지 절반이 테이블 반대편에 마주 앉는다.
+    // **창 폭은 보지 않는다** — 좁은 창에서 자리 줄이 접히면 방 모양이 창을 따라 변한다.
+    const cols = Math.min(meet ? Math.ceil(n / 2) : n, MAX_COLS);
     const per = meet ? cols * 2 : cols; // 줄(또는 테이블) 하나가 받는 인원
     const rows = Math.ceil(n / per);
     // 마지막 테이블에 가까운 쪽 줄이 있는가 — 없으면 그만큼 방이 낮아진다
@@ -247,115 +309,139 @@ export function layout(rooms, maxWidth, opts = {}) {
     const deskH = meet ? (rows - 1) * MEET_BLOCK_H + (lastFacing ? MEET_BLOCK_H : MEET_LONE_H) : rows * SLOT_H;
     const w = Math.max(MIN_ROOM_W, cols * SLOT_W + ROOM_PAD * 2);
     const floorH = FLOOR_BASE + Math.min(n, 6) * 4;
-    const plan = { room, theme, meet, cols, per, rows, deskH, w, floorH, h: deskTop + deskH + floorH + ROOM_PAD };
-
-    // 줄바꿈 판정은 예전과 같다 — 방이 어느 줄에 서는지가 달라지면 그건 다른 변경이다
-    if (lineW > 0 && lineW + w > usable) {
-      lines.push(line);
-      line = [];
-      lineW = 0;
-    }
-    line.push(plan);
-    lineW += w + ROOM_GAP;
+    plans.push({ room, theme, meet, cols, per, rows, deskH, w, floorH, h: deskTop + deskH + floorH + ROOM_PAD });
   }
-  if (line.length) lines.push(line);
 
-  // 줄마다 가장 높은 방에 맞춘다. 남는 높이는 **바닥에 준다** — 돌아다닐 자리가 넓어질 뿐
+  if (!plans.length) return { boxes, seats, width: 0, height: 0, grid: EMPTY_GRID };
+
+  const slots = assignSlots(
+    plans.map((p) => p.room.key),
+    opts.slots,
+    GRID_COLS,
+  );
+  for (const p of plans) p.slot = slots.get(p.room.key) ?? [0, 0];
+
+  // 격자 크기. **뒤쪽의 빈 열·행은 자른다** — 안 자르면 방 하나짜리 사무실에도 빈 띠가
+  // 붙어 끌 수 있는 범위가 쓸데없이 넓어진다. 끌고 있는 동안(spread)만 오른쪽·아래로
+  // 한 칸 되살려 새 열·새 줄에 놓을 수 있게 한다. 앞쪽 열이 정하는 x는 그대로라
+  // 펼쳐도 이미 놓인 방은 움직이지 않는다.
+  const maxCol = Math.max(...plans.map((p) => p.slot[0]));
+  const maxRow = Math.max(...plans.map((p) => p.slot[1]));
+  const nCols = opts.spread ? GRID_COLS : maxCol + 1;
+  const nRows = maxRow + (opts.spread ? 2 : 1);
+
+  // 열 폭·행 높이는 그 열·행의 가장 큰 방이 정한다. 방 폭은 늘리지 않고 **시작선만 맞춘다** —
+  // 열 폭까지 늘리면 1인 방이 5인 방 옆에서 텅 빈 강당이 된다.
+  const colW = Array.from({ length: nCols }, () => EMPTY_COL_W);
+  const rowH = Array.from({ length: nRows }, () => EMPTY_ROW_H);
+  for (const p of plans) {
+    colW[p.slot[0]] = Math.max(colW[p.slot[0]], p.w);
+    rowH[p.slot[1]] = Math.max(rowH[p.slot[1]], p.h);
+  }
+  const colX = [];
+  const rowY = [];
+  let ax = 0;
+  for (let c = 0; c < nCols; c += 1) {
+    colX.push(ax);
+    ax += colW[c] + ROOM_GAP;
+  }
+  let ay = 0;
+  for (let r = 0; r < nRows; r += 1) {
+    rowY.push(ay);
+    ay += rowH[r] + ROOM_GAP;
+  }
+
+  // 행 안에서 가장 높은 방에 맞춘다. 남는 높이는 **바닥에 준다** — 돌아다닐 자리가 넓어질 뿐
   // 자리 배치는 그대로다(자리는 벽 쪽 기준이라 아래로만 늘어난다).
-  for (const row of lines) {
-    const tallest = Math.max(...row.map((p) => p.h));
-    for (const p of row) {
-      p.floorH += tallest - p.h;
-      p.h = tallest;
-    }
+  for (const p of plans) {
+    const h = rowH[p.slot[1]];
+    p.floorH += h - p.h;
+    p.h = h;
   }
 
   // ── 2걸음: 맞춘 높이로 좌표를 붙여 박스를 만든다
-  let x = 0;
-  let y = 0;
-  let rowH = 0;
+  for (const { room, theme, meet, cols, per, rows, deskH, w, floorH, h, slot } of plans) {
+    const x = colX[slot[0]];
+    const y = rowY[slot[1]];
+    // 방이 최소 폭까지 늘어난 경우 자리 줄을 가운데로 모은다
+    const deskOff = Math.floor((w - (cols * SLOT_W + ROOM_PAD * 2)) / 2) + ROOM_PAD;
+    const area = {
+      x: x + 4,
+      y: y + deskTop + deskH,
+      w: w - 8,
+      h: floorH - 3,
+    };
+    const box = {
+      room,
+      theme,
+      x,
+      y,
+      w,
+      h,
+      cols,
+      rows,
+      slot, // 어느 칸에 앉았나 — 끌어 옮길 때 이 값을 굳혀 설정에 적는다
+      floor: area,
+      hue: hues.get(room.key) ?? HUES[0],
+      props: placeProps(area, theme),
+      // 다 같이 모이는 자리 — 정수기 앞 잡담이 여기서 벌어진다
+      hang: { x: area.x + Math.floor(area.w / 2), y: area.y + area.h - 6 },
+      seats: [],
+      // 회의실만 채운다. 한 테이블을 두 줄이 나눠 쓰므로 그리는 순서를 여기서 잡아야 한다.
+      blocks: meet
+        ? Array.from({ length: rows }, (_, b) => ({
+            top: y + deskTop + b * MEET_BLOCK_H,
+            x: x + deskOff - MEET_OVERHANG,
+            w: cols * SLOT_W + MEET_OVERHANG * 2,
+            far: [],
+            near: [],
+          }))
+        : null,
+    };
+    box.decor = placeWallDecor(box, theme);
+    boxes.push(box);
 
-  for (const row of lines) {
-    x = 0;
-    rowH = row[0]?.h ?? 0;
-
-    for (const { room, theme, meet, cols, per, rows, deskH, w, floorH, h } of row) {
-      // 방이 최소 폭까지 늘어난 경우 자리 줄을 가운데로 모은다
-      const deskOff = Math.floor((w - (cols * SLOT_W + ROOM_PAD * 2)) / 2) + ROOM_PAD;
-      const area = {
-        x: x + 4,
-        y: y + deskTop + deskH,
-        w: w - 8,
-        h: floorH - 3,
-      };
-      const box = {
-        room,
-        theme,
-        x,
-        y,
-        w,
-        h,
-        cols,
-        rows,
+    room.workers.forEach((worker, i) => {
+      const seat = {
+        worker,
+        box,
+        name: opts.nameOf ? opts.nameOf(worker) : worker.name,
         floor: area,
-        hue: hues.get(room.key) ?? HUES[0],
-        props: placeProps(area, theme),
-        // 다 같이 모이는 자리 — 정수기 앞 잡담이 여기서 벌어진다
-        hang: { x: area.x + Math.floor(area.w / 2), y: area.y + area.h - 6 },
-        seats: [],
-        // 회의실만 채운다. 한 테이블을 두 줄이 나눠 쓰므로 그리는 순서를 여기서 잡아야 한다.
-        blocks: meet
-          ? Array.from({ length: rows }, (_, b) => ({
-              top: y + deskTop + b * MEET_BLOCK_H,
-              x: x + deskOff - MEET_OVERHANG,
-              w: cols * SLOT_W + MEET_OVERHANG * 2,
-              far: [],
-              near: [],
-            }))
-          : null,
+        idx: i, // 바닥을 인원수만큼 나눠 각자 제 구역 근처를 돈다 — 안 그러면 한곳에 뭉친다
+        count: room.workers.length,
+        w: SLOT_W,
+        h: SLOT_H,
+        side: null, // 회의실에서만 'far' | 'near'
+        dy: DY_DESK,
+        actor: null, // 매 프레임 갱신 — 히트 테스트가 이걸 본다
       };
-      box.decor = placeWallDecor(box, theme);
-      boxes.push(box);
-
-      room.workers.forEach((worker, i) => {
-        const seat = {
-          worker,
-          box,
-          name: opts.nameOf ? opts.nameOf(worker) : worker.name,
-          floor: area,
-          idx: i, // 바닥을 인원수만큼 나눠 각자 제 구역 근처를 돈다 — 안 그러면 한곳에 뭉친다
-          count: room.workers.length,
-          w: SLOT_W,
-          h: SLOT_H,
-          side: null, // 회의실에서만 'far' | 'near'
-          dy: DY_DESK,
-          actor: null, // 매 프레임 갱신 — 히트 테스트가 이걸 본다
-        };
-        if (meet) {
-          const blk = box.blocks[Math.floor(i / per)];
-          const within = i % per;
-          const far = within < cols;
-          seat.side = far ? 'far' : 'near';
-          seat.dy = far ? DY_MEET_FAR : DY_MEET_NEAR;
-          seat.x = x + deskOff + (within % cols) * SLOT_W;
-          seat.y = blk.top + (far ? 0 : MEET_NEAR - SEAT_HEAD);
-          seat.h = MEET_BLOCK_H - (MEET_NEAR - SEAT_HEAD); // 마주 앉은 두 줄의 판정 영역이 겹치지 않을 만큼
-          blk[seat.side].push(seat);
-        } else {
-          seat.x = x + deskOff + (i % cols) * SLOT_W;
-          seat.y = y + deskTop + Math.floor(i / cols) * SLOT_H;
-        }
-        seats.push(seat);
-        box.seats.push(seat);
-      });
-
-      x += w + ROOM_GAP;
-    }
-    y += rowH + ROOM_GAP;
+      if (meet) {
+        const blk = box.blocks[Math.floor(i / per)];
+        const within = i % per;
+        const far = within < cols;
+        seat.side = far ? 'far' : 'near';
+        seat.dy = far ? DY_MEET_FAR : DY_MEET_NEAR;
+        seat.x = x + deskOff + (within % cols) * SLOT_W;
+        seat.y = blk.top + (far ? 0 : MEET_NEAR - SEAT_HEAD);
+        seat.h = MEET_BLOCK_H - (MEET_NEAR - SEAT_HEAD); // 마주 앉은 두 줄의 판정 영역이 겹치지 않을 만큼
+        blk[seat.side].push(seat);
+      } else {
+        seat.x = x + deskOff + (i % cols) * SLOT_W;
+        seat.y = y + deskTop + Math.floor(i / cols) * SLOT_H;
+      }
+      seats.push(seat);
+      box.seats.push(seat);
+    });
   }
 
-  // 마지막 줄 뒤에 붙은 간격은 뺀다 — 사무실 아래에 빈 띠가 남는다
-  return { boxes, seats, width: usable, height: Math.max(0, y - ROOM_GAP) };
+  // 마지막 열·행 뒤에 붙은 간격은 뺀다 — 사무실 오른쪽과 아래에 빈 띠가 남는다
+  return {
+    boxes,
+    seats,
+    width: Math.max(0, ax - ROOM_GAP),
+    height: Math.max(0, ay - ROOM_GAP),
+    grid: { cols: nCols, rows: nRows, colX, colW, rowY, rowH },
+  };
 }
 
 // 클릭·호버 판정. 캐릭터가 자리를 떠나 있으므로 "지금 서 있는 곳"을 먼저 본다.
@@ -366,6 +452,34 @@ export function pickAt(view, lx, ly) {
     if (a && lx >= a.x - 11 && lx <= a.x + 11 && ly >= a.y - 14 && ly <= a.y + 5) return s;
   }
   return view.seats.find((s) => lx >= s.x && lx < s.x + s.w && ly >= s.y && ly < s.y + s.h) ?? null;
+}
+
+// 방 이름 띠(벽면) 판정 — **방을 끌어 옮기는 손잡이**다. 자리도 게도 없는 줄이라
+// 자리 선택(pickAt)과 절대 겹치지 않는다. 잡을 수 있다는 것은 커서 모양으로 알린다.
+export function pickRoomAt(view, lx, ly) {
+  return (
+    view.boxes.find((b) => lx >= b.x && lx < b.x + b.w && ly >= b.y && ly < b.y + ROOM_HEAD) ?? null
+  );
+}
+
+// 좌표가 어느 칸인가. 격자 밖이면 가장 가까운 칸에 붙인다 — 끌고 있는 동안에는 오른쪽·아래로
+// 한 칸 펼쳐져 있으므로(layout의 spread) 새 열·새 줄도 이 안에 들어온다.
+export function cellAt(view, lx, ly) {
+  const g = view.grid;
+  if (!g?.cols) return null;
+  const pick = (v, starts) => {
+    let i = 0;
+    for (let k = 0; k < starts.length; k += 1) if (v >= starts[k]) i = k;
+    return i;
+  };
+  return [pick(lx, g.colX), pick(ly, g.rowY)];
+}
+
+// 칸 하나의 사각형(논리 좌표). 놓을 자리를 표시하는 쪽과 재는 쪽이 같은 셈을 써야 한다.
+export function cellRect(view, c, r) {
+  const g = view.grid;
+  if (!g?.cols || c < 0 || r < 0 || c >= g.cols || r >= g.rows) return null;
+  return { x: g.colX[c], y: g.rowY[r], w: g.colW[c], h: g.rowH[r] };
 }
 
 // ── 프리미티브
@@ -2263,11 +2377,56 @@ export function renderMini(ctx, view, opts) {
   paintLabels(ctx, labels, { scale, dpr });
 }
 
+// ── 방을 끌고 있는 동안의 안내.
+//
+// 칸이 눈에 보이지 않으면 방이 왜 그 자리로 튀는지 알 수 없다 — 끌기 시작할 때만 격자를
+// 드러낸다. 격자는 방 **아래**에 옅게 깔고(위에 그으면 벽 소품과 이름표를 가른다), 놓을 칸은
+// 방 **위에** 짚는다. 그 칸에 이미 방이 있으면 자리를 맞바꾸는 것이라 그 방까지 짚어 줘야 한다.
+const GRID_LINE = '#2a3241';
+const DROP_FILL = 'rgba(255, 207, 92, 0.12)';
+
+function drawGridLines(ctx, view) {
+  const g = view.grid;
+  if (!g?.cols) return;
+  ctx.fillStyle = GRID_LINE;
+  // 점선으로 그으면 배율마다 점 간격이 달라 보인다 — 1px 실선으로 칸의 네 변을 두른다
+  for (let c = 0; c < g.cols; c += 1) {
+    for (let r = 0; r < g.rows; r += 1) {
+      const x = g.colX[c];
+      const y = g.rowY[r];
+      const w = g.colW[c];
+      const h = g.rowH[r];
+      ctx.fillRect(x, y, w, 1);
+      ctx.fillRect(x, y + h - 1, w, 1);
+      ctx.fillRect(x, y, 1, h);
+      ctx.fillRect(x + w - 1, y, 1, h);
+    }
+  }
+}
+
+function drawDropCell(ctx, view, drag) {
+  const at = cellRect(view, drag.to[0], drag.to[1]);
+  if (at) {
+    rect(ctx, at.x, at.y, at.w, at.h, DROP_FILL);
+    ctx.fillStyle = COLORS.sel;
+    ctx.fillRect(at.x, at.y, at.w, 1);
+    ctx.fillRect(at.x, at.y + at.h - 1, at.w, 1);
+    ctx.fillRect(at.x, at.y, 1, at.h);
+    ctx.fillRect(at.x + at.w - 1, at.y, 1, at.h);
+  }
+  // 지금 손에 잡힌 방 — 격자가 켜진 화면에서 어느 것을 들고 있는지 표시가 없으면 헷갈린다
+  const held = view.boxes.find((b) => b.room.key === drag.key);
+  if (!held) return;
+  ctx.strokeStyle = COLORS.sel;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(held.x + 0.5, held.y + 0.5, held.w - 1, held.h - 1);
+}
+
 // 캔버스는 **보이는 창**이고 사무실이 그 안에서 움직인다(app.mjs의 panX·panY).
 // 세계 좌표 → 화면은 `world * scale + pan`이다. 전에는 캔버스가 사무실만큼 컸는데,
 // 그러면 8배로 확대했을 때 수천만 픽셀짜리 비트맵을 매 프레임 다시 그리고 바닥도 거기서 끝난다.
 export function render(ctx, view, opts) {
-  const { scale, dpr, t, hover, selected, pan = { x: 0, y: 0 } } = opts;
+  const { scale, dpr, t, hover, selected, pan = { x: 0, y: 0 }, drag = null } = opts;
   const labels = [];
 
   // 자리·바닥 전환 단계를 먼저 정한다 — 아래 그리는 순서가 전부 이걸 본다.
@@ -2306,7 +2465,9 @@ export function render(ctx, view, opts) {
     { x: -pan.x / scale, y: -pan.y / scale, w: ctx.canvas.width / (scale * dpr), h: ctx.canvas.height / (scale * dpr) },
     tint,
   );
+  if (drag) drawGridLines(ctx, view);
   for (const box of view.boxes) drawRoom(ctx, box, labels, t);
+  if (drag) drawDropCell(ctx, view, drag);
 
   // 자리 줄 먼저, 그다음 바닥의 게들을 y 순으로 — 앞에 선 게가 뒤를 가린다.
   for (const box of view.boxes) {

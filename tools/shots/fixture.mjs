@@ -222,7 +222,25 @@ export function buildFixture(lang) {
   return {
     state,
     meta: { version: '0.5.0', claudeDir: 'C:\\Users\\you\\.claude', lang, pref: lang, platform: 'win32' },
-    view: { names: 'show', roomThemes: {}, pinned: ['claude-office'], collapsed: [], roomGroups: [], roomAlias: {}, roomLevels: {} },
+    view: {
+      names: 'show',
+      roomThemes: {},
+      pinned: ['claude-office'],
+      collapsed: [],
+      roomGroups: [],
+      roomAlias: {},
+      roomLevels: {},
+      // 방 자리를 **콕 집어 둔다.** 배치는 칸 그리드이고 자동은 세 열로 늘어서므로
+      // (renderer/render.mjs의 GRID_COLS) 그대로 두면 사무실이 무대보다 넓어져 캡처의
+      // 좌우가 잘린다. 2×2로 앉히면 3배에서 딱 들어가고, 사람이 자리를 정할 수 있다는
+      // 것도 그림에 그대로 담긴다.
+      roomSlots: {
+        'claude-office': [0, 0],
+        'api-gateway': [1, 0],
+        portal: [0, 1],
+        billing: [1, 1],
+      },
+    },
     // main/index.mjs의 notifySettings()가 돌려주는 모양. kinds·levels·doneAfterMs가 없으면
     // 알림 탭과 방 탭이 그리다 터진다.
     notify: {

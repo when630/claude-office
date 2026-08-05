@@ -225,8 +225,9 @@ export default {
     roomCollapse: 'Collapse in the office',
     roomsEmpty: 'No rooms are up right now. Once a session attaches you can pick its type here.',
     roomsReset: 'Reset all to auto',
+    slotsReset: 'Reset room layout',
     roomsHint:
-      'Auto assigns by hashing the room name. A type you pick is remembered by working-directory name, so it survives the room going away and coming back. The box on the right is how loudly that room may call you — <b>No alerts</b> keeps its sessions from notifying at all (they still show up in the office), and <b>Keen</b> pulls the repeat nudges in to <code>1 · 3 · 10 · 30 min</code>. Under the name, <b>☆</b> pins the room to the front and <b>▥</b> collapses it out of the office — both change the view only; alerts and attendance carry on.',
+      'Auto assigns by hashing the room name. A type you pick is remembered by working-directory name, so it survives the room going away and coming back. The box on the right is how loudly that room may call you — <b>No alerts</b> keeps its sessions from notifying at all (they still show up in the office), and <b>Keen</b> pulls the repeat nudges in to <code>1 · 3 · 10 · 30 min</code>. Under the name, <b>☆</b> pins the room to the front and <b>▥</b> collapses it out of the office — both change the view only; alerts and attendance carry on.<br><br>To move a room, <b>drag its name strip</b> in the office. Rooms snap to cells, and dropping one on an occupied cell swaps the two (<b>Esc</b> cancels before you let go). The layout stays put no matter the window size — a smaller window just draws it smaller.',
   },
 
   // ── Attendance
