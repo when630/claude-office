@@ -27,6 +27,7 @@ import {
   fmtTokens,
   fmtLimit,
 } from '../shared/i18n.mjs';
+import { accelLabel, modHint } from '../shared/accel.mjs';
 
 const canvas = document.getElementById('office');
 const ctx = canvas.getContext('2d');
@@ -1435,11 +1436,8 @@ function accelOf(e) {
   return parts.join('+');
 }
 
-// 저장은 Accelerator 문법 그대로 두고 보여줄 때만 눌러 편다 — `CommandOrControl+Alt+O`는
-// 칸을 다 잡아먹고, 사람이 실제로 누르는 키의 이름도 아니다.
-function accelLabel(accel) {
-  return accel.replace('CommandOrControl', /Mac/i.test(navigator.userAgent) ? 'Cmd' : 'Ctrl');
-}
+// 보여줄 때만 눌러 펴는 일은 shared/accel.mjs가 한다 (맥은 키캡 기호, 윈도는 글자).
+const IS_MAC = /Mac/i.test(navigator.userAgent);
 
 // main이 없으면(브라우저로 직접 연 경우) 이 탭들은 채울 값이 없다 — 빈 화면 대신 이유를 적는다
 function noIpc() {
@@ -1512,7 +1510,8 @@ function hotkeyBlock() {
   const row = (action) => {
     const accel = hotkeyCfg.hotkeys[action] ?? '';
     const bad = accel && hotkeyCfg.failed?.includes(accel);
-    const text = capturing === action ? t('cfg.hotkeyPress') : accel ? accelLabel(accel) : t('cfg.hotkeyNone');
+    const text =
+      capturing === action ? t('cfg.hotkeyPress') : accel ? accelLabel(accel, IS_MAC) : t('cfg.hotkeyNone');
     return `<div class="cfg-row">
       <label><b>${t(HOTKEY_LABEL[action])}</b>${bad ? `<small class="warn">${t('cfg.hotkeyTaken')}</small>` : ''}</label>
       <button type="button" class="btn cfg-key${capturing === action ? ' on' : ''}${bad ? ' bad' : ''}"
@@ -1679,11 +1678,13 @@ function drawCfg() {
   // 판 전체를 설명하는 것은 제목에 붙일 자리가 없다 — 탭 바 끝에 둔다.
   // "이 탭에 관한 설명"으로 읽히고, 제목이 있는 절은 그 제목 안에 따로 붙는다.
   const TAB_HINT = { keys: 'cfg.hotkeyHint', rooms: 'cfg.roomsHint' };
+  // 수식키 이름은 플랫폼에 따라 갈린다(맥은 ⌘ · ⌥ · ⇧) — 사전에는 자리만 두고 여기서 채운다
+  const TAB_HINT_PARAMS = { keys: { mods: modHint(IS_MAC) } };
   cfgTabsEl.innerHTML =
     CFG_TABS.map(
       ([k]) => `<button type="button" role="tab" aria-selected="${k === pane[0]}"
       class="btn btn-toggle${k === pane[0] ? ' on' : ''}" data-cfg-tab="${k}">${t(`cfg.tab.${k}`)}</button>`,
-    ).join('') + (TAB_HINT[pane[0]] ? hintBtn(TAB_HINT[pane[0]]) : '');
+    ).join('') + (TAB_HINT[pane[0]] ? hintBtn(TAB_HINT[pane[0]], TAB_HINT_PARAMS[pane[0]]) : '');
   cfgBody.innerHTML = pane[1]();
 }
 

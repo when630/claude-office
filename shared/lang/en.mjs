@@ -206,7 +206,7 @@ export default {
     hotkeyPress: 'Press a combination…',
     hotkeyTaken: 'Another app has it',
     hotkeyHint:
-      'Click a box and press the combination you want. <b>Backspace</b> clears it, which turns that shortcut off. Combinations without a modifier (Ctrl · Alt · Shift) are refused — these are global and would swallow your typing. A combination another app already holds is marked in red.',
+      'Click a box and press the combination you want. <b>Backspace</b> clears it, which turns that shortcut off. Combinations without a modifier ({mods}) are refused — these are global and would swallow your typing. A combination another app already holds is marked in red.',
     quiet: 'Quiet hours',
     quietRange: 'Hours',
     quietHint:
