@@ -909,7 +909,14 @@ function workerPanel(w) {
   return `
     <div class="panel-body">
     <header class="who">
-      <span class="mood ${esc(w.mood)}">${esc(t(`mood.${w.mood}`))}</span>
+      ${
+        // 서버 장애로 멈춘 중이면 mood 자리를 그 사실이 쓴다. mood는 그대로 두는 값이라
+        // (에러 뒤 쉬고 있으면 idle, 사용자가 다시 던졌으면 typing) 그것만 보여주면
+        // 사무실에서 어지러워하는 게를 눌러 놓고 "대기"라고 적힌 패널을 보게 된다.
+        w.broken
+          ? `<span class="mood broken">${esc(t('mood.broken'))}</span>`
+          : `<span class="mood ${esc(w.mood)}">${esc(t(`mood.${w.mood}`))}</span>`
+      }
       <h2>${esc(panelName(w))}</h2>
       ${w.title ? `<p class="subtitle">${esc(w.title)}</p>` : ''}
       <p class="cwd">${esc(w.cwd)}</p>

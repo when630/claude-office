@@ -99,6 +99,24 @@ function humming(key, tms) {
   return Math.floor((tms + (hashStr(key) % HUM_CYCLE)) / HUM_CYCLE) % 3 === 0;
 }
 
+// 어지러워하고 있는가 — 서버 장애로 응답을 못 받는 세션(main/collect.mjs의 isBroken)은
+// 머리 위로 별이 돈다. 그동안 상태 기호는 접는다: 궤도가 기호 말풍선 자리(머리 옆)를
+// 지나므로 둘을 같이 띄우면 겹친다.
+//
+// **판정을 렌더러가 아니라 여기 두는 이유**는 두 곳이 같은 답을 봐야 하기 때문이다 —
+// 기호를 접는 쪽(glyphKeyFor)과 별을 그리는 쪽(render.mjs의 drawDizzy)이 갈라지면
+// 기호와 별이 함께 뜨거나 함께 사라진다.
+//
+// 양보하는 자리가 둘이다.
+//  - **입력 대기가 먼저다.** 서버가 죽어 있어도 나를 부르는 것이 더 급한 소식이고,
+//    느낌표를 접으면 정작 답해야 할 때 아무 신호가 남지 않는다(기다리는 놈을 잡담 짝에서
+//    빼두는 것과 같은 판단이다)
+//  - **전환 중(✓ 다 했다 · ✱ 받았다)도 양보한다.** 그 표시는 걸어 나가는 내내 들고 있어야
+//    "다 하고 나가는 것"으로 읽힌다
+export function showsDizzy(worker, phase = null) {
+  return Boolean(worker.broken) && worker.mood !== 'waiting' && !phase?.note;
+}
+
 export function glyphKeyFor(worker, { chat = null, answering = false, phase = null, slot = '', tms = 0 } = {}) {
   // 잡담 중엔 상태 기호를 접는다. 예외는 하나 — **상대가 답하는 동안** 먼저 말한 쪽 머리에
   // 하트를 띄운다("들었다"는 표시). 그때는 이쪽 말풍선이 이미 걷혀 있어 겹치지 않고,
@@ -109,6 +127,9 @@ export function glyphKeyFor(worker, { chat = null, answering = false, phase = nu
   // "다 하고 나가는 것"으로 읽힌다.
   if (phase?.note === 'done') return 'gCheck';
   if (phase?.note === 'start') return 'gSpark';
+
+  // 어지러운 동안엔 머리 위 별이 상태 기호 자리를 쓴다
+  if (showsDizzy(worker, phase)) return null;
 
   switch (worker.mood) {
     case 'waiting':
@@ -245,6 +266,14 @@ export function speechFor(worker, tms, extra = []) {
   // 경과 시간도 세션에서 나온 값이라 'real'(흰 말풍선)로 보낸다.
   const waited = waitedLine(worker);
   if (waited && i % 3 === 1) return { text: waited, alpha: fade(f), kind: 'real' };
+
+  // 서버 장애로 멈춘 중이면 그 얘기가 먼저다. mood 상투구를 그대로 두면 `idle`의 심심하다는
+  // 소리나 방 분위기 얘기가 나오고, 정작 멈춰 있는 이유는 아무 데도 안 뜬다.
+  // 세션에서 읽어온 말(realLine)도 안 쓴다 — 그건 멈추기 **전에** 하던 일이라 지금 상황이 아니다.
+  if (showsDizzy(worker)) {
+    const text = pick(t('talk.lines.broken'), seed, i);
+    if (text) return { text, alpha: fade(f), kind: 'idle' };
+  }
 
   const real = realLine(worker, i);
   const base = t(`talk.lines.${worker.mood}`);

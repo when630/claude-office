@@ -43,6 +43,8 @@ export const SPR = {
   sip: sprite(PX.CLAWD_SIP),
   aide: sprite(PX.CLAWD_AIDE),
   aideUp: sprite(PX.CLAWD_AIDE_UP),
+  tiltL: sprite(PX.CLAWD_TILT_L),
+  tiltR: sprite(PX.CLAWD_TILT_R),
 
   // 바닥 소품
   plant: sprite(PX.PLANT),
@@ -104,6 +106,20 @@ export const SPR = {
   gSpark: glyph(PX.G_SPARK, '#d8a33a'),
   // 헤매는 중 — 어두운 gQuestion과 같은 모양이지만 눈에 걸려야 하므로 색이 다르다
   gStuck: glyph(PX.G_QUESTION, '#d8a33a'),
+
+  // 서버 장애로 응답을 못 받는 세션의 머리 위를 도는 별. 궤도의 앞뒤를 크기로 낸다.
+  //
+  // **연보라다 — 다른 색은 전부 임자가 있다.** 만화 관례의 노랑을 쓸 수 없다: 노랑은
+  // 나를 기다린다(gBang·--acc)와 헤매는 중·일을 받았다(gStuck·gSpark)가 나눠 쓰고 있다.
+  // 빨강은 실패(gCross), 초록은 완료(gCheck), 파랑은 작업 중(--work)이다. 색이 겹치면
+  // "무슨 일인가"를 색으로 짚을 수 없게 되고, 그게 이 화면이 파는 유일한 것이다.
+  // 게 몸통(클레이색)의 보색이라 어두운 방에서도 또렷하다.
+  //
+  // 궤도의 **앞뒤를 이 두 색이 가른다** — 모양은 같고 뒤쪽만 흐리다. 뒤쪽을 작은 점으로
+  // 줄여 봤더니 한 바퀴의 절반 동안 별이 먼지가 되어, 도는 것이 아니라 깜빡이는 것으로
+  // 보였다(실제 크기로 굽어 확인했다).
+  dizzy: glyph(PX.DIZZY_STAR, '#b9a1f0'),
+  dizzyFar: glyph(PX.DIZZY_STAR, '#6f5f9c'),
 };
 
 export function drawSprite(ctx, spr, x, y) {
