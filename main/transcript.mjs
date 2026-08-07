@@ -319,6 +319,60 @@ export function scanErrorRun(lines) {
   return run;
 }
 
+// Claude **서버 쪽** 문제로 응답을 아예 못 받고 있는가.
+//
+// 도구가 실패하는 것(scanErrorRun)과 다른 종류의 멈춤이다. 그쪽은 세션이 돌고는 있는데
+// 진전이 없는 것이고, 이쪽은 모델이 대답을 못 해서 **턴 자체가 성립하지 않는다.**
+// 사람이 할 일도 다르다 — 헤매면 들여다봐야 하고, 서버 장애면 기다리면 된다.
+//
+// 흔적은 model이 `<synthetic>`인 assistant 줄로 남는다:
+//   {"type":"assistant","message":{"model":"<synthetic>","content":[{"type":"text",
+//    "text":"API Error: 529 Overloaded…"}]},"error":"server_error",
+//    "isApiErrorMessage":true,"apiErrorStatus":529}
+//
+// **`server_error`만 센다.** 로컬 트랜스크립트에서 실측한 `isApiErrorMessage` 41건은 세 갈래였다.
+//   - `server_error` (529 Overloaded · 연결 끊김) — 서버 고장. 이것만 여기서 본다
+//   - `rate_limit` (429 · 세션/모델 한도) — 서버가 아니라 내 몫을 다 쓴 것이다. 앱에 이미
+//     사용량 게이지가 있고, 그쪽은 기다리는 것 말고 할 일이 다르다(/model로 바꾸기 등)
+//   - `authentication_failed` (`/login` 필요) — 내 로그인 문제다. 어지러워할 일이 아니다
+//
+// **연속을 세되 정상 응답이 뒤에 붙으면 끊는다.** 529는 몇 분 뒤 재시도로 풀리는 게 보통이라
+// (실측: 프롬프트 → 에러까지 3.5분, 사용자가 같은 지시를 다시 던져 회복) 옛 에러가 꼬리에
+// 남아 있는 것만으로 어지러워하면 지나간 장애를 영구히 붙들게 된다. 그 뒤에 온 정상 응답
+// 한 줄이 "이제 된다"는 증거다.
+//
+// 서브에이전트(isSidechain) 줄은 세지 않는다 — 비서가 529를 먹어도 본체는 멀쩡히 돌 수 있고,
+// 회복 판정을 sidechain별로 따로 추적해야 해서 얻는 것보다 복잡함이 크다.
+export function scanApiFail(lines) {
+  let run = 0;
+  let at = null;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    if (!line || line.length > MAX_LINE) continue;
+    const failed = line.includes('"isApiErrorMessage":true');
+    // 정상 응답인지 보려면 assistant 줄인지부터 봐야 한다. usage는 assistant 줄만 들고 있다.
+    if (!failed && !line.includes('cache_read_input_tokens')) continue;
+
+    let o;
+    try {
+      o = JSON.parse(line);
+    } catch {
+      continue; // 쓰는 중이라 깨진 줄
+    }
+    if (o.type !== 'assistant' || o.isSidechain) continue;
+
+    if (!failed || !o.isApiErrorMessage) {
+      // 실제 모델이 대답한 줄 = 회복했다. `<synthetic>`은 에러·안내용 가짜 응답이라 세지 않는다.
+      if (o.message?.model && o.message.model !== '<synthetic>') break;
+      continue;
+    }
+    if (o.error !== 'server_error') break; // 한도·로그인 — 서버 고장이 아니다
+    run++;
+    at ??= Date.parse(o.timestamp || '') || null;
+  }
+  return { run, at };
+}
+
 // 뒤에서 앞으로 훑으며 각 항목의 "가장 최근 것"을 하나씩 줍는다.
 function parseTail(text) {
   const out = {
@@ -334,6 +388,7 @@ function parseTail(text) {
     plan: null,
     turns: [],
     errorRun: 0,
+    apiFail: { run: 0, at: null },
   };
   const lines = text.split('\n');
   const seenPr = new Set();
@@ -343,6 +398,7 @@ function parseTail(text) {
   out.aides = scanAides(lines);
   out.plan = scanPlan(lines);
   out.errorRun = scanErrorRun(lines);
+  out.apiFail = scanApiFail(lines);
 
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i];
@@ -490,6 +546,8 @@ export async function readTranscript(cwd, sessionId) {
     // 연달아 실패한 도구 호출 수와 대화 파일이 마지막으로 자란 시각 — 헤매는 세션을
     // 알아보는 두 신호다(main/collect.mjs의 isStuck)
     errorRun: parsed.errorRun,
+    // 서버 쪽 문제로 응답을 못 받고 있는가 — { run, at } (main/collect.mjs의 isBroken)
+    apiFail: parsed.apiFail,
     at: st.mtimeMs,
   };
 

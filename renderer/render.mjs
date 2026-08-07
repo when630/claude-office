@@ -15,6 +15,7 @@ import {
   rnd,
   slotNow,
   glyphKeyFor,
+  showsDizzy,
   hangEveryAt,
 } from './talk.mjs';
 import { assignThemes, THEMES } from './themes.mjs';
@@ -1606,10 +1607,54 @@ export function walkPos(seat, t) {
   };
 }
 
+// ── 어지러움. 서버 장애로 응답을 못 받는 세션(worker.broken)은 몸을 좌우로 갸우뚱하고
+// 머리 위로 별이 돈다. 12px에서 머리 자체를 회전시킬 방법은 없으므로 둘을 겹쳐 낸다.
+//
+// **몸과 별이 같은 위상으로 돈다.** 각도 하나를 두 곳이 나눠 쓰므로(dizzyAngle) 별이
+// 오른쪽에 있을 때 몸도 오른쪽으로 기운다 — 주기를 따로 두면 함께 도는 것이 아니라
+// 별은 별대로 돌고 몸은 몸대로 떠는 그림이 된다.
+const DIZZY_CYCLE = 1100;
+const DIZZY_STARS = 2; // 반대편에 하나씩. 하나면 뒤쪽 반원에 있는 동안 머리 위가 텅 빈다
+const DIZZY_RX = 6; // 좌우 반경 — 별까지 합쳐 15px이라 게 폭(16) 안에서 돈다
+const DIZZY_RY = 2; // 위아래 반경
+const DIZZY_CY = -5; // 궤도 중심 — 머리 맨 윗줄에서 이만큼 위
+
+function dizzyAngle(t) {
+  return ((t % DIZZY_CYCLE) / DIZZY_CYCLE) * Math.PI * 2;
+}
+
+function clawdDizzy(t) {
+  return Math.sin(dizzyAngle(t)) >= 0 ? SPR.tiltR : SPR.tiltL;
+}
+
+// 궤도는 **머리에 닿지 않는 납작한 타원**이다.
+//
+// 별은 게보다 **나중에** 그려진다(상태 기호와 같은 층이다). 그래서 궤도가 몸을 파고들면
+// 가려지는 대신 몸 위에 얹혀 실루엣에 구멍을 뚫는다 — 실제로 원으로 돌려 보니 앞쪽
+// 반원에서 머리에 구멍이 난 것처럼 보였다. 어두운 테두리를 둘러 물건으로 만들어 봤지만
+// (결재판에 썼던 수법) 그건 몸에 더 큰 구멍이 됐다. 그래서 그리는 순서를 건드리지 않고
+// **궤도를 머리 위로 띄웠다**(DIZZY_CY · DIZZY_RY) — 가장 아래로 내려온 별도 머리보다 위다.
+//
+// 앞뒤는 색으로 낸다. **뒤에 있는 별을 먼저 그려** 앞 별이 그것을 덮게 한다 — 둘이 교차하는
+// 순간에 앞뒤가 뒤바뀌면 도는 방향이 그 프레임만 반대로 읽힌다.
+function drawDizzy(ctx, cx, top, t) {
+  const a = dizzyAngle(t);
+  const angles = [];
+  for (let i = 0; i < DIZZY_STARS; i++) angles.push(a + (i / DIZZY_STARS) * Math.PI * 2);
+  angles.sort((p, q) => Math.cos(q) - Math.cos(p));
+  for (const s of angles) {
+    const spr = Math.cos(s) > 0 ? SPR.dizzyFar : SPR.dizzy;
+    drawSprite(ctx, spr, cx + Math.sin(s) * DIZZY_RX - spr.w / 2, top + DIZZY_CY - Math.cos(s) * DIZZY_RY - spr.h / 2);
+  }
+}
+
 // 앉아서 일하는 동작도 방마다 다르다. 회의실은 손짓, 연구실은 두 팔을 든 채 젓는 모습.
 // 앉으면 상판이 하반신을 덮어 다리가 안 보이므로, 두드리는 동작은 **팔을 한 줄 올렸다
 // 내리는**(stand↔armsUp) 것으로 만든다 — 팔은 눈 높이라 상판 위에 늘 남는다.
 function clawdSeated(worker, t, station) {
+  // 서버 장애로 응답을 못 받는 중 — 자리에 앉은 채로 갸우뚱거린다. 앉으면 상판이 하반신을
+  // 덮으므로 상반신만 기운 갸우뚱 프레임이 그대로 읽힌다.
+  if (showsDizzy(worker)) return clawdDizzy(t);
   // 헤매는 중 — 자리에는 있지만 손이 안 나간다. 아주 느리게 팔을 들었다 내리는 것이
   // 머리를 긁적이는 모습으로 읽힌다(두드리는 150ms와 확연히 다른 주기여야 한다).
   if (worker.mood === 'stuck') return Math.floor(t / 700) % 2 ? SPR.armsHigh : SPR.stand;
@@ -1627,10 +1672,20 @@ function clawdSeated(worker, t, station) {
   }
 }
 
-function clawdStanding(worker, t, pos, chat) {
+// phase를 받는 것은 어지러움 때문이다 — 자리를 오가는 중(✓·✱를 든 동안)에는 갸우뚱하지
+// 않는다. 기호를 접는 쪽과 같은 판정을 써야 표시와 자세가 갈라지지 않는다(showsDizzy).
+function clawdStanding(worker, t, pos, chat, phase = null) {
   if (worker.mood === 'waiting') return SPR.armsHigh;
   // 걷기는 대각선 짝으로 — 두 프레임의 접지선이 같아야 하므로 몸통은 띄우지 않는다
+  //
+  // **어지러워도 걷는 동안은 걷기 프레임이 먼저다.** 갸우뚱 프레임은 다리가 제자리에
+  // 붙어 있어서, 걷는 중에 끼우면 좌표만 흐르고 발은 안 움직이는 미끄러짐이 된다
+  // (걷는 경로는 시간에서 유도되므로 프레임만 바꿔서는 게를 세울 수 없다).
+  // 그동안에도 머리 위 별은 돈다 — 비틀비틀 걸어가는 것으로 읽힌다.
   if (pos.moving) return Math.floor(t / 160) % 2 ? SPR.stepA : SPR.stepB;
+  // 멈춰 서 있으면 갸우뚱한다. 잡담·머그보다 앞이다 — 서버가 죽은 판에 수다를 떨거나
+  // 커피를 들고 있으면 어지러움이 장식으로 보인다.
+  if (showsDizzy(worker, phase)) return clawdDizzy(t);
   if (chat) return Math.floor(t / 220) % 2 ? SPR.chat : SPR.stand;
   // 자판기·정수기·커피머신 앞에 섰으면 컵을 들고 있다 — 들렀다는 표시가 이것뿐이다
   if (DRINK_KEYS.includes(pos.atProp)) return SPR.sip;
@@ -1902,7 +1957,7 @@ function drawMeetingRoom(ctx, box, scale, t, labels, hover, selected) {
 // 걷는 게 아니라 발을 붙인 채 몸만 들썩이는 모습이었다. 걸음은 다리로만 만든다.
 function drawWanderer(ctx, seat, pos, t, labels, hover, selected, chat) {
   const { worker } = seat;
-  const spr = clawdStanding(worker, t, pos, chat);
+  const spr = clawdStanding(worker, t, pos, chat, seat.phase);
   const x = Math.round(pos.x);
   const y = Math.round(pos.y); // 발 위치
   const top = y - spr.h;
@@ -2251,6 +2306,9 @@ export function layoutMini(rooms, maxW, maxH, opts = {}) {
 // 뒷줄에는 이름표도 없어서 두드리는 손(typing)·자는 모습(stopped)·그냥 서 있는 것(idle)이
 // 유일한 구분이다. 머리 위 기호는 그 위에 얹힌다(glyphKeyFor).
 function clawdMini(worker, t) {
+  // 서버 장애로 응답을 못 받는 중 — 큰 창과 같은 갸우뚱이다. 미니에는 걷기가 없으므로
+  // 자세가 늘 이것으로 갈린다(큰 창은 걷는 동안 걷기 프레임에 양보한다).
+  if (showsDizzy(worker)) return clawdDizzy(t);
   switch (worker.mood) {
     case 'waiting':
       return SPR.armsHigh; // 손을 들고 부른다
@@ -2297,6 +2355,7 @@ function drawMiniSeat(ctx, seat, t, labels, opts) {
     const float = worker.mood === 'waiting' ? Math.round(Math.sin(t / 260) * 1.5) : Math.round(Math.sin(t / 900) * 1);
     drawGlyphBubble(ctx, cx, feet - spr.h - M_GLYPH_GAP + float, glyph);
   }
+  if (showsDizzy(worker)) drawDizzy(ctx, cx, feet - spr.h, t);
 
   if (!seat.front) return;
 
@@ -2522,8 +2581,12 @@ export function render(ctx, view, opts) {
       if (inTransit) drawGlyphBubble(ctx, cx, top - 1 + float, glyph);
       else drawGlyphBubble(ctx, cx + 12, top + 4 + float, glyph);
     }
-    // 기호가 머리 위로 올라간 동안엔 말풍선이 그 위로 더 비켜야 한다
-    const speechGap = glyph ? (inTransit ? 15 : 6) : 2;
+    // 기호가 접힌 자리를 도는 별. 둘은 같은 판정으로 갈리므로 함께 뜨는 일이 없다.
+    if (showsDizzy(worker, seat.phase)) drawDizzy(ctx, cx, top, t);
+    // 기호가 머리 위로 올라간 동안엔 말풍선이 그 위로 더 비켜야 한다.
+    // 어지러울 때도 같다 — 궤도가 머리 위 8px까지 올라가므로 기본 간격(2)이면 별이
+    // 말풍선을 뚫고 지나간다.
+    const speechGap = glyph ? (inTransit ? 15 : 6) : showsDizzy(worker, seat.phase) ? 10 : 2;
 
     // 비서가 보고하는 동안엔 본인은 입을 다문다 — 둘이 동시에 떠들면 말풍선이 겹친다
     const report = seat.aideAnchor ? reportFor(worker, t) : null;

@@ -72,6 +72,11 @@
   --fail: #e2624a;
   --fail-fg: #f18a72;
   --fail-bg: #3d1d18;
+  /* 서버 장애로 응답을 못 받는 중. **캔버스에서 도는 별과 같은 색이어야 한다**
+     (sprites.mjs의 dizzy) — 사무실에서 본 보라 별과 패널의 칩이 같은 것을 가리킨다는 게
+     색으로만 이어진다. 남은 색이 보라뿐인 사정도 그쪽에 적어 뒀다. */
+  --broken: #b9a1f0;
+  --broken-bg: #2a2245;
 
   /* 주 동작(터미널 열기) — 초록이지만 --done과 다른 축이다. 끝났다는 뜻이 아니라 누르라는 뜻이다 */
   --go-line: #2d6a4a;
@@ -889,6 +894,10 @@ b.lv-na {
 .mood.done {
   background: var(--done-bg);
   color: var(--done-fg);
+}
+.mood.broken {
+  background: var(--broken-bg);
+  color: var(--broken);
 }
 
 /* ── 기본 정보 요약. 값 열두 개 중 늘 보는 셋만 한 줄에 세우고 나머지는 접는다.

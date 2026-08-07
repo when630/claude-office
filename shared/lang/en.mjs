@@ -61,6 +61,9 @@ export default {
     typing: 'working',
     waiting: 'waiting on you',
     stuck: 'going in circles',
+    // Not a mood but a flag laid on top of one (collect.mjs's isBroken). It lives here
+    // because the panel chip shares the mood slot.
+    broken: 'no server response',
     idle: 'idle',
     done: 'done',
     failed: 'failed',
@@ -481,6 +484,21 @@ export default {
     waiting: 'Waiting for {d}…',
 
     lines: {
+      // Server-side outage — what it mutters while the room spins. These must read as
+      // "not my fault, just wait it out"; if they blur into the `stuck` lines above,
+      // the two states become indistinguishable in speech.
+      broken: [
+        'The room is spinning',
+        'The server is not answering',
+        'Sorry, what was that again',
+        'My mind just went blank',
+        'I blacked out for a second',
+        'Looks like the line dropped',
+        'It should come back shortly',
+        'Not my fault this time',
+        'I am seeing stars',
+        'Let me catch my breath and retry',
+      ],
       stuck: [
         'Been circling the same spot for a while',
         'Why is this not working',

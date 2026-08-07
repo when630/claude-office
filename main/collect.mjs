@@ -153,6 +153,36 @@ export function isSlowing(tr, mood, now = Date.now()) {
   return quiet >= SLOWING_QUIET_MS && quiet < STUCK_QUIET_MS;
 }
 
+// Claude 서버 쪽 문제로 응답을 못 받고 있는가 — 화면에서는 어지러워한다.
+//
+// `stuck`과 갈라 두는 이유: `stuck`은 "돌고는 있는데 진전이 없다"이고 이쪽은 **아예 돌지
+// 못한다.** 턴이 에러로 끝나면 status가 `idle`로 떨어지므로, 이 판정이 없으면 게가 자리에서
+// 일어나 태평하게 방을 어슬렁거린다 — 내 잘못이 아닌 이유로 일이 멈춘 순간인데 사무실은
+// 한가한 그림이었다.
+//
+// `slowing`과 같은 처지라 **새 mood를 만들지 않는다.** mood는 그대로 두고 표시만 얹는다.
+// 하나는 이게 status와 직교하기 때문이다 — 에러 뒤 그대로 쉬고 있으면 `idle`, 사용자가 다시
+// 던졌으면 `busy`이고, 어느 쪽이든 "서버가 죽어 있다"는 사실은 같다. mood로 만들면 그 조합을
+// 다 나열해야 하고 근태·통계·미니뷰의 mood 목록까지 전부 갈라진다.
+//
+// 판정은 여기서 한다 — 문턱을 아는 곳이 한 군데여야 한다(isSlowing과 같은 이유).
+//
+// 시간 문턱이 필요한 이유: 트랜스크립트 꼬리에는 **회복하지 못한 채 끝난 세션의 에러 줄이
+// 그대로 남는다**(뒤에 정상 응답이 없으니 scanApiFail의 연속도 끊기지 않는다). 문턱이 없으면
+// 어제 장애를 만난 세션이 오늘까지 어지러워한다. 넉넉히 잡은 쪽은 실측 때문이다 —
+// 529 한 번의 내부 재시도에 3.5분이 걸렸고, 문턱이 그보다 짧으면 정작 서버가 죽어 있는
+// 동안에 표시가 꺼진다.
+export const BROKEN_FRESH_MS = 8 * 60 * 1000;
+
+export function isBroken(tr, now = Date.now()) {
+  const fail = tr?.apiFail;
+  if (!fail?.run) return false;
+  // 시각을 못 읽었으면(줄이 깨졌거나 옛 형식) 대화 파일이 마지막으로 자란 시각으로 대신한다 —
+  // 에러 줄이 곧 마지막 줄이므로 그게 사실상 같은 값이다.
+  const at = fail.at ?? tr.at;
+  return at != null && now - at < BROKEN_FRESH_MS;
+}
+
 // status(실시간) → needs → state(스냅샷) 순으로 캐릭터의 기분을 정한다.
 //
 // `status: "waiting"`은 Claude Code가 **사용자 답을 기다리는 동안** 직접 넣어 주는 값이다 —
@@ -326,6 +356,9 @@ export async function collect({ groups = [], alias = {} } = {}) {
       mood,
       // 헤매기 직전인가 — mood는 그대로 typing이고 화면에 말줄임만 얹는다
       slowing: isSlowing(tr, mood, now),
+      // 서버 쪽 문제로 응답을 못 받고 있는가 — 이것도 mood를 갈아치우지 않고 표시만 얹는다.
+      // 화면에서는 머리 위로 별이 돌고 몸이 좌우로 갸우뚱한다.
+      broken: isBroken(tr, now),
       // 잡은 state.json의 detail이 가장 최신. 터미널 세션은 그런 파일이 없으니
       // 자리를 비운 사용자에게 남긴 요약(away_summary) → 마지막으로 한 말 순으로 대신한다.
       detail: trimText(st.detail || tr?.summary || tr?.lastMessage || ''),
