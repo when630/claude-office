@@ -57,6 +57,9 @@ shared/i18n.mjs     화면에 나가는 문구 — t()·언어 정하기, 기간
 shared/lang/*.mjs   언어별 사전 (순수 데이터 — UI 문구 · 방 이름 · 캐릭터 대사)
 shared/accel.mjs    단축키를 보여주는 꼴 — 맥은 키캡 기호(⌥⌘O), 윈도는 글자(Ctrl+Alt+O).
                     설정 창과 등록 실패 알림이 같은 표기를 써야 해서 shared에 있다
+shared/status.mjs   세션 하나를 **무엇이라고 부를지**. mood 위에 얹히는 표시(서버 장애)가
+                    생기면서 "그래서 어느 칸에 세는가"의 답이 한 곳에 있어야 했다 —
+                    상단바·세션 목록·트레이·패널·캔버스가 전부 이것을 본다
 tools/make-icons.mjs        캐릭터 픽셀 → PNG (의존성 없이 직접 인코딩) — 맥 메뉴바용 16px 변형도 굽는다
 tools/install-usage-tap.mjs 위 로직의 CLI 껍데기 (npm run usage-tap)
 test/               `npm test` (node --test, 의존성 없음) — 알림 문턱 판정 · attach 명령 조립

@@ -37,6 +37,9 @@ export default {
     typing: '작업 중',
     waiting: '입력 대기',
     stuck: '헤매는 중',
+    // mood가 아니라 그 위에 얹히는 표시다(collect.mjs의 isBroken). 세는 칸에서는
+    // 다른 상태와 겹치지 않게 빼 주므로 여기서도 나란히 선다.
+    broken: '서버 응답 없음',
     failed: '실패',
     longest: '최장 {d}',
     tokens: '{n} tok',
@@ -118,6 +121,7 @@ export default {
     typing: '작업 중',
     waiting: '입력 대기',
     stuck: '헤매는 중',
+    broken: '서버 응답 없음',
     ctxMax: '최고 컨텍스트',
     aides: '서브에이전트',
     spare: '예비 슬롯',
@@ -301,6 +305,7 @@ export default {
     waiting: '{n} 입력 대기',
     waitingLong: '{n} 입력 대기 (최장 {d})',
     stuck: '{n} 헤매는 중',
+    broken: '{n} 서버 응답 없음',
     failed: '{n} 실패',
     update: '업데이트 설치하고 재시작 (v{v})',
     open: '사무실 열기',

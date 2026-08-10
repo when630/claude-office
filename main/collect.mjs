@@ -14,6 +14,7 @@ import { readTasks } from './tasks.mjs';
 import { readPromptLog, lastPromptFor } from './prompts.mjs';
 import { readTouchedFiles } from './files.mjs';
 import { groupOf, labelOf } from './rooms.mjs';
+import { showsBroken } from '../shared/status.mjs';
 
 export { CLAUDE_DIR };
 
@@ -183,6 +184,26 @@ export function isBroken(tr, now = Date.now()) {
   return at != null && now - at < BROKEN_FRESH_MS;
 }
 
+// 상단바·트레이가 세는 칸. **순수 함수다** — 화면(app.mjs의 RAIL_GROUPS)이 같은 규칙으로
+// 묶으므로 여기 한 곳을 테스트해 두면 둘 다 지켜진다.
+//
+// 서버 장애는 mood가 아니라 그 위에 얹히는 표시라(isBroken) 어느 mood와도 같이 온다.
+// **다른 칸에서 빼 준다** — 안 그러면 한 세션이 두 번 세어져 칸의 합이 출근 인원을 넘고,
+// "6 출근 · 2 작업 중 · 1 서버 응답 없음 · 4 쉬는 중"처럼 셈이 안 맞는 상단바가 된다.
+// 빼는 쪽이 맞는 이유는 지금 그 세션을 부르는 이름이 서버 장애이기 때문이다 —
+// 어느 칸으로 부를지는 shared/status.mjs가 정한다.
+export function countBuckets(staff) {
+  return {
+    typing: staff.filter((w) => w.mood === 'typing' && !showsBroken(w)).length,
+    // 헤매는 자리는 typing에 섞지 않는다 — 섞으면 "작업 중 5"가 되고 구분한 뜻이 사라진다
+    stuck: staff.filter((w) => w.mood === 'stuck' && !showsBroken(w)).length,
+    waiting: staff.filter((w) => w.mood === 'waiting').length,
+    broken: staff.filter(showsBroken).length,
+    idle: staff.filter((w) => ['idle', 'done', 'stopped'].includes(w.mood) && !showsBroken(w)).length,
+    failed: staff.filter((w) => w.mood === 'failed' && !showsBroken(w)).length,
+  };
+}
+
 // status(실시간) → needs → state(스냅샷) 순으로 캐릭터의 기분을 정한다.
 //
 // `status: "waiting"`은 Claude Code가 **사용자 답을 기다리는 동안** 직접 넣어 주는 값이다 —
@@ -337,6 +358,7 @@ export async function collect({ groups = [], alias = {} } = {}) {
     const st = job?.state ?? {};
     const tr = scripts[i];
     const mood = moodOf(s, job, tr, now);
+    const broken = isBroken(tr, now);
 
     workers.push({
       key: job ? `job:${job.id}` : `pid:${s.pid}`,
@@ -358,7 +380,11 @@ export async function collect({ groups = [], alias = {} } = {}) {
       slowing: isSlowing(tr, mood, now),
       // 서버 쪽 문제로 응답을 못 받고 있는가 — 이것도 mood를 갈아치우지 않고 표시만 얹는다.
       // 화면에서는 머리 위로 별이 돌고 몸이 좌우로 갸우뚱한다.
-      broken: isBroken(tr, now),
+      broken,
+      // 마지막 서버 에러 시각. 세션 목록이 "몇 분째 응답이 없다"를 여기서 센다 — 문턱이
+      // 8분(BROKEN_FRESH_MS)이라 그 숫자가 곧 "곧 풀릴 것인가"의 단서다. 대기 시간과 같이
+      // **절대 시각을 그대로** 보내므로 스냅샷이 늦게 와도 화면에서 센 값이 어긋나지 않는다.
+      brokenAt: broken ? (tr?.apiFail?.at ?? tr?.at ?? null) : null,
       // 잡은 state.json의 detail이 가장 최신. 터미널 세션은 그런 파일이 없으니
       // 자리를 비운 사용자에게 남긴 요약(away_summary) → 마지막으로 한 말 순으로 대신한다.
       detail: trimText(st.detail || tr?.summary || tr?.lastMessage || ''),
@@ -437,12 +463,7 @@ export async function collect({ groups = [], alias = {} } = {}) {
   const ctxs = staff.map((w) => w.context?.pct).filter((p) => p != null);
   const stats = {
     total: staff.length,
-    typing: staff.filter((w) => w.mood === 'typing').length,
-    // 헤매는 자리는 typing에 섞지 않는다 — 섞으면 "작업 중 5"가 되고 구분한 뜻이 사라진다
-    stuck: staff.filter((w) => w.mood === 'stuck').length,
-    waiting: staff.filter((w) => w.mood === 'waiting').length,
-    idle: staff.filter((w) => ['idle', 'done', 'stopped'].includes(w.mood)).length,
-    failed: staff.filter((w) => w.mood === 'failed').length,
+    ...countBuckets(staff),
     tokens: staff.reduce((a, w) => a + w.tokens, 0),
     contextMax: ctxs.length ? Math.max(...ctxs) : null,
     aides: staff.reduce((a, w) => a + w.aides.length, 0),

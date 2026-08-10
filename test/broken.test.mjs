@@ -6,8 +6,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { scanApiFail } from '../main/transcript.mjs';
-import { isBroken, BROKEN_FRESH_MS } from '../main/collect.mjs';
+import { isBroken, countBuckets, BROKEN_FRESH_MS } from '../main/collect.mjs';
 import { showsDizzy, glyphKeyFor } from '../renderer/talk.mjs';
+import { showsBroken } from '../shared/status.mjs';
 
 const iso = (ms) => new Date(ms).toISOString();
 
@@ -117,6 +118,43 @@ test('입력 대기와 전환 표시가 어지러움보다 앞이다', () => {
   const phase = { mode: 'out', note: 'done' };
   assert.equal(showsDizzy(done, phase), false);
   assert.equal(glyphKeyFor(done, { phase }), 'gCheck');
+});
+
+// ── 어느 칸으로 세는가 (shared/status.mjs)
+//
+// 상단바·세션 목록·트레이·패널이 전부 이 답 하나를 본다. 갈라지면 화면이 자기 모순에
+// 빠진다 — 상단바가 `2 작업 중`인데 목록의 작업 중 묶음에는 셋이 있는 식이다.
+
+test('서버 장애는 그 세션을 부르는 이름이 된다 — 단 입력 대기가 먼저다', () => {
+  assert.equal(showsBroken({ mood: 'idle', broken: true }), true);
+  assert.equal(showsBroken({ mood: 'typing', broken: true }), true);
+  assert.equal(showsBroken({ mood: 'stuck', broken: true }), true);
+  // 서버가 죽어 있어도 나를 부르고 있으면 그쪽이 더 급한 소식이다
+  assert.equal(showsBroken({ mood: 'waiting', broken: true }), false);
+  assert.equal(showsBroken({ mood: 'idle' }), false);
+  assert.equal(showsBroken(null), false);
+});
+
+// 세는 칸이 서로 겹치면 합이 출근 인원을 넘는다. 상단바·트레이(collect.mjs의 countBuckets)와
+// 세션 목록(app.mjs의 RAIL_GROUPS)이 같은 규칙을 쓰므로 여기 한 번이면 둘 다 붙잡힌다.
+test('세는 칸끼리 겹치지 않는다 — 합이 출근 인원과 같다', () => {
+  const staff = [
+    { mood: 'typing' },
+    { mood: 'typing', broken: true },
+    { mood: 'stuck' },
+    { mood: 'stuck', broken: true },
+    { mood: 'waiting' },
+    { mood: 'waiting', broken: true }, // 부름이 먼저라 대기로 센다
+    { mood: 'idle', broken: true },
+    { mood: 'done' },
+    { mood: 'failed' },
+    { mood: 'failed', broken: true },
+    { mood: 'stopped' },
+  ];
+  const buckets = countBuckets(staff);
+  assert.deepEqual(buckets, { typing: 1, stuck: 1, waiting: 2, broken: 4, idle: 2, failed: 1 });
+  const sum = Object.values(buckets).reduce((a, n) => a + n, 0);
+  assert.equal(sum, staff.length);
 });
 
 test('고장나지 않았으면 아무것도 안 바뀐다', () => {

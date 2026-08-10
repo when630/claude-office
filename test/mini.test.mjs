@@ -67,6 +67,29 @@ test('상태 우선순위대로 선다 — 대기 → 헤맴 → 실패', () => 
   assert.deepEqual(keys(front), ['wt', 's', 'f']);
 });
 
+// 서버 장애(main/collect.mjs의 isBroken)는 mood가 아니라 그 위에 얹히는 표시라, mood만
+// 보던 앞줄 판정에 안 걸렸다 — 그 세션은 대개 `idle`이라 뒷줄에서 이름도 없이 서 있었다.
+const broken = (key, mood, statusAt = 1000) => ({ ...w(key, mood, statusAt), broken: true });
+
+test('서버 장애로 멈춘 세션도 앞줄이다 — mood는 대개 idle이다', () => {
+  const { front, back } = miniRoster([room('a', [broken('down', 'idle'), w('busy', 'typing')])]);
+  assert.deepEqual(keys(front), ['down']);
+  assert.deepEqual(keys(back), ['busy']);
+});
+
+test('서버 장애는 헤맴과 실패 사이다 — 세션 목록의 묶음 순서와 같다', () => {
+  const { front } = miniRoster([
+    room('a', [w('f', 'failed', 100), broken('b', 'idle', 100), w('s', 'stuck', 100), w('wt', 'waiting', 100)]),
+  ]);
+  assert.deepEqual(keys(front), ['wt', 's', 'b', 'f']);
+});
+
+test('입력 대기는 서버가 죽어도 대기다 — 부름이 먼저다', () => {
+  // 서버가 죽어 있어도 나를 부르고 있으면 그쪽이 더 급한 소식이다 (shared/status.mjs).
+  const { front } = miniRoster([room('a', [w('s', 'stuck', 100), broken('wt', 'waiting', 100)])]);
+  assert.deepEqual(keys(front), ['wt', 's']);
+});
+
 test('같은 상태끼리는 오래 기다린 것이 앞이다', () => {
   const { front } = miniRoster([
     room('a', [w('new', 'waiting', 9000), w('old', 'waiting', 1000), w('mid', 'waiting', 5000)]),

@@ -53,10 +53,16 @@ blinks to itself.
 |---|---|
 | working | Sits and hammers the keyboard, code scrolling on the monitor |
 | going in circles | Still at the desk, but the claws stop — a slow scratch of the head, and a ❓ |
+| **no server response** | Head tilts side to side, stars spinning above it |
 | **waiting on you** | Steps out in front of the desk, both claws up, holding a ❗ |
 | done | Walks out onto the floor with a ✓ and goes for a stroll |
 | failed · stopped | Slumped in the chair (✗ / zZ) |
 | idle | Mills about the room; now and then everyone gathers on the rug (more often at lunch) |
+
+**No server response** is not the same as going in circles. Going in circles means the session is
+running but getting nowhere; this one cannot run at all because of something on Claude's side
+(`API Error: 529 Overloaded` and the like) — nothing to look into, just something to wait out, so
+it is counted separately. Usage limits and expired logins do not land here.
 
 Three more things the office tells you without any text:
 
@@ -219,8 +225,8 @@ where it does.
 The `▭` button in the top bar (or the tray menu) drops the office into a small frameless window
 that stays **always on top**. No rooms here — just the crabs, **gathered in one place**.
 
-- The **front row** is whoever is waiting on you, stuck or failed, with a name and how long it has
-  been like that. No waiting, no front row
+- The **front row** is whoever is waiting on you, stuck, cut off by a server outage or failed, with
+  a name and how long it has been like that. No waiting, no front row
 - The **back row** is everyone working, unnamed
 - Nobody wanders in this window — there is no reason to chase a moving target in a view you only
   glance at
@@ -266,7 +272,7 @@ restarts.
 ### Once there are a lot of rooms
 
 - The **session list** on the left groups everything by state — waiting on you · going in circles ·
-  failed · working · resting · clocked out. The urgent group is always on top, so twenty rooms
+  no server response · failed · working · resting · clocked out. The urgent group is always on top, so twenty rooms
   need no scanning. Click a row to open that desk; click a desk in the office and the row
   highlights to match
 - **Filter them by name** in the box above the list. Pin the ones you watch with `☆` in Settings
