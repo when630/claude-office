@@ -34,6 +34,10 @@ export function buildFixture(lang) {
     status: 'idle',
     mood: o.mood,
     slowing: false,
+    // 서버 장애는 mood가 아니라 그 위에 얹히는 표시다(main/collect.mjs의 isBroken).
+    // brokenAt이 있어야 세션 목록이 "몇 분째 응답이 없다"를 적는다.
+    broken: o.broken ?? false,
+    brokenAt: o.broken ? (o.brokenAt ?? min(2)) : null,
     detail: o.detail ?? '',
     needs: o.needs ?? null,
     suggestedReply: o.suggestedReply ?? null,
@@ -88,6 +92,21 @@ export function buildFixture(lang) {
             { at: iso(9), state: 'working', detail: s('라우터 테스트를 고쳤습니다', 'Fixed the router tests') },
             { at: iso(17), state: 'working', detail: s('실패한 테스트를 살펴보겠습니다', 'Looking at the failing tests') },
           ],
+        }),
+        // 서버 장애로 멈춘 세션. **자리를 비운 놈으로 둔다** — 턴이 에러로 끝나면 status가
+        // idle로 떨어지는 것이 실제 모습이고, 바닥에서 어지러워하는 편이 캡처에서 잘 읽힌다
+        // (자리에 앉으면 상판과 모니터가 몸의 절반을 가린다). 이 방의 다른 하나는 대기라
+        // 책상 앞에 서 있으므로 바닥에서 둘이 겹치지 않는다.
+        worker({
+          key: 'sess:9a9a9a9a',
+          cwd: 'D:\\AIProject\\api-gateway',
+          room: 'api-gateway',
+          mood: 'idle',
+          broken: true,
+          intent: s('스키마 마이그레이션', 'Schema migration'),
+          lastPrompt: s('스키마 바뀐 것 반영해줘', 'Apply the schema change'),
+          tokens: 45_000,
+          context: { tokens: 45_000, limit: 1_000_000, pct: 5 },
         }),
       ],
     },
@@ -211,7 +230,7 @@ export function buildFixture(lang) {
       { key: 'job:tray-icons', jobId: 'tray-icons', name: 'tray-icons', state: 'failed', detail: s('아이콘 굽기가 실패했습니다', 'The icon build failed'), tokens: 12_000, links: [], at: min(140) },
     ],
     // 상단바 숫자는 여기서 온다 — 위 workers를 고쳤으면 같이 고쳐야 화면이 맞는다
-    stats: { total: 6, typing: 2, stuck: 1, waiting: 2, idle: 0, failed: 1, tokens: 3_140_000, contextMax: 96, aides: 1, spare: 1 },
+    stats: { total: 7, typing: 2, stuck: 1, waiting: 2, broken: 1, idle: 0, failed: 1, tokens: 3_185_000, contextMax: 96, aides: 1, spare: 1 },
     usage: {
       at: min(1),
       session: { pct: 42, resetAt: Date.parse('2026-08-04T18:25:00+09:00'), leftMs: 2 * 3600_000 + 34 * 60_000 },

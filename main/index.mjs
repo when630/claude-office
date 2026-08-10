@@ -668,9 +668,12 @@ function maybeNotify(snapshot) {
 // ── 트레이
 function trayIconFor(stats) {
   if (stats?.waiting > 0) return 'tray-wait';
-  // 헤매는 자리도 붉은 점을 쓴다 — 실패와 같은 뜻("뭔가 잘못됐다")이고, 아이콘을 한 벌 더
-  // 굽는 값어치가 있을 만큼 다른 상태는 아니다
-  if (stats?.failed > 0 || stats?.stuck > 0) return 'tray-fail';
+  // 헤매는 자리도 서버가 죽은 자리도 붉은 점을 쓴다 — 실패와 같은 뜻("뭔가 잘못됐다")이고,
+  // 아이콘을 한 벌 더 굽는 값어치가 있을 만큼 다른 상태는 아니다. 셋을 가르는 것은 툴팁이다.
+  //
+  // **깜빡임에는 넣지 않는다.** 깜빡임은 "지금 나를 부르고 있다"는 뜻으로 아껴 쓰는데,
+  // 서버 장애는 내가 답할 것이 없는 멈춤이다(updateBlink).
+  if (stats?.failed > 0 || stats?.stuck > 0 || stats?.broken > 0) return 'tray-fail';
   return 'tray';
 }
 
@@ -718,6 +721,9 @@ function updateTray(snapshot) {
     );
   }
   if (stats.stuck) parts.push(t('tray.stuck', { n: stats.stuck }));
+  // 서버 장애는 실패보다 앞이다 — 실패는 이미 끝난 일이고 이쪽은 지금 막혀 있다
+  // (세션 목록의 묶음 순서와 같다).
+  if (stats.broken) parts.push(t('tray.broken', { n: stats.broken }));
   if (stats.failed) parts.push(t('tray.failed', { n: stats.failed }));
   const who = app.isPackaged ? 'Claude Office' : 'Claude Office (dev)';
   tray.setToolTip(`${who} — ${parts.join(' · ')}`);

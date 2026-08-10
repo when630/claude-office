@@ -11,6 +11,7 @@
 // 애니메이션 시각 인자를 `tms`로 부르는 이유: 이 파일에서 `t`는 사전을 읽는 함수다.
 // 렌더러의 다른 곳에서는 `t`가 시각이지만, 여기서 둘이 겹치면 조용히 엉뚱한 것을 부른다.
 import { t, fmtDur } from '../shared/i18n.mjs';
+import { showsBroken } from '../shared/status.mjs';
 
 export function hashStr(s) {
   let h = 2166136261;
@@ -107,14 +108,11 @@ function humming(key, tms) {
 // 기호를 접는 쪽(glyphKeyFor)과 별을 그리는 쪽(render.mjs의 drawDizzy)이 갈라지면
 // 기호와 별이 함께 뜨거나 함께 사라진다.
 //
-// 양보하는 자리가 둘이다.
-//  - **입력 대기가 먼저다.** 서버가 죽어 있어도 나를 부르는 것이 더 급한 소식이고,
-//    느낌표를 접으면 정작 답해야 할 때 아무 신호가 남지 않는다(기다리는 놈을 잡담 짝에서
-//    빼두는 것과 같은 판단이다)
-//  - **전환 중(✓ 다 했다 · ✱ 받았다)도 양보한다.** 그 표시는 걸어 나가는 내내 들고 있어야
-//    "다 하고 나가는 것"으로 읽힌다
+// 어느 칸으로 부를지(입력 대기가 먼저인 것)는 shared/status.mjs가 정한다. 여기서 더하는
+// 것은 **캔버스에만 있는 사정** 하나뿐이다 — 자리를 오가는 중(✓ 다 했다 · ✱ 받았다)에는
+// 갸우뚱하지 않는다. 그 표시는 걸어 나가는 내내 들고 있어야 "다 하고 나가는 것"으로 읽힌다.
 export function showsDizzy(worker, phase = null) {
-  return Boolean(worker.broken) && worker.mood !== 'waiting' && !phase?.note;
+  return showsBroken(worker) && !phase?.note;
 }
 
 export function glyphKeyFor(worker, { chat = null, answering = false, phase = null, slot = '', tms = 0 } = {}) {

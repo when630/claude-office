@@ -2092,12 +2092,26 @@ const MINI_FRONT_MOODS = ['waiting', 'stuck', 'failed'];
 // stopped가 맨 뒤인 이유: 이 앱에서 멈춘 세션은 흐리게 그리고(drawSeatBody) 방 조명을 내릴 때도
 // 살아 있는 것으로 세지 않는다(LIVE_MOODS). 뒷줄에서도 일하는 것보다 앞에 세울 이유가 없다.
 const MINI_RANK = { waiting: 0, stuck: 1, failed: 2, typing: 3, idle: 4, stopped: 5 };
+// 서버 장애는 mood가 아니므로 위 표에 없다. 헤매는 중과 실패 **사이**다 — 세션 목록의
+// 묶음 순서와 같은 판단이다(헤매면 사람이 들여다봐야 하고, 실패는 이미 끝난 일이다).
+const MINI_RANK_BROKEN = 1.5;
+
+// 서버 장애로 멈춘 세션도 앞줄이다. 앞줄은 "내가 볼 것"이고, mood만 보면 이 세션은 대개
+// `idle`이라 뒷줄에서 이름도 없이 서 있었다 — 곁눈질하는 창에서 멈춘 일을 놓치는 자리였다.
+function miniFront(worker) {
+  return showsDizzy(worker) || MINI_FRONT_MOODS.includes(worker.mood);
+}
+
+function miniRank(worker) {
+  if (showsDizzy(worker)) return MINI_RANK_BROKEN;
+  return MINI_RANK[worker.mood] ?? 9;
+}
 
 // 같은 급끼리는 **오래된 것이 앞**이다. statusAt은 단조 증가하므로 새로 생긴 대기가 줄 끝에
 // 붙고 이미 서 있던 게의 자리는 밀리지 않는다 — 눌렀는데 다른 게가 눌리면 곁눈질이 안 된다.
 function miniCmp(a, b) {
-  const ra = MINI_RANK[a.worker.mood] ?? 9;
-  const rb = MINI_RANK[b.worker.mood] ?? 9;
+  const ra = miniRank(a.worker);
+  const rb = miniRank(b.worker);
   if (ra !== rb) return ra - rb;
   const sa = a.worker.statusAt ?? Infinity;
   const sb = b.worker.statusAt ?? Infinity;
@@ -2113,7 +2127,7 @@ export function miniRoster(rooms) {
   for (const room of rooms ?? []) {
     for (const worker of room.workers ?? []) {
       if (worker.mood === 'done') continue;
-      (MINI_FRONT_MOODS.includes(worker.mood) ? front : back).push({ worker, room });
+      (miniFront(worker) ? front : back).push({ worker, room });
     }
   }
   return { front: front.sort(miniCmp), back: back.sort(miniCmp) };

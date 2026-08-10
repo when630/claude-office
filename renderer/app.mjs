@@ -30,6 +30,7 @@ import {
   fmtLimit,
 } from '../shared/i18n.mjs';
 import { accelLabel, modHint } from '../shared/accel.mjs';
+import { showsBroken } from '../shared/status.mjs';
 
 const canvas = document.getElementById('office');
 const ctx = canvas.getContext('2d');
@@ -276,8 +277,12 @@ function roomsForCanvas() {
 // **매 프레임 다시 부른다**(renderMini의 noteOf) — 레이아웃에서 한 번 만들어 두면
 // 스냅샷이 안 올 동안 분이 멈춘다(상단바의 shownWaitMin과 같은 함정이다).
 function miniNote(w) {
-  if (!w.statusAt) return '';
-  const ms = Date.now() - w.statusAt;
+  // 서버 장애는 **얼마나 응답이 없었나**를 센다 — status가 바뀐 시각(statusAt)은 그 사이
+  // 사용자가 다시 던졌는지 같은 다른 사정을 따라가므로 멈춰 있은 시간과 다르다.
+  // 세션 목록도 같은 값을 적는다(railMeta).
+  const at = showsBroken(w) ? w.brokenAt : w.statusAt;
+  if (!at) return '';
+  const ms = Date.now() - at;
   return ms < 60_000 ? '' : fmtDur(ms);
 }
 
@@ -817,6 +822,7 @@ function idlePanel() {
         <div><dt>${t('idle.typing')}</dt><dd>${s.typing ?? 0}</dd></div>
         <div><dt>${t('idle.waiting')}</dt><dd>${s.waiting ?? 0}</dd></div>
         ${s.stuck ? `<div><dt>${t('idle.stuck')}</dt><dd>${s.stuck}</dd></div>` : ''}
+        ${s.broken ? `<div><dt>${t('idle.broken')}</dt><dd>${s.broken}</dd></div>` : ''}
         <div><dt>${t('idle.ctxMax')}</dt><dd>${s.contextMax == null ? '—' : `${s.contextMax}%`}</dd></div>
         <div><dt>${t('idle.aides')}</dt><dd>${s.aides ?? 0}</dd></div>
         ${s.spare ? `<div><dt>${t('idle.spare')}</dt><dd>${s.spare}</dd></div>` : ''}
@@ -913,7 +919,9 @@ function workerPanel(w) {
         // 서버 장애로 멈춘 중이면 mood 자리를 그 사실이 쓴다. mood는 그대로 두는 값이라
         // (에러 뒤 쉬고 있으면 idle, 사용자가 다시 던졌으면 typing) 그것만 보여주면
         // 사무실에서 어지러워하는 게를 눌러 놓고 "대기"라고 적힌 패널을 보게 된다.
-        w.broken
+        // 입력 대기가 먼저인 것은 shared/status.mjs가 정한다 — 상단바·목록과 같은 답이라야
+        // 목록에서 `입력 대기`로 세어 놓고 패널만 `서버 응답 없음`이라고 적는 일이 없다.
+        showsBroken(w)
           ? `<span class="mood broken">${esc(t('mood.broken'))}</span>`
           : `<span class="mood ${esc(w.mood)}">${esc(t(`mood.${w.mood}`))}</span>`
       }
@@ -1291,6 +1299,7 @@ function drawMiniStats() {
   miniStatsEl.innerHTML = [
     s.waiting ? `<span class="w">${icon('bang')}${s.waiting} ${t('topbar.waiting')}</span>` : '',
     s.stuck ? `<span class="s">${s.stuck}</span>` : '',
+    s.broken ? `<span class="b">${s.broken}</span>` : '',
     s.failed ? `<span class="f">${s.failed}</span>` : '',
     `<span class="n">${s.total ?? 0}</span>`,
   ]
@@ -1375,6 +1384,7 @@ function drawStats() {
     `<b>${s.total ?? 0}</b> ${t('topbar.in')}`,
     s.typing ? `<span class="t">${s.typing}</span> ${t('topbar.typing')}` : '',
     s.stuck ? `<span class="s">${s.stuck}</span> ${t('topbar.stuck')}` : '',
+    s.broken ? `<span class="b">${s.broken}</span> ${t('topbar.broken')}` : '',
     s.failed ? `<span class="f">${s.failed}</span> ${t('topbar.failed')}` : '',
   ]
     .filter(Boolean)
@@ -1414,17 +1424,32 @@ waitChip.addEventListener('click', selectLongestWait);
 //
 // 급한 순서로 묶는다. **헤매는 중을 작업 중에 섞지 않는다** — 섞으면 "작업 중 5"가 되고
 // 구분해 둔 뜻이 사라진다(main/collect.mjs의 같은 판단).
+//
+// **서버 장애는 mood가 아니라 그 위에 얹히는 표시라** 다른 묶음과 겹친다(idle이면서 서버가
+// 죽어 있을 수 있다). 그래서 나머지 predicate에서 빼 주고, 어느 칸으로 부를지는
+// shared/status.mjs가 정한다 — 상단바가 세는 숫자와 여기 묶음 인원이 갈라지면 둘 중
+// 어느 쪽이 맞는지 알 수 없다.
+//
+// 순서는 **헤매는 중 다음, 실패 앞**이다. 헤매는 것은 사람이 들여다봐야 하니 더 급하고,
+// 실패는 이미 끝난 일이지만 서버 장애는 지금 막혀 있다.
 const RAIL_GROUPS = [
   ['waiting', 'topbar.waiting', (w) => w.mood === 'waiting'],
-  ['stuck', 'topbar.stuck', (w) => w.mood === 'stuck'],
-  ['failed', 'topbar.failed', (w) => w.mood === 'failed'],
-  ['typing', 'topbar.typing', (w) => w.mood === 'typing'],
-  ['rest', 'rail.rest', (w) => ['idle', 'done', 'stopped'].includes(w.mood)],
+  ['stuck', 'topbar.stuck', (w) => w.mood === 'stuck' && !showsBroken(w)],
+  ['broken', 'topbar.broken', showsBroken],
+  ['failed', 'topbar.failed', (w) => w.mood === 'failed' && !showsBroken(w)],
+  ['typing', 'topbar.typing', (w) => w.mood === 'typing' && !showsBroken(w)],
+  ['rest', 'rail.rest', (w) => ['idle', 'done', 'stopped'].includes(w.mood) && !showsBroken(w)],
 ];
 
 // 행 오른쪽에 적을 것. 묶음마다 알고 싶은 시간이 다르다 —
 // 대기는 **얼마나 기다렸나**, 도는 것은 **얼마나 돌았나**, 퇴근은 **언제 끝났나**.
 function railMeta(w) {
+  // 서버 장애는 **얼마나 응답이 없었나**다. 문턱이 8분이라(collect.mjs의 BROKEN_FRESH_MS)
+  // 그 숫자가 곧 "곧 풀릴 것인가"의 단서다 — 방금이면 기다리면 되고, 문턱에 가까우면
+  // 다음 스냅샷에서 표시가 꺼진다는 뜻이다. 대기와 같이 1초마다 갈아 끼운다.
+  if (showsBroken(w)) {
+    return w.brokenAt ? `<time class="t" data-since="${w.brokenAt}">${fmtDur(Date.now() - w.brokenAt)}</time>` : '';
+  }
   if (w.mood === 'waiting') {
     // 1초마다 갈아 끼운다(tickRail). statusAt이 절대 시각이라 스냅샷을 기다리지 않는다.
     return w.statusAt ? `<time class="t" data-since="${w.statusAt}">${fmtDur(Date.now() - w.statusAt)}</time>` : '';
@@ -1451,7 +1476,11 @@ function drawRail() {
     const list = workers.filter(pick);
     if (!list.length) continue;
     parts.push(`<div class="rail-group ${esc(key)}">${t(label)}<span class="c">${list.length}</span></div>`);
-    parts.push(list.map((w) => railRow(w.key, w.mood, panelName(w), railMeta(w))).join(''));
+    // 점 색은 mood가 아니라 **그 세션을 부르는 이름**을 따른다 — 묶음은 서버 응답 없음인데
+    // 점은 쉬는 중 회색이면 묶음 제목과 줄이 서로 다른 말을 한다.
+    parts.push(
+      list.map((w) => railRow(w.key, showsBroken(w) ? 'broken' : w.mood, panelName(w), railMeta(w))).join(''),
+    );
   }
   // 퇴근한 작업은 캔버스에 없다(자리를 안 차지한다) — 목록에서만 만난다.
   if (recent.length) {

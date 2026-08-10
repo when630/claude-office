@@ -40,6 +40,9 @@ export default {
     typing: 'working',
     waiting: 'waiting on you',
     stuck: 'going in circles',
+    // Not a mood but a flag laid on top of one (collect.mjs's isBroken). The counters
+    // subtract it from the other buckets, so it stands beside them here too.
+    broken: 'no server response',
     failed: 'failed',
     longest: 'longest {d}',
     tokens: '{n} tok',
@@ -118,6 +121,7 @@ export default {
     typing: 'Working',
     waiting: 'Waiting on you',
     stuck: 'Going in circles',
+    broken: 'No server response',
     ctxMax: 'Peak context',
     aides: 'Subagents',
     spare: 'Spare slots',
@@ -299,6 +303,7 @@ export default {
     waiting: '{n} waiting on you',
     waitingLong: '{n} waiting on you (longest {d})',
     stuck: '{n} going in circles',
+    broken: '{n} no server response',
     failed: '{n} failed',
     update: 'Install update and restart (v{v})',
     open: 'Open the office',

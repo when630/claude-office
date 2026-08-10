@@ -328,6 +328,10 @@ select:focus-visible {
   color: var(--stuck);
   font-weight: 700;
 }
+#stats .b {
+  color: var(--broken);
+  font-weight: 700;
+}
 #stats .f {
   color: var(--fail);
   font-weight: 700;
@@ -474,6 +478,9 @@ body.mini #stage-empty {
 #mini-stats .s {
   color: var(--stuck);
 }
+#mini-stats .b {
+  color: var(--broken);
+}
 #mini-stats .f {
   color: var(--fail);
 }
@@ -600,6 +607,9 @@ body.mini #stage-empty {
 }
 .rail-group.waiting {
   color: var(--acc);
+}
+.rail-group.broken {
+  color: var(--broken);
 }
 .rail-group .c {
   margin-left: auto;
@@ -1287,6 +1297,10 @@ b.lv-na {
 }
 .dot.stuck {
   background: var(--stuck);
+}
+/* mood는 아니지만 목록에서 한 묶음을 이루므로 여기 나란히 둔다 (shared/status.mjs) */
+.dot.broken {
+  background: var(--broken);
 }
 .dot.idle {
   background: var(--dot);
