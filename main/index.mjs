@@ -914,6 +914,15 @@ function quietMenu() {
   ];
 }
 
+// 로그인 항목은 등록할 때와 읽을 때 같은 args를 써야 한다 — 어긋나면 openAtLogin이 늘
+// false로 읽혀 트레이 체크가 켜지지 않는다. 개발 실행은 execPath가 electron.exe라 앱
+// 경로까지 붙여야 맨몸 Electron(기본 앱 창)이 뜨지 않는다. 따옴표는 Electron이 감싼다.
+// 맥은 args를 안 쓴다 — 로그인 실행은 wasOpenedAtLogin으로 구분한다(아래 hidden).
+function loginItemOpts() {
+  if (process.platform !== 'win32') return {};
+  return { args: app.isPackaged ? ['--hidden'] : [app.getAppPath(), '--hidden'] };
+}
+
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
     ...(updateReady
@@ -1015,13 +1024,8 @@ function buildTrayMenu() {
     {
       label: t('tray.autostart'),
       type: 'checkbox',
-      checked: app.getLoginItemSettings().openAtLogin,
-      click: (item) => {
-        // args는 Windows 전용 — 맥의 로그인 실행은 wasOpenedAtLogin으로 구분한다(아래 hidden)
-        const opts = { openAtLogin: item.checked };
-        if (process.platform === 'win32') opts.args = ['--hidden'];
-        app.setLoginItemSettings(opts);
-      },
+      checked: app.getLoginItemSettings(loginItemOpts()).openAtLogin,
+      click: (item) => app.setLoginItemSettings({ ...loginItemOpts(), openAtLogin: item.checked }),
     },
     { type: 'separator' },
     {
