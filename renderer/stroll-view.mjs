@@ -452,16 +452,27 @@ function perkOf(k) {
 // 지휘 중의 커서. **OS 커서를 감추고 이것을 그린다**(stroll-app의 setCommand) —
 // 모양과 그 이유는 shared/pixels.mjs의 CURSOR_ARROW에 적혀 있다. 가리키는 지점이
 // 스프라이트의 왼쪽 위이므로 커서 좌표에 그대로 얹는다.
-function drawCursor(ctx, at, ready) {
-  const x = Math.round(at.x);
-  const y = Math.round(at.y);
+// **커서는 세계가 아니라 화면에 속한다** — 게 배율(2·3·4배)을 타면 안 된다.
+// 배율 4로 쓰는 사람 화면에서는 40×52px짜리 화살표가 떠서, 커서가 아니라 커서 그림을 끌고
+// 다니는 꼴이었다. 그래서 여기서만 변환을 갈아 끼워 **늘 2배로 찍는다**(글자를 확대 변환
+// 밖에서 그리는 것과 같은 사정이다).
+const CURSOR_ZOOM = 2;
+
+function drawCursor(ctx, at, ready, opts) {
+  const { scale, dpr } = opts;
+  ctx.setTransform(CURSOR_ZOOM * dpr, 0, 0, CURSOR_ZOOM * dpr, 0, 0);
+  // 논리 좌표 → 창 좌표(at * scale) → 이 변환의 좌표
+  const x = Math.round((at.x * scale) / CURSOR_ZOOM);
+  const y = Math.round((at.y * scale) / CURSOR_ZOOM);
   drawSprite(ctx, SPR.cursor, x, y);
   // 고른 게가 있으면 "보낼 수 있다"를 알리는 배지가 꼬리 옆에 붙는다. **화살표에 닿아 있어야
   // 한다** — 머리 옆에 2px 띄워 찍었더니 커서에 딸린 표시가 아니라 화면에 떠 있는 티끌로
   // 보였다. 어두운 테두리를 둘러 밝은 벽지에서도 배지로 읽히게 한다.
-  if (!ready) return;
-  rect(ctx, x + 8, y + 8, 4, 4, PICK_EDGE);
-  rect(ctx, x + 9, y + 9, 2, 2, MARK_MOVE);
+  if (ready) {
+    rect(ctx, x + 8, y + 8, 4, 4, PICK_EDGE);
+    rect(ctx, x + 9, y + 9, 2, 2, MARK_MOVE);
+  }
+  ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
 }
 
 // 누른 자리에 남는 표식 — 지금은 "저리로 가라" 하나뿐이다. 고르기는 게마다 따로 물리는
@@ -587,7 +598,7 @@ export function renderStroll(ctx, pets, opts) {
   if (marks.length) drawMarks(ctx, marks, t);
   if (box) drawBox(ctx, box);
   // 커서는 맨 위다 — 게에도 상자에도 가리면 안 된다
-  if (cursor) drawCursor(ctx, cursor, cursor.ready);
+  if (cursor) drawCursor(ctx, cursor, cursor.ready, opts);
   // 이름표는 게를 다 그린 뒤에 — 옆 게가 남의 이름표를 덮으면 안 된다
   for (const tag of tags) drawTag(ctx, tag.pet, tag.at, opts);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
