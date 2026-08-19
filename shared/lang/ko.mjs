@@ -29,6 +29,7 @@ export default {
   // ── 상단바
   topbar: {
     mini: '작게 띄우기',
+    stroll: '바탕화면으로 내보내기',
     filter: '방 이름',
     hidden: '{n}개 숨김',
     hiddenTitle: '거르기와 접기를 모두 푼다',
@@ -209,6 +210,7 @@ export default {
     hotkeyToggle: '창 열고 닫기',
     hotkeyJump: '가장 오래 기다린 세션 열기',
     hotkeyMini: '작게 띄우기 켜고 끄기',
+    hotkeyStroll: '바탕화면 산책 켜고 끄기',
     hotkeyNone: '없음',
     hotkeyPress: '조합을 누르세요…',
     hotkeyTaken: '다른 앱이 쓰고 있습니다',
@@ -310,6 +312,7 @@ export default {
     update: '업데이트 설치하고 재시작 (v{v})',
     open: '사무실 열기',
     mini: '작게 띄우기 (항상 위)',
+    stroll: '바탕화면으로 내보내기 (산책)',
     waitingList: '기다리는 세션',
     waitingNone: '기다리는 세션이 없습니다',
     notify: '알림',

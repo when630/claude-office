@@ -32,6 +32,7 @@ export default {
   // ── Top bar
   topbar: {
     mini: 'Shrink to a corner',
+    stroll: 'Out onto the desktop',
     filter: 'Room name',
     hidden: '{n} hidden',
     hiddenTitle: 'Clear the filter and unfold every room',
@@ -207,6 +208,7 @@ export default {
     hotkeyToggle: 'Show or hide the window',
     hotkeyJump: 'Open the longest wait',
     hotkeyMini: 'Toggle the mini window',
+    hotkeyStroll: 'Toggle the desktop stroll',
     hotkeyNone: 'None',
     hotkeyPress: 'Press a combination…',
     hotkeyTaken: 'Another app has it',
@@ -308,6 +310,7 @@ export default {
     update: 'Install update and restart (v{v})',
     open: 'Open the office',
     mini: 'Mini window (always on top)',
+    stroll: 'Out onto the desktop (stroll)',
     waitingList: 'Waiting on you',
     waitingNone: 'Nothing waiting on you',
     notify: 'Notifications',

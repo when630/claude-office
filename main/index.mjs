@@ -72,6 +72,9 @@ let mini = null; // 미니 모드 창 — 프레임을 나중에 못 바꾸므�
 // 화면 구성이 바뀔 때 미니 자리를 다시 당기는 청취자. screen은 앱 수명 내내 살아 있으므로
 // 창을 닫을 때 떼어내야 여닫을 때마다 쌓이지 않는다.
 let miniFit = null;
+// 산책 창 — 작업 영역을 통째로 덮는 투명 오버레이. 창은 안 보이고 게만 바탕화면에 남는다.
+let stroll = null;
+let strollFit = null;
 let tray = null;
 let timer = null;
 let lastSnapshot = null;
@@ -107,9 +110,12 @@ const defaults = {
     toggle: 'CommandOrControl+Alt+O',
     jump: 'CommandOrControl+Alt+W',
     mini: 'CommandOrControl+Alt+M',
+    stroll: 'CommandOrControl+Alt+S',
   },
-  // 미니 모드와 두 모습의 창 자리. 다시 켜면 있던 모습으로 그 자리에 뜬다.
-  mini: false,
+  // 지금 어느 모습으로 쓰는가 — 큰 창 · 미니 · 산책. **셋은 배타적이다.** 같은 사무실을
+  // 두 벌로 띄워 두면 어느 쪽이 진짜인지 헷갈리고, 산책은 그 위에 겹쳐 놓을 것도 아니다.
+  mode: 'normal',
+  // 창 자리. 산책은 작업 영역을 그대로 덮으므로 기억할 자리가 없다.
   bounds: { normal: null, mini: null },
   history: true,
   trayHintShown: false,
@@ -117,6 +123,7 @@ const defaults = {
   // 값이 없는 옛 설정 파일이 그대로 열린 채로 뜬다.
   view: {
     names: 'show',
+    strollMax: 6,
     roomThemes: {},
     pinned: [],
     collapsed: [],
@@ -158,7 +165,7 @@ function loadSettings() {
     quiet: sanitizeQuiet(saved.quiet),
     roomNotify: sanitizeRoomNotify(saved.roomNotify),
     hotkeys: sanitizeHotkeys(saved.hotkeys),
-    mini: saved.mini === true,
+    mode: sanitizeMode(saved),
     bounds: { normal: sanitizeBounds(saved.bounds?.normal), mini: sanitizeBounds(saved.bounds?.mini) },
     view: sanitizeView(saved.view),
   };
@@ -230,7 +237,7 @@ function notifySettings() {
 //
 // 창을 열지 않고도 처리하려는 것이다. 지금은 토스트를 놓치면 창을 열고 → 책상을 찾고 →
 // 클릭하고 → 터미널에서 열기까지 네 걸음인데, terminal.mjs는 id만 있으면 되는 자리다.
-const HOTKEY_ACTIONS = ['toggle', 'jump', 'mini'];
+const HOTKEY_ACTIONS = ['toggle', 'jump', 'mini', 'stroll'];
 // Accelerator 문법(수식키+키) 중 우리가 받아들이는 모양. 손으로 고친 settings.json이
 // 앱을 못 뜨게 하지 않도록 좁게 받는다 — register()는 이상한 문자열에 예외를 던진다.
 const ACCEL_OK = /^(?:(?:CommandOrControl|Command|Control|Ctrl|Alt|Option|Shift|Super)\+){1,3}[A-Za-z0-9]{1,12}$/;
@@ -261,7 +268,12 @@ function applyHotkeys() {
   globalShortcut.unregisterAll();
   // 미니는 지금 상태를 뒤집는다 — 곁눈질하려고 내리는 일이 잦은데 그때마다 창을 앞으로
   // 꺼내 버튼을 찾아야 한다면 곁눈질용이라는 목적과 어긋난다
-  const run = { toggle: toggleWindow, jump: jumpToLongestWait, mini: () => setMini(!settings.mini) };
+  const run = {
+    toggle: toggleWindow,
+    jump: jumpToLongestWait,
+    mini: () => toggleMode('mini'),
+    stroll: () => toggleMode('stroll'),
+  };
   const failed = [];
   for (const action of HOTKEY_ACTIONS) {
     const accel = settings.hotkeys[action];
@@ -282,13 +294,19 @@ function applyHotkeys() {
 // 다른 창에 가려 있을 때 눌렀는데 사라지면 그건 고장으로 읽힌다.
 function toggleWindow() {
   // 미니로 쓰는 중이면 미니를 여닫는다 — 여기서 큰 창으로 바꿔 버리면 모드를 뺏는 셈이다
-  const w = settings.mini ? mini : win;
+  // 산책은 창을 감추고 켜는 것이 아니다 — 게가 바탕화면에 있는 것이 곧 그 모드라서,
+  // 토글이 할 일은 모드를 끄고 큰 창으로 돌아오는 것뿐이다.
+  if (settings.mode === 'stroll') {
+    setMode('normal');
+    return;
+  }
+  const w = settings.mode === 'mini' ? mini : win;
   if (w && !w.isDestroyed() && w.isVisible() && w.isFocused()) {
     w.hide();
     return;
   }
-  if (settings.mini) {
-    setMini(true); // 창이 없으면 다시 만들고, 있으면 올린다
+  if (settings.mode === 'mini') {
+    setMode('mini'); // 창이 없으면 다시 만들고, 있으면 올린다
     mini?.focus();
     return;
   }
@@ -328,7 +346,17 @@ function sanitizeView(v) {
     // 접은 채로 껐다 켜면 그대로여야 한다. `!== false`라서 값이 없으면 열림이다.
     railOpen: v?.railOpen !== false,
     panelOpen: v?.panelOpen !== false,
+    // 산책 모드에 한 번에 내보낼 인원. 세션이 스물이어도 바탕화면이 게로 덮이면 안 되므로
+    // 급한 순으로 이만큼만 나간다(renderer/stroll.mjs의 strollCast).
+    strollMax: strollMax(v?.strollMax),
   };
+}
+
+// 산책 인원. 손으로 고친 settings.json이 화면을 게로 덮지 못하게 위아래를 막는다.
+function strollMax(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return defaults.view.strollMax;
+  return Math.min(24, Math.max(1, Math.round(n)));
 }
 
 // 방 → 칸(`[열, 행]`). 손으로 고친 settings.json도 이 문을 지나므로 모양이 깨진 항목만
@@ -446,9 +474,9 @@ function createWindow(show = true) {
 }
 
 function showWindow() {
-  // 미니로 내려가 있었다면 큰 창을 부르는 순간 미니는 접는다 — 둘이 같이 떠 있을 이유가 없다
-  if (settings.mini) {
-    setMini(false);
+  // 미니·산책으로 내려가 있었다면 큰 창을 부르는 순간 접는다 — 셋이 배타적인 이유와 같다
+  if (settings.mode !== 'normal') {
+    setMode('normal');
     return;
   }
   if (!win || win.isDestroyed()) createWindow(true);
@@ -557,32 +585,163 @@ function createMini() {
   });
 }
 
-function setMini(on) {
-  if (on) {
-    if (win && !win.isDestroyed()) win.hide();
-    if (!mini || mini.isDestroyed()) createMini();
-    else mini.show();
-  } else {
-    if (mini && !mini.isDestroyed()) {
-      settings.bounds = { ...settings.bounds, mini: mini.getBounds() };
-      mini.destroy();
-      mini = null;
+// ── 산책 모드
+//
+// 큰 창도 미니도 결국 **창**이다. 곁눈질하려면 화면 어딘가를 내주고 그 자리를 지켜야 한다.
+// 산책은 그 자리를 없앤다 — 작업 영역을 통째로 덮는 투명 창을 깔고 게만 남긴다.
+//
+// 그래서 이 창의 설계는 통째로 "없는 척하기"다:
+//   - `transparent` + `frame: false` — 배경이 없으니 게 말고는 아무것도 안 보인다.
+//     투명 창은 **크기를 못 바꾼다**(Electron 제약)이라 `resizable: false`이고, 자리는
+//     우리가 작업 영역에 맞춰 정한다.
+//   - `setIgnoreMouseEvents(true, { forward: true })` — 기본은 **클릭을 통과시킨다.**
+//     화면을 덮는 창이 마우스를 먹으면 그 순간 이 앱은 고장난 것이다. forward를 켜야
+//     통과 중에도 mousemove만은 렌더러에 와서 "커서가 게 위에 왔다"를 알 수 있고,
+//     그때만 잠깐 통과를 끈다(setStrollPass).
+//   - Windows는 `focusable: false`다 — 게를 끌어도 **작업 중인 창의 초점을 뺏지 않아야**
+//     한다. 맥은 켜 두지 않는다: 초점을 못 받는 창이 마우스 눌림을 받는 보장이 없어,
+//     여기서 아끼자고 집어 드는 것 자체를 잃을 수는 없다.
+function strollArea() {
+  // 주 모니터의 작업 영역. 여러 모니터에 걸치는 창은 배율이 다른 화면에서 게가 늘어나므로
+  // 우선 한 화면만 쓴다(README의 한계에 적어 두었다).
+  return screen.getPrimaryDisplay().workArea;
+}
+
+function fitStroll() {
+  if (!stroll || stroll.isDestroyed()) return;
+  const area = strollArea();
+  const b = stroll.getBounds();
+  if (b.x === area.x && b.y === area.y && b.width === area.width && b.height === area.height) return;
+  stroll.setBounds(area);
+}
+
+function createStroll() {
+  const area = strollArea();
+  stroll = new BrowserWindow({
+    ...area,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    hasShadow: false,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    focusable: process.platform !== 'win32',
+    icon: icon('icon.png'),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      contextIsolation: true,
+      sandbox: true,
+      // **이게 없으면 게가 얼어붙는다.** 아무것도 안 그린 투명 창은 Chromium의 occlusion
+      // 판정에 걸려 `visibilityState: hidden`이 되고, 그러면 requestAnimationFrame이
+      // 멈춘다 — 창은 화면에 떠 있는데 게만 멈춰 선 그림이 된다(실제 앱을 띄워 확인했다).
+      // 이 값을 끄면 가려진 동안에도 visible로 남고 프레임이 계속 그려진다.
+      backgroundThrottling: false,
+    },
+  });
+
+  // 기본은 통과. 게 위에 커서가 오면 렌더러가 알려 준다(office:stroll-pass).
+  stroll.setIgnoreMouseEvents(true, { forward: true });
+  // 작업 표시줄 위에 남아야 한다 — 미니와 같은 사정이다(위 createMini의 긴 주석).
+  if (process.platform === 'win32') stroll.setAlwaysOnTop(true, 'pop-up-menu');
+  // 데스크톱을 바꿔도 게는 따라온다. 전체화면 앱 위에까지 올라가지는 않는다 —
+  // 발표나 영상 위에 게가 걸어다니면 그건 곁눈질이 아니라 사고다.
+  stroll.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
+
+  stroll.loadFile(path.join(ROOT, 'renderer', 'stroll.html'));
+  stroll.webContents.setWindowOpenHandler(({ url }) => {
+    openExternal(url);
+    return { action: 'deny' };
+  });
+
+  // 모니터가 바뀌거나 작업 표시줄이 옮겨지면 덮을 자리도 달라진다.
+  // **창과 함께 떼어낸다** — screen은 앱 수명 내내 살아 있다.
+  strollFit = () => fitStroll();
+  screen.on('display-metrics-changed', strollFit);
+  screen.on('display-added', strollFit);
+  screen.on('display-removed', strollFit);
+
+  stroll.on('closed', () => {
+    if (strollFit) {
+      screen.off('display-metrics-changed', strollFit);
+      screen.off('display-added', strollFit);
+      screen.off('display-removed', strollFit);
+      strollFit = null;
     }
+    stroll = null;
+  });
+}
+
+// 커서가 게 위에 있는 동안만 클릭을 먹는다. 렌더러가 상태가 **바뀔 때만** 부른다.
+function setStrollPass(pass) {
+  if (!stroll || stroll.isDestroyed()) return;
+  stroll.setIgnoreMouseEvents(pass, { forward: true });
+}
+
+function closeMini() {
+  if (!mini || mini.isDestroyed()) return;
+  settings.bounds = { ...settings.bounds, mini: mini.getBounds() };
+  mini.destroy();
+  mini = null;
+}
+
+function closeStroll() {
+  if (!stroll || stroll.isDestroyed()) return;
+  stroll.destroy();
+  stroll = null;
+}
+
+const MODES = ['normal', 'mini', 'stroll'];
+
+// 저장된 값에서 모습을 읽는다. `mini: true`만 있던 옛 설정 파일이 미니로 열려야 한다 —
+// 이 앱은 트레이에 상주하며 계속 업데이트되므로 남의 설정을 잃는 것이 곧 회귀다.
+function sanitizeMode(saved) {
+  if (MODES.includes(saved?.mode)) return saved.mode;
+  return saved?.mini === true ? 'mini' : 'normal';
+}
+
+// 셋 중 하나로 갈아탄다. **다른 둘은 반드시 접는다** — 배타라는 약속이 여기 한 곳에만 있다.
+function setMode(next) {
+  const mode = MODES.includes(next) ? next : 'normal';
+  if (mode !== 'mini') closeMini();
+  if (mode !== 'stroll') closeStroll();
+
+  if (mode === 'normal') {
     if (!win || win.isDestroyed()) createWindow(true);
     else {
       if (win.isMinimized()) win.restore();
       win.show();
       win.focus();
     }
+  } else {
+    // 큰 창은 감추기만 한다 — 자리를 누르고 올라올 때 렌더러 로드를 기다리지 않게 남겨 둔다
+    if (win && !win.isDestroyed()) win.hide();
+    if (mode === 'mini') {
+      if (!mini || mini.isDestroyed()) createMini();
+      else mini.show();
+    } else {
+      if (!stroll || stroll.isDestroyed()) createStroll();
+      else stroll.show();
+    }
   }
-  settings.mini = on;
+
+  settings.mode = mode;
   saveSettings();
   refreshTrayMenu();
 }
 
+// 같은 모습을 다시 부르면 큰 창으로 돌아온다 — 단축키 하나로 켜고 끄기 위해서다
+function toggleMode(mode) {
+  setMode(settings.mode === mode ? 'normal' : mode);
+}
+
 // 지금 화면에 있는 창. 스냅샷·언어를 밀어 보낼 곳이다.
 function liveWindows() {
-  return [win, mini].filter((w) => w && !w.isDestroyed());
+  return [win, mini, stroll].filter((w) => w && !w.isDestroyed());
 }
 
 function sendAll(channel, payload) {
@@ -932,8 +1091,14 @@ function buildTrayMenu() {
     {
       label: t('tray.mini'),
       type: 'checkbox',
-      checked: settings.mini,
-      click: (item) => setMini(item.checked),
+      checked: settings.mode === 'mini',
+      click: (item) => setMode(item.checked ? 'mini' : 'normal'),
+    },
+    {
+      label: t('tray.stroll'),
+      type: 'checkbox',
+      checked: settings.mode === 'stroll',
+      click: (item) => setMode(item.checked ? 'stroll' : 'normal'),
     },
     { label: t('tray.waitingList'), submenu: waitingMenu() },
     { type: 'separator' },
@@ -1181,11 +1346,13 @@ if (!app.requestSingleInstanceLock()) {
       return notifySettings();
     });
 
-    // 미니 모드. 상단바 버튼과 미니 창의 확대 버튼이 같은 문을 지난다.
-    ipcMain.handle('office:getMini', () => settings.mini);
-    ipcMain.on('office:setMini', (_e, on) => setMini(on === true));
-    // 미니에서 자리를 누르면 큰 창으로 올라오며 그 자리가 펼쳐진다
-    ipcMain.on('office:mini-select', (_e, key) => selectInWindow(String(key ?? '')));
+    // 모습 바꾸기. 상단바 버튼·미니 창의 확대 버튼·산책 창이 같은 문을 지난다.
+    ipcMain.handle('office:getMode', () => settings.mode);
+    ipcMain.on('office:setMode', (_e, mode) => setMode(String(mode ?? 'normal')));
+    // 미니·산책에서 게를 누르면 큰 창으로 올라오며 그 자리가 펼쳐진다
+    ipcMain.on('office:select-session', (_e, key) => selectInWindow(String(key ?? '')));
+    // 산책 창이 커서 밑을 알려 온다 — 게 위에 있는 동안만 클릭을 먹고 나머지는 통과시킨다
+    ipcMain.on('office:stroll-pass', (_e, on) => setStrollPass(on === true));
 
     // 전역 단축키. 등록 실패는 반환값으로만 알 수 있어(register가 false를 낼 뿐이다)
     // 실패한 조합을 함께 넘긴다 — 설정 창이 그 자리를 표시한다.
@@ -1220,8 +1387,9 @@ if (!app.requestSingleInstanceLock()) {
     const hidden = process.argv.includes('--hidden') || app.getLoginItemSettings().wasOpenedAtLogin === true;
     // 큰 창은 미니로 쓰던 사람에게도 만들어 둔다(숨긴 채로) — 자리를 눌러 올라올 때
     // 새로 만들면서 렌더러가 로드되기를 기다리지 않아도 된다.
-    createWindow(!hidden && !settings.mini);
-    if (settings.mini && !hidden) createMini();
+    createWindow(!hidden && settings.mode === 'normal');
+    if (!hidden && settings.mode === 'mini') createMini();
+    if (!hidden && settings.mode === 'stroll') createStroll();
 
     // 새 버전은 받아만 두고 강제 재시작하지 않는다 — 재시작은 트레이 메뉴에서,
     // 아니면 다음 종료 때 조용히 설치된다. 맥(서명 없음)은 알림만 띄운다(main/updater.mjs).

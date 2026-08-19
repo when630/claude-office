@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'"
+    />
+    <title>Claude Office — stroll</title>
+    <!-- 산책 모드는 **껍데기가 없다.** 상단바도 패널도 없이 투명한 창 위에 캔버스 하나뿐이라
+         style.css를 통째로 끌고 올 이유가 없다 — 필요한 것은 픽셀 폰트 선언과 투명 배경뿐이다. -->
+    <style>
+      @font-face {
+        font-family: 'MonaS12';
+        src:
+          local('MonaS12'),
+          url('./fonts/MonaS12TextKR.woff2') format('woff2');
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: transparent;
+        /* 창 전체가 클릭을 통과하지만(main의 setIgnoreMouseEvents), 게를 잡는 동안에는
+           통과가 꺼진다. 그때 글자·캔버스가 선택되면 끌기가 텍스트 드래그로 새 나간다. */
+        user-select: none;
+        cursor: default;
+      }
+      #stroll {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="stroll"></canvas>
+    <script type="module" src="./stroll-app.mjs"></script>
+  </body>
+</html>

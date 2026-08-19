@@ -320,6 +320,85 @@ export const CLAWD_AIDE_UP = [
 ];
 
 // ── 바닥 소품
+// ── 산책 모드에서만 쓰는 자세 셋 (renderer/stroll-view.mjs)
+//
+// 바탕화면에는 책상이 없다. 큰 창에서 "작업 중"은 의자에 앉아 상판 뒤에서 팔을 놀리는
+// 것이었는데, 여기서는 게가 맨바닥에 있으므로 **앉는 것부터 그려야** 노트북을 펼 수 있다.
+
+// 바닥에 앉은 몸. 다리 세 줄을 걷어내고 **한 줄로 눌러 좌우로 1px씩 퍼뜨린다** —
+// 다리를 그냥 지우면 하반신이 잘린 몸통이 되고, 접힌 다리를 그리려 하면 이 폭에서는
+// 얼룩으로 읽힌다. 바닥에 닿는 줄이 몸통보다 넓은 것만이 "주저앉았다"를 만든다.
+export const CLAWD_SIT = [
+  '..rrrrrrrrrrrr..',
+  '..rrrrrrrrrrrr..',
+  '..rrrrrrrrrrrr..',
+  'rrrkkrrrrrrkkrrr',
+  'rrrkkrrrrrrkkrrr',
+  'rrrrrrrrrrrrrrrr',
+  '..rrrrrrrrrrrr..',
+  '..rrrrrrrrrrrr..',
+  '..rrrrrrrrrrrr..',
+  '.rrrrrrrrrrrrrr.',
+];
+
+// 앉아서 팔을 한 줄 올린 프레임 — 노트북 타이핑. CLAWD_ARMS_UP과 같은 박자로 번갈아 쓴다.
+// 노트북 상판이 하반신을 덮으므로 화면에 남는 것은 눈과 팔뿐이고, 그 한 줄이 전부다.
+export const CLAWD_SIT_UP = [
+  '..rrrrrrrrrrrr..',
+  '..rrrrrrrrrrrr..',
+  'rrrrrrrrrrrrrrrr',
+  'rrrkkrrrrrrkkrrr',
+  'rrrkkrrrrrrkkrrr',
+  '..rrrrrrrrrrrr..',
+  '..rrrrrrrrrrrr..',
+  '..rrrrrrrrrrrr..',
+  '..rrrrrrrrrrrr..',
+  '.rrrrrrrrrrrrrr.',
+];
+
+// 집어 들렸을 때. 팔은 CLAWD_ARMS_HIGH처럼 위로 뻗고 **다리는 한 줄 더 길어진다.**
+//
+// 처음엔 들린 티를 내려고 다리를 좌우로 벌려 봤는데, 네 짝이 제각기 퍼지자 게가 아니라
+// 거미가 됐다(굽어서 확인했다). 이 크기에서 다리는 **개수와 간격이 실루엣**이라 간격을
+// 건드리면 다른 생물이 된다. 늘어뜨리기만 하고, 버둥은 두 프레임의 길이 차로 낸다 —
+// A는 넷 다 길고 B는 안쪽 두 짝만 남는다. 걷기가 대각선 짝으로 딛는 것과 같은 수법이다.
+//
+// 공중에 떠 있다는 것 자체는 자세가 아니라 **그림자가 말한다**(stroll-view의 drawPet —
+// 들린 동안 그림자는 바닥에 남고 몸만 커서를 따라 올라간다).
+export const CLAWD_HELD_A = [
+  'rr............rr',
+  'rrrrrrrrrrrrrrrr',
+  'rrrrrrrrrrrrrrrr',
+  'rrrkkrrrrrrkkrrr',
+  '..rkkrrrrrrkkr..',
+  '..rrrrrrrrrrrr..',
+  '..rrrrrrrrrrrr..',
+  '..rrrrrrrrrrrr..',
+  '..rrrrrrrrrrrr..',
+  '..rr.rr..rr.rr..',
+  '..rr.rr..rr.rr..',
+  '..rr.rr..rr.rr..',
+  '..rr.rr..rr.rr..',
+  '..rr.rr..rr.rr..',
+];
+
+export const CLAWD_HELD_B = [
+  'rr............rr',
+  'rrrrrrrrrrrrrrrr',
+  'rrrrrrrrrrrrrrrr',
+  'rrrkkrrrrrrkkrrr',
+  '..rkkrrrrrrkkr..',
+  '..rrrrrrrrrrrr..',
+  '..rrrrrrrrrrrr..',
+  '..rrrrrrrrrrrr..',
+  '..rrrrrrrrrrrr..',
+  '..rr.rr..rr.rr..',
+  '..rr.rr..rr.rr..',
+  '..rr.rr..rr.rr..',
+  '.....rr..rr.....',
+  '.....rr..rr.....',
+];
+
 export const PLANT = [
   '....gg....',
   '..G.gg.G..',
@@ -691,6 +770,53 @@ export const FLASK = ['.zz..', '.zz..', 'zaaz.', 'zaaz.', 'ztttz', 'zttts', '.zz
 
 // 라운지 노트북 — 뚜껑을 세운 모습
 export const LAPTOP = ['.sssssss.', '.sdddddS.', '.sdaaadS.', '.sdddddS.', '.sssssss.', 'zzzzzzzzz', 'zSSSSSSSz'];
+
+// 바닥에서 펴는 노트북 — 산책 모드 전용. 책상 위의 LAPTOP(9px)을 그대로 쓰면 게(16px) 앞에서
+// **장난감처럼 작아** 무릎에 올린 물건으로 안 읽힌다(나란히 굽어 보고 13px로 넓혔다).
+// 15px까지 넓히면 이번엔 게가 노트북 뒤로 숨어 눈만 남는다 — 13이 둘 다 보이는 유일한 폭이다.
+export const LAPTOP_OPEN = [
+  '.sssssssssss.',
+  '.sdddddddddS.',
+  '.sdaaaaaaadS.',
+  '.sdaaaaaaadS.',
+  '.sdddddddddS.',
+  '.sssssssssss.',
+  'zzzzzzzzzzzzz',
+  'zSSSSSSSSSSSz',
+];
+
+// 화면에 코드가 흐르는 프레임. 팔을 올린 프레임과 짝지어 번갈아 쓴다 — 몸이 1px 오르내리는
+// 것만으로는 타이핑인지 숨쉬는 것인지 알 수 없고, **화면이 같이 깜빡여야** 일하는 것이 된다.
+//
+// 글줄은 투명이 아니라 **어두운 픽셀**이다. 처음엔 화면을 파서 냈는데, 게가 노트북 뒤에
+// 앉아 있으므로 그 구멍으로 몸통이 비쳐 화면에 주황 점이 박혔다(굽어서 확인했다).
+export const LAPTOP_OPEN_CODE = [
+  '.sssssssssss.',
+  '.sdddddddddS.',
+  '.sdaaadaaadS.',
+  '.sdadaaadadS.',
+  '.sdddddddddS.',
+  '.sssssssssss.',
+  'zzzzzzzzzzzzz',
+  'zSSSSSSSSSSSz',
+];
+
+// 꺼내서 펴는 두 단계. 접힌 판 → 반쯤 선 화면 → LAPTOP_OPEN.
+// 스프라이트로 두는 이유는 클립으로 잘라 올리면 상판 테두리(s)까지 잘려 나가기 때문이다.
+export const LAPTOP_SHUT = [
+  'zzzzzzzzzzzzz',
+  'zSSSSSSSSSSSz',
+  '.zzzzzzzzzzz.',
+];
+
+export const LAPTOP_HALF = [
+  '.sssssssssss.',
+  '.sdaaaaaaadS.',
+  '.sdddddddddS.',
+  'zzzzzzzzzzzzz',
+  'zSSSSSSSSSSSz',
+];
+
 
 // 자료실 열람석에 펼쳐진 책
 export const BOOK = ['..z...z..', '.zwz.zwz.', 'zwwwzwwwz', 'zwwwzwwwz', 'mmmmmmmmm'];

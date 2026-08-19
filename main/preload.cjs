@@ -19,10 +19,14 @@ contextBridge.exposeInMainWorld('office', {
   // 설정 창의 알림 설정 — 종류별 on/off와 방해금지 (트레이 메뉴와 같은 값)
   getNotify: () => ipcRenderer.invoke('office:getNotify'),
   setNotify: (patch) => ipcRenderer.invoke('office:setNotify', patch),
-  // 미니 모드 — 작게 띄워 두는 사무실 (별도 창이라 렌더러는 켜고 끄기만 한다)
-  getMini: () => ipcRenderer.invoke('office:getMini'),
-  setMini: (on) => ipcRenderer.send('office:setMini', on),
-  miniSelect: (key) => ipcRenderer.send('office:mini-select', key),
+  // 어느 모습으로 쓸까 — 'normal'(큰 창) · 'mini'(작게 띄워 두는 사무실) · 'stroll'(바탕화면 산책).
+  // 셋 다 별도 창이라 렌더러는 갈아타 달라고만 한다.
+  getMode: () => ipcRenderer.invoke('office:getMode'),
+  setMode: (mode) => ipcRenderer.send('office:setMode', mode),
+  // 미니·산책에서 게를 누르면 큰 창이 올라오며 그 세션이 펼쳐진다
+  selectSession: (key) => ipcRenderer.send('office:select-session', key),
+  // 산책 창이 커서 밑을 알려 온다 — 게 위에 있는 동안만 클릭을 먹는다
+  strollPass: (on) => ipcRenderer.send('office:stroll-pass', on),
   // 전역 단축키 — 저장된 조합과 못 잡은 조합을 함께 돌려준다
   getHotkeys: () => ipcRenderer.invoke('office:getHotkeys'),
   setHotkeys: (patch) => ipcRenderer.invoke('office:setHotkeys', patch),

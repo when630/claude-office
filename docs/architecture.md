@@ -49,6 +49,13 @@ renderer/           픽셀 렌더러 (app · render · sprites · themes · talk
                     유무는 창을 만들 때 정해지고 나중에 못 바꾸기 때문이다.
                     캔버스는 큰 창과 **다른 함수**를 탄다(`layoutMini`·`renderMini`) —
                     방을 안 그리고 게만 두 줄로 모아 세운다
+renderer/stroll.html      산책 창의 뼈대 — 캔버스 하나뿐이라 style.css를 안 끌고 온다
+renderer/stroll-app.mjs   산책 창의 껍데기 — 스냅샷·프레임·마우스(집어 들기·클릭 통과 판정).
+                          큰 창의 app.mjs를 안 태운다 — 쓸 것이 없는 2천 줄이 창마다 한 벌 돈다
+renderer/stroll.mjs       산책의 **움직임** — 걷기·앉기·낙하·등퇴장. 캔버스를 모르고 `now`·`dt`를
+                          받으므로 node로 돈다(test/stroll.test.mjs). 큰 창은 자리를 시각에서
+                          유도했지만(walkPos) 여기서는 사람이 게를 옮기므로 상태가 남아야 한다
+renderer/stroll-view.mjs  산책 **그리기** — 배경이 없어 스프라이트·말풍선·이름표뿐이다
 renderer/fonts/     번들 폰트 둘 — 사무실 픽셀 폰트(Mona S 12px)와 껍데기 본문
                     (Pretendard Variable). 둘 다 OFL 1.1. **선언만 두고 설치를 기대하지
                     않는다** — 그 전에는 설치한 사람만 Pretendard를 봤다 (renderer/fonts/README.md)
@@ -70,6 +77,22 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
 
 ## 손댈 만한 곳
 
+- **산책 모드는 "없는 척하는 창"이다**(`main/index.mjs`의 `createStroll`). 작업 영역을 통째로
+  덮으므로 잘못 만들면 **화면 전체가 클릭을 먹는다** — 그래서 기본은
+  `setIgnoreMouseEvents(true, { forward: true })`이고, 커서가 게 위에 왔을 때만 렌더러가
+  알려 와서 잠깐 끈다(`office:stroll-pass`). forward를 켜야 통과 중에도 mousemove가 와서
+  "게 위에 왔다"를 알 수 있다(Electron에서 통과 중 전달되는 것은 mousemove뿐이다).
+  **`backgroundThrottling: false`가 빠지면 게가 얼어붙는다** — 아무것도 안 그린 투명 창은
+  Chromium의 occlusion 판정에 걸려 `visibilityState: hidden`이 되고 rAF가 멈춘다(실제 앱을
+  띄워 확인했다. 창은 떠 있는데 게만 멈춘 그림이 된다). 투명 창은 크기를 못 바꾸므로
+  `resizable: false`이고 자리는 `fitStroll`이 작업 영역에 맞춰 다시 잡는다.
+  Windows만 `focusable: false`다 — 게를 끌어도 작업 중인 창의 초점을 뺏지 않아야 하는데,
+  맥에서는 초점을 못 받는 창이 마우스 눌림을 받는 보장이 없어 집어 드는 것 자체를 잃는다
+- **모습은 셋 중 하나다**(`settings.mode` — `normal` · `mini` · `stroll`). 배타라는 약속은
+  `setMode` 한 곳에만 있다. 옛 설정의 `mini: true`는 `sanitizeMode`가 읽어 준다 —
+  트레이 상주 앱이라 남의 설정을 잃는 것이 곧 회귀다
+- **산책에 누구를 내보낼지는 미니와 같은 판단을 쓴다**(`strollCast` → `miniRoster`). 급한 순으로
+  `view.strollMax`(기본 6)마리까지다. 여기서 순서를 따로 매기면 같은 앱이 창마다 다른 말을 한다
 - `renderer/style.css` — **껍데기의 값은 다 `:root`에 있다.** 리터럴 hex는 그 정의부 밖에
   하나도 없어야 한다(모서리·글자 크기도 단으로 접혀 있고, 예외는 모양이 값을 정하는 곳뿐 —
   주석에 이유가 적혀 있다). 버튼 생김새는 셋(`.btn`·`.btn-go`·`.btn-toggle`)이고 그 위에
