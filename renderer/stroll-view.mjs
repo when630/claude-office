@@ -47,7 +47,8 @@ function bodyOf(pet, t) {
     case 'held':
       return Math.floor(t / 190) % 2 ? SPR.heldA : SPR.heldB;
     case 'warp':
-      return SPR.heldA; // 떨어지는 동안 다리는 늘어져 있다 (집혔을 때와 같은 자세)
+    case 'sink':
+      return SPR.heldA; // 구멍을 오갈 때는 다리가 늘어져 있다 (집혔을 때와 같은 자세)
     case 'land':
       return SPR.armsUp; // 딛고 선 직후 — 팔이 한 줄 올라간 채 잠깐 멈칫한다
     case 'work':
@@ -153,16 +154,20 @@ function drawPet(ctx, pet, t, opts) {
   const y = Math.round(pet.y);
   const lifted = pet.act === 'held';
   const falling = pet.act === 'warp';
+  const sinking = pet.act === 'sink';
 
-  // 포탈은 **게보다 먼저** 그린다 — 게가 구멍에서 나오는 것이지 구멍이 게 위에 얹히는 것이 아니다.
-  // 자리는 설 자리 위다: 떨어지는 동안 게가 아래로 내려가도 구멍은 제자리에 남는다.
-  if (pet.portal > 0) drawPortal(ctx, x, Math.round(pet.portalY), pet.portal, t);
+  // 나올 때 구멍은 **게보다 먼저** 그린다 — 게가 거기서 나오는 것이지 구멍이 게 위에 얹히는
+  // 것이 아니다. 들어갈 때는 반대다(아래 참고). 자리는 어느 쪽이든 제자리에 남는다.
+  if (pet.portal > 0 && !sinking) drawPortal(ctx, x, Math.round(pet.portalY), pet.portal, t);
 
-  // 그림자는 **설 자리에** 진다 — 떨어지는 동안에도 어디에 내려앉을지 미리 보인다
+  // 그림자는 **설 자리에** 진다 — 떨어지는 동안에도 어디에 내려앉을지 미리 보인다.
+  // 구멍으로 잠기는 동안에는 없다: 발밑이 구멍인데 그림자가 지면 바닥이 있는 것이 된다.
   const shadowY = falling ? Math.round(pet.gy) : y;
-  ctx.globalAlpha = lifted ? 0.14 : falling ? 0.18 : 0.3;
-  rect(ctx, x - 6, shadowY - 1, 12, 2, COLORS.shadow);
-  ctx.globalAlpha = 1;
+  if (!sinking) {
+    ctx.globalAlpha = lifted ? 0.14 : falling ? 0.18 : 0.3;
+    rect(ctx, x - 6, shadowY - 1, 12, 2, COLORS.shadow);
+    ctx.globalAlpha = 1;
+  }
 
   // 포탈이 다 열리기 전에는 아직 나오지 않았다
   if (falling && pet.portal < 1) return { x, top: y };
@@ -177,12 +182,28 @@ function drawPet(ctx, pet, t, opts) {
 
   const dim = worker.mood === 'stopped';
   if (dim) ctx.globalAlpha = 0.45;
+  // 가라앉는 동안에는 **구멍 아래로 내려간 몸을 자른다** — 안 자르면 구멍 위를 지나쳐
+  // 그대로 흘러내리는 것이 되어, 들어가는 것이 아니라 떨어뜨린 것으로 보인다
+  if (sinking) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x - 16, pet.portalY - 60, 32, 60);
+    ctx.clip();
+  }
   drawSprite(ctx, body, x - body.w / 2, y - body.h);
+  if (sinking) ctx.restore();
   if (dim) ctx.globalAlpha = 1;
 
   // 노트북은 몸보다 나중에 — 상판이 하반신을 덮어야 "뒤에 앉았다"가 된다
   const lap = laptopOf(pet.lap, t);
   if (lap) drawSprite(ctx, lap, x - lap.w / 2, y - lap.h + LAP_DY);
+
+  // 들어갈 때 구멍은 **게보다 나중에** — 테두리가 몸 위에 얹혀야 빠진 것으로 보인다.
+  // 그 뒤로는 아무것도 안 그린다: 기호도 이름표도 없이 조용히 잠긴다.
+  if (sinking) {
+    if (pet.portal > 0) drawPortal(ctx, x, Math.round(pet.portalY), pet.portal, t);
+    return { x, top: y - body.h };
+  }
 
   let top = y - body.h;
   const glyphKey = glyphKeyFor(worker);

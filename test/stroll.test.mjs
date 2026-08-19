@@ -252,16 +252,30 @@ test('세로가 가로보다 빠르지 않다 — 위아래로 미끄러지면 �
   }
 });
 
-test('목록에서 빠지면 화면 밖으로 걸어 나간 뒤에 사라진다', () => {
+test('목록에서 빠지면 발밑 구멍으로 가라앉아 사라진다', () => {
   const world = createWorld();
   const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
-  run(world, cast, { frames: 700, rng: () => 0.1 });
+  run(world, cast, { frames: 200, rng: () => 0.4 });
+  const at = find(run(world, cast, { frames: 1, t0: 50_000 }), 'a');
+  const spot = { x: at.x, y: at.y };
 
-  const leaving = find(run(world, [], { frames: 2, t0: 50_000 }), 'a');
-  assert.equal(leaving.act, 'out', '그 자리에서 사라졌다');
+  const leaving = find(run(world, [], { frames: 2, t0: 50_016 }), 'a');
+  assert.equal(leaving.act, 'sink', '그 자리에서 그냥 사라졌다');
+  // 구멍은 **선 자리에** 열린다 — 어디론가 걸어가서 사라지면 눈이 놓친다
+  assert.equal(Math.round(leaving.portalY), Math.round(spot.y));
+  assert.equal(Math.round(leaving.x), Math.round(spot.x));
 
-  const gone = run(world, [], { frames: 3000, t0: 50_100 });
-  assert.equal(find(gone, 'a'), null, '나가고도 남아 있다');
+  // 구멍이 다 열릴 때까지는 잠기지 않는다
+  const opening = find(run(world, [], { frames: 4, t0: 50_050 }), 'a');
+  assert.equal(Math.round(opening.y), Math.round(spot.y), '구멍도 없는데 가라앉았다');
+
+  // 잠기기 시작하면 아래로 내려간다
+  const sinking = find(run(world, [], { frames: 12, t0: 50_300 }), 'a');
+  assert.ok(sinking.y > spot.y, `안 가라앉는다: ${sinking.y}`);
+
+  // 구멍이 닫히면 사라진다 — 화면 끝까지 걸어 나갈 때와 달리 1초면 끝난다
+  const gone = run(world, [], { frames: 80, t0: 50_500 });
+  assert.equal(find(gone, 'a'), null, '가라앉고도 남아 있다');
 });
 
 test('프레임 사이에 튀지 않는다 — 창이 가려졌다 돌아와도', () => {

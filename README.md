@@ -247,6 +247,8 @@ across it.
 - Crabs arrive through a **portal**: it opens over the spot they are about to take and they drop
   out of it. Switching to the stroll brings everyone out at once, right where they are — a session
   that is working is already at its laptop, not walking in from off-screen
+- They leave the same way. When a session is gone a portal opens **under its feet** and the crab
+  sinks into it, right where it stood
 - Give a session work and its crab stops where it stands, **pulls out a laptop and gets to work**.
   When the work ends it folds the laptop away and carries on walking
 - Whoever is waiting on you stands still with both claws up and a `❗` — same as everywhere else.

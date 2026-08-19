@@ -47,8 +47,11 @@ const PORTAL_CLOSE_MS = 260;
 const NEAR = 1.2;
 const REST_MIN = 900;
 const REST_SPAN = 2600;
-// 화면 밖 여백 — 퇴장은 이만큼 밖까지 걸어 나가고 사라진다(등장은 포탈이라 안 쓴다)
-const OFFSCREEN = 22;
+// 가라앉는 깊이와 속도. **떨어지는 것이 아니라 빨려 들어가는 것이라 등속이다** —
+// 나올 때처럼 중력을 주었더니 마지막 두 프레임에 훅 사라져서, 들어간 것이 아니라
+// 그 자리에서 꺼진 것으로 보였다(굽어서 확인했다).
+const SINK_H = 22;
+const SINK_SPEED = 0.045;
 
 // 화면에 내보낼 게를 급한 순으로. **미니 창의 줄 세우기를 그대로 쓴다** — "무엇이 급한가"의
 // 답이 화면마다 갈리면 같은 앱이 자기 모순에 빠진다(shared/status.mjs가 있는 이유와 같다).
@@ -163,16 +166,19 @@ export function stepStroll(world, cast, { w, h, now, dt, drag = null, rng = Math
     // 멈칫하는 사이(land) 시간이 멈춰, 게가 다시 걸을 때까지 구멍이 열린 채로 남았다.
     if (pet.warpAt != null) {
       pet.portal = portalOpen(now - pet.warpAt);
-      if (pet.portal <= 0 && pet.act !== 'warp') pet.warpAt = null;
+      if (pet.portal <= 0 && pet.act !== 'warp' && pet.act !== 'sink') pet.warpAt = null;
     }
 
     const gone = !live.has(pet.key);
-    // 목록에서 빠진 게는 화면 밖으로 걸어 나간다 — 그 자리에서 사라지면 눈이 그것을 놓친다
-    if (gone && pet.act !== 'out' && pet.act !== 'held') {
-      pet.act = 'out';
+    // 목록에서 빠진 게는 **발밑에 열린 구멍으로 가라앉는다.** 그 자리에서 그냥 사라지면 눈이
+    // 그것을 놓치고, 전에 쓰던 "화면 밖으로 걸어 나가기"는 넓은 화면에서 수십 초가 걸렸다 —
+    // 세션은 이미 끝났는데 게만 한참 남아 있었다. 들어오는 길과 같은 구멍으로 나간다.
+    if (gone && pet.act !== 'sink' && pet.act !== 'held') {
+      pet.act = 'sink';
       pet.lap = 0;
-      pet.gx = pet.x < w / 2 ? -OFFSCREEN : w + OFFSCREEN;
-      pet.gy = pet.y;
+      pet.warpAt = now; // 포탈 시간표를 처음부터 다시 쓴다
+      pet.portalY = pet.y; // 구멍은 선 자리에 열린다
+      pet.vy = 0;
       pet.until = 0;
     }
 
@@ -217,8 +223,13 @@ export function stepStroll(world, cast, { w, h, now, dt, drag = null, rng = Math
       }
       continue;
     }
-    if (pet.act === 'out') {
-      if (advance(pet, step, 0, speed)) world.pets.delete(pet.key);
+    // 구멍으로 가라앉는 중. 구멍이 다 열린 뒤에 잠기기 시작하고, 구멍이 닫히면 사라진다.
+    if (pet.act === 'sink') {
+      pet.moving = false;
+      const age = now - pet.warpAt;
+      // 다 잠긴 뒤로는 더 내려가지 않는다 — 구멍이 닫힐 때까지 화면 밖으로 흘러갈 이유가 없다
+      if (age >= PORTAL_OPEN_MS) pet.y = Math.min(pet.portalY + SINK_H, pet.y + SINK_SPEED * step);
+      if (age > PORTAL_OPEN_MS && pet.portal <= 0) world.pets.delete(pet.key);
       continue;
     }
 
@@ -331,4 +342,4 @@ export function petAt(pets, px, py, scale = 2) {
   return null;
 }
 
-export const STROLL_TUNING = { SPEED_X, SPEED_Y, EDGE_X, EDGE_TOP, EDGE_BOTTOM, OPEN_MS, SHUT_MS, LAND_MS, OFFSCREEN };
+export const STROLL_TUNING = { SPEED_X, SPEED_Y, EDGE_X, EDGE_TOP, EDGE_BOTTOM, OPEN_MS, SHUT_MS, LAND_MS, DROP_H, SINK_H };
