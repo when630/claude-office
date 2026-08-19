@@ -4,6 +4,7 @@
 // 갈라 쓰는 값이 있었지만, 산책에는 **DOM이 캔버스 하나뿐**이다. 같은 app.mjs를 태우면
 // 쓰지도 않을 2천 줄이 창마다 한 벌씩 돌게 된다.
 import { OFFICE_FONT_PX, OFFICE_FONT_FAMILY } from './render.mjs';
+import { setLang } from '../shared/i18n.mjs';
 import {
   createWorld,
   stepStroll,
@@ -60,6 +61,13 @@ let frozen = false; // 헤드리스로 굽을 때만 켠다 (__stroll.freeze)
 let command = false; // 지금 지휘 모드인가
 let box = null; // 그리는 중인 선택 상자 (창 좌표)
 const selected = new Set(); // 고른 게의 key
+let pings = []; // 누른 자리에 남는 파문 (논리 좌표)
+
+// 파문 하나. 오래된 것은 그릴 때 걸러지므로 여기서는 개수만 막는다.
+function ping(x, y, move) {
+  pings.push({ x: x / scale, y: y / scale, t0: performance.now(), move });
+  if (pings.length > 8) pings = pings.slice(-8);
+}
 
 function logical() {
   return { w: canvas.clientWidth / scale, h: canvas.clientHeight / scale };
@@ -77,7 +85,8 @@ function setPassThrough(on) {
   if (on === passThrough) return;
   passThrough = on;
   window.office?.strollPass?.(on);
-  document.body.style.cursor = on ? 'default' : 'grab';
+  // 지휘 중이면 커서를 감춘 채로 둔다 — 여기서 되돌리면 십자가 두 겹이 된다
+  document.body.style.cursor = command ? 'none' : on ? 'default' : 'grab';
 }
 
 function tick(now) {
@@ -137,6 +146,9 @@ function tick(now) {
     selected,
     // 상자는 창 좌표로 그렸으므로 논리 좌표로 바꿔 넘긴다
     box: box && { x0: box.x0 / scale, y0: box.y0 / scale, x1: box.x1 / scale, y1: box.y1 / scale },
+    command,
+    cursor: command && pointer ? { x: pointer.x / scale, y: pointer.y / scale, ready: selected.size > 0 } : null,
+    pings,
   });
 }
 tick.last = 0;
@@ -153,7 +165,9 @@ function setCommand(on) {
   command = on;
   if (!on) box = null;
   setPassThrough(!on);
-  document.body.style.cursor = on ? 'crosshair' : passThrough ? 'default' : 'grab';
+  // 지휘 중에는 **OS 커서를 감추고 캔버스에 직접 그린다**(stroll-view의 drawCursor) —
+  // 화살표 그대로면 지금 지휘 중인지가 화면에 드러나지 않는다
+  document.body.style.cursor = on ? 'none' : passThrough ? 'default' : 'grab';
 }
 
 window.addEventListener('mousemove', (e) => {
@@ -183,7 +197,10 @@ window.addEventListener('mousedown', (e) => {
     e.preventDefault();
     // 우클릭 — 고른 게들을 그 자리로 보낸다
     if (e.button === 2) {
-      if (selected.size) orderMove(world, selected, e.clientX / scale, e.clientY / scale, logical().w, logical().h);
+      if (selected.size) {
+        orderMove(world, selected, e.clientX / scale, e.clientY / scale, logical().w, logical().h);
+        ping(e.clientX, e.clientY, true);
+      }
       return;
     }
     if (e.button !== 0) return;
@@ -221,6 +238,7 @@ window.addEventListener('mouseup', () => {
       });
       for (const p of inBox) selected.add(p.key);
     }
+    ping(box.x1, box.y1, false);
     box = null;
     return;
   }
@@ -243,6 +261,14 @@ function connect() {
   if (!window.office) return;
   window.office.onState(applyState);
   window.office.getState().then(applyState);
+  // **언어는 창마다 따로 세운다.** 렌더러는 제 프로세스라 main이 정한 언어를 물어봐야 하는데,
+  // 이 창은 글자를 잡담 말풍선에만 쓰다 보니 빠뜨렸다 — 한국어로 쓰는 사람에게 게가 영어로
+  // 떠들고 있었다. 트레이에서 언어를 바꾸면 그때도 따라와야 한다(onLang).
+  window.office
+    .meta?.()
+    .then((m) => m?.lang && setLang(m.lang))
+    .catch(() => {});
+  window.office.onLang?.((p) => p?.lang && setLang(p.lang));
   window.office
     .getView?.()
     .then((v) => {
