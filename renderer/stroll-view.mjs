@@ -62,8 +62,12 @@ function bodyOf(pet, t) {
     case 'nap':
       return SPR.asleep;
     case 'dizzy':
-      // 흔들린 뒤 — 큰 창과 같은 갸우뚱이다(render.mjs의 clawdDizzy)
-      return Math.sin(((t % DIZZY_CYCLE) / DIZZY_CYCLE) * Math.PI * 2) >= 0 ? SPR.tiltR : SPR.tiltL;
+      // 흔들린 뒤 — **몸은 그대로 두고 머리 위 별만 돌린다.** 큰 창처럼 갸우뚱 프레임을
+      // 끼웠더니 줄마다 어긋난 머리가 이 크기에서 "기울었다"가 아니라 "찌그러졌다"로 보였다.
+      // 어지러움은 별이 말한다.
+      return SPR.stand;
+    case 'hop':
+      return SPR.armsUp; // 뛰는 동안 팔이 올라간다
     case 'land':
       return SPR.armsUp; // 딛고 선 직후 — 팔이 한 줄 올라간 채 잠깐 멈칫한다
     case 'work':
@@ -94,6 +98,9 @@ function laptopOf(lap, t) {
   return Math.floor(t / 220) % 2 ? SPR.laptopCode : SPR.laptopOpen;
 }
 
+// 폴짝 뛸 때 몸이 뜨는 높이. `pet.hop`(0..1)에 곱한다 — 얼마나 뛰었나는 움직임이 정하고,
+// 그것이 몇 px인가는 그리는 쪽이 정한다.
+const HOP_H = 7;
 const BUBBLE_H = 11;
 
 function drawGlyphBubble(ctx, cx, bottom, glyph) {
@@ -179,6 +186,8 @@ function drawPet(ctx, pet, t, opts) {
   const lifted = pet.act === 'held';
   const falling = pet.act === 'warp';
   const sinking = pet.act === 'sink';
+  // 폴짝 뛴 높이. 몸만 이만큼 뜨고 그림자는 바닥에 남는다.
+  const hop = (pet.hop ?? 0) * HOP_H;
 
   // 구멍의 **뒤쪽 절반**이 먼저다. 게는 그 위에 그리고, 앞쪽 절반은 게 위에 얹는다(아래).
   const portalY = Math.round(pet.portalY ?? 0);
@@ -187,10 +196,14 @@ function drawPet(ctx, pet, t, opts) {
 
   // 그림자는 **설 자리에** 진다 — 떨어지는 동안에도 어디에 내려앉을지 미리 보인다.
   // 구멍으로 잠기는 동안에는 없다: 발밑이 구멍인데 그림자가 지면 바닥이 있는 것이 된다.
+  //
+  // **뜬 만큼 작고 옅어진다.** 폴짝 뛸 때 몸만 올려 봤더니 뛴 것이 아니라 화면이 흔들린
+  // 것으로 보였다 — 발밑에 남아 줄어드는 그림자가 "떴다"를 만드는 전부다.
   const shadowY = falling ? Math.round(pet.gy) : y;
   if (!sinking) {
-    ctx.globalAlpha = lifted ? 0.14 : falling ? 0.18 : 0.3;
-    rect(ctx, x - 6, shadowY - 1, 12, 2, COLORS.shadow);
+    const k = hop > 0 ? 1 - (hop / HOP_H) * 0.45 : 1;
+    ctx.globalAlpha = (lifted ? 0.14 : falling ? 0.18 : 0.3) * k;
+    rect(ctx, x - 6 * k, shadowY - 1, 12 * k, 2, COLORS.shadow);
     ctx.globalAlpha = 1;
   }
 
@@ -216,7 +229,7 @@ function drawPet(ctx, pet, t, opts) {
     else ctx.rect(x - 16, portalY, 32, 80);
     ctx.clip();
   }
-  drawSprite(ctx, body, x - body.w / 2, y - body.h);
+  drawSprite(ctx, body, x - body.w / 2, y - hop - body.h);
   if (inPortal) ctx.restore();
   if (dim) ctx.globalAlpha = 1;
 

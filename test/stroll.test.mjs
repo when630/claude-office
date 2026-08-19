@@ -504,3 +504,39 @@ test('오래 할 일이 없으면 기지개를 켜거나 존다', () => {
   const up = find(stepStroll(world, busy, { w: W, h: H, now: 300_700, dt: 16 }), 'a');
   assert.equal(up.act, 'work', '자다가 일을 못 받는다');
 });
+
+test('만남을 만들러 간다 — 가끔 다른 게 옆을 목적지로 잡는다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle'), worker('b', 'idle')]));
+  run(world, cast, { frames: 200, rng: () => 0.4 });
+
+  // 목적지를 여러 번 고르게 하고, 그중 상대 근처를 고른 적이 있는지 본다.
+  // 각자 아무 데나 다니면 넓은 화면에서 마주칠 일이 없어 잡담도 술래잡기도 안 일어난다.
+  // 난수를 낮게 고정하면 목적지를 고를 때마다 "찾아가기"를 탄다 — 확률에 기대면 가끔 샌다
+  let visited = 0;
+  for (let i = 0; i < 400; i++) {
+    const pets = stepStroll(world, cast, { w: W, h: H, now: 400_000 + i * 16, dt: 16, rng: () => 0.2 });
+    for (const p of pets) {
+      const other = pets.find((q) => q !== p);
+      if (other && Math.hypot(p.gx - other.x, p.gy - other.y) < 26) visited++;
+    }
+  }
+  assert.ok(visited > 0, '서로를 찾아가지 않는다');
+});
+
+test('폴짝 뛰면 떴다 내려온다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
+  const pet = find(run(world, cast, { frames: 120, rng: () => 0.4 }), 'a');
+  pet.act = 'hop';
+  pet.hopAt = 500_000;
+  pet.hop = 0;
+
+  const mid = find(stepStroll(world, cast, { w: W, h: H, now: 500_190, dt: 16 }), 'a');
+  assert.ok(mid.hop > 0.9, `안 뜬다: ${mid.hop}`);
+  assert.equal(mid.act, 'hop');
+
+  const done = find(stepStroll(world, cast, { w: W, h: H, now: 500_400, dt: 16 }), 'a');
+  assert.equal(done.hop, 0, '뜬 채로 끝난다');
+  assert.notEqual(done.act, 'hop');
+});

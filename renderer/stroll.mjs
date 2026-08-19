@@ -67,15 +67,23 @@ const RUN_MULT = 2.3;
 // 산책이 아니게 되므로 **가까운 동안만** 멈추고, 커서가 가만히 있으면 곧 제 갈 길을 간다.
 const LOOK_NEAR = 34;
 const LOOK_MS = 1400;
-// 잡담 — 이만큼 가까이 서면 말을 튼다. 한 마디씩 주고받고 헤어진다.
-const CHAT_NEAR = 20;
+// 잡담 — 이만큼 가까이 오면 말을 튼다. 한 마디씩 주고받고 헤어진다.
+//
+// **만남을 기다리지 않고 만들러 간다**(aim의 VISIT_CHANCE). 각자 아무 데나 목적지를 고르면
+// 넓은 화면에서 둘이 스무 픽셀 안에 서는 일이 거의 없어, 잡담이 있으나 마나 한 기능이 됐다.
+const CHAT_NEAR = 30;
 const CHAT_MS = 4200;
 const CHAT_SAY_MS = 1900; // 한 사람이 말하고 있는 시간
-const CHAT_COOL_MS = 9000; // 헤어진 뒤 다시 말 걸기까지
+const CHAT_COOL_MS = 6000; // 헤어진 뒤 다시 말 걸기까지
+// 다음 목적지를 이 확률로 **다른 게 옆**에 잡는다 — 그래야 마주친다
+const VISIT_CHANCE = 0.34;
 // 술래잡기 — 쉬고 있는 둘을 골라 잠깐 쫓게 한다
-const CHASE_CHANCE = 0.0016; // 프레임마다 굴린다(30fps에서 20초에 한 번쯤)
+const CHASE_CHANCE = 0.006; // 프레임마다 굴린다(30fps에서 5~6초에 한 번쯤)
 const CHASE_MS = 5200;
 const CHASE_CATCH = 12;
+// 폴짝. 잡히거나 반가울 때 한 번 뛴다. **얼마나 뜨는지는 여기서 안 정한다** —
+// `pet.hop`은 0에서 1까지의 정도이고, 몇 px로 그릴지는 그리는 쪽이 안다(stroll-view의 HOP_H).
+const HOP_MS = 380;
 // 쉬는 모습 — 할 일 없이 이만큼 지나면 기지개를 켜거나 잠깐 존다
 // 26초로 두었더니 걷는 중간중간 자꾸 기지개가 나와, 산책이 아니라 몸풀기가 됐다
 const REST_LONG_MS = 62_000;
@@ -214,7 +222,9 @@ function freeToPlay(pet, live, now) {
 // 가까이 선 둘을 짝지어 말을 트게 한다. **한 프레임에 한 쌍만** — 여럿이 동시에 말풍선을
 // 띄우면 바탕화면이 대화창이 된다.
 function pairChats(world, live, now) {
-  const idle = [...world.pets.values()].filter((p) => freeToPlay(p, live, now) && !p.moving);
+  // **걷는 중이어도 말을 튼다.** 둘 다 멈춰 서 있기를 기다렸더니 스쳐 지나가기만 했다 —
+  // 가까워진 순간 서로 멈춰 세우는 편이 "마주쳤다"에 가깝다.
+  const idle = [...world.pets.values()].filter((p) => freeToPlay(p, live, now));
   for (let i = 0; i < idle.length; i++) {
     for (let j = i + 1; j < idle.length; j++) {
       const a = idle[i];
@@ -345,7 +355,7 @@ export function stepStroll(
       if (now >= pet.until) {
         // 흔들려서 내려왔으면 서자마자 비틀거린다
         pet.act = pet.dizzyUntil > now ? 'dizzy' : 'walk';
-        if (pet.act === 'walk') aim(pet, area, rng);
+        if (pet.act === 'walk') aim(pet, area, rng, world);
         pet.until = 0;
       }
       continue;
@@ -358,7 +368,7 @@ export function stepStroll(
       if (busy || now >= pet.dizzyUntil) {
         pet.dizzyUntil = 0;
         pet.act = 'walk';
-        aim(pet, area, rng);
+        aim(pet, area, rng, world);
       } else {
         pet.moving = false;
         continue;
@@ -392,7 +402,7 @@ export function stepStroll(
     // 창이 작아졌거나 모니터가 바뀌었으면 화면 안으로 당긴다 — 밖에 남으면 영영 안 보인다
     if (outsideArea(pet, area)) {
       clampToArea(pet, area);
-      aim(pet, area, rng);
+      aim(pet, area, rng, world);
     }
 
     const want = gone ? 'walk' : wantAct(pet.entry.worker);
@@ -425,6 +435,21 @@ export function stepStroll(
       continue;
     }
 
+    // 폴짝 — 몸이 포물선으로 떴다 내려온다. **그림자는 바닥에 남아 작아진다**(그리는 쪽) —
+    // 몸만 올라가면 뛴 것이 아니라 화면이 흔들린 것으로 보인다.
+    if (pet.act === 'hop') {
+      const age = now - pet.hopAt;
+      pet.moving = false;
+      if (age < HOP_MS) {
+        pet.hop = Math.sin((age / HOP_MS) * Math.PI);
+        continue;
+      }
+      pet.hop = 0;
+      pet.act = 'walk';
+      pet.until = now + REST_MIN;
+      aim(pet, area, rng, world);
+    }
+
     // 잡담 중 — 마주 보고 한 마디씩 주고받는다. 그동안은 걷지 않는다.
     if (pet.talk) {
       if (now - pet.talk.t0 < CHAT_MS) {
@@ -434,6 +459,13 @@ export function stepStroll(
       }
       pet.talk = null;
       pet.chatCool = now + CHAT_COOL_MS; // 헤어지자마자 또 말을 걸면 두 마리가 붙박이가 된다
+      // 이야기가 잘 끝나면 폴짝 뛰고 간다
+      if (rng() < 0.4) {
+        pet.act = 'hop';
+        pet.hopAt = now;
+        pet.hop = 0;
+        continue;
+      }
     }
 
     // 술래잡기 — 술래는 상대를 향해, 도망자는 반대쪽으로 달린다
@@ -444,9 +476,10 @@ export function stepStroll(
         pet.chase = null;
         pet.chatCool = now + CHAT_COOL_MS;
         pet.dash = false;
-        // 잡히면 둘 다 잠깐 폴짝 뛰고 흩어진다
-        pet.act = 'land';
-        pet.until = now + LAND_MS;
+        // 잡히면 폴짝 뛰고 흩어진다
+        pet.act = 'hop';
+        pet.hopAt = now;
+        pet.hop = 0;
         continue;
       }
       pet.act = 'walk';
@@ -484,7 +517,7 @@ export function stepStroll(
       if (now < pet.until) continue;
       pet.act = 'walk';
       pet.restSince = now;
-      aim(pet, area, rng);
+      aim(pet, area, rng, world);
       pet.until = 0;
     }
     if (pet.restSince == null) pet.restSince = now;
@@ -508,7 +541,7 @@ export function stepStroll(
       pet.moving = false;
       pet.dash = false;
       pet.until = now + REST_MIN + rng() * REST_SPAN;
-      aim(pet, area, rng);
+      aim(pet, area, rng, world);
     } else {
       leaveTrack(world, pet, Math.abs(pet.x - was.x) + Math.abs(pet.y - was.y), now);
     }
@@ -555,10 +588,23 @@ function advance(pet, step, near, speed = 1) {
 
 // 다음 목적지. **너무 가까운 곳은 고르지 않는다** — 한 걸음 걷고 멈추기를 반복하면
 // 걷는 것이 아니라 떠는 것으로 보인다.
-function aim(pet, area, rng = Math.random) {
+function aim(pet, area, rng = Math.random, world = null) {
   // 가끔 달린다. **목적지를 고를 때 정한다** — 걷는 도중에 갑자기 빨라지면 걸음이 아니라
   // 화면이 끊긴 것으로 보인다.
   pet.dash = rng() < RUN_CHANCE;
+
+  // 가끔 **다른 게를 찾아간다.** 각자 아무 데나 다니면 넓은 화면에서 마주칠 일이 없어
+  // 잡담도 술래잡기도 일어나지 않는다 — 만남은 기다릴 것이 아니라 만들 것이다.
+  if (world && rng() < VISIT_CHANCE) {
+    const others = [...world.pets.values()].filter((p) => p !== pet && p.act !== 'sink' && p.act !== 'warp');
+    if (others.length) {
+      const mate = others[Math.min(others.length - 1, Math.floor(rng() * others.length))];
+      pet.gx = Math.min(Math.max(mate.x + (rng() < 0.5 ? -12 : 12), area.x0), area.x1);
+      pet.gy = Math.min(Math.max(mate.y, area.y0), area.y1);
+      return;
+    }
+  }
+
   const spanX = area.x1 - area.x0;
   const spanY = area.y1 - area.y0;
   const least = Math.min(60, Math.max(8, spanX / 3));
@@ -593,4 +639,4 @@ export function petAt(pets, px, py, scale = 2) {
   return null;
 }
 
-export const STROLL_TUNING = { SPEED_X, SPEED_Y, EDGE_X, EDGE_TOP, EDGE_BOTTOM, OPEN_MS, SHUT_MS, LAND_MS, DROP_H, SINK_H };
+export const STROLL_TUNING = { SPEED_X, SPEED_Y, EDGE_X, EDGE_TOP, EDGE_BOTTOM, OPEN_MS, SHUT_MS, LAND_MS, DROP_H, SINK_H, HOP_MS };
