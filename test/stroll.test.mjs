@@ -25,7 +25,7 @@ globalThis.document = {
   }),
 };
 
-const { createWorld, stepStroll, strollCast, wantAct, petAt, petHitBox, strollArea, STROLL_MAX } = await import(
+const { createWorld, stepStroll, strollCast, wantAct, saying, petAt, petHitBox, strollArea, STROLL_MAX } = await import(
   '../renderer/stroll.mjs'
 );
 
@@ -195,32 +195,83 @@ test('입력 대기는 멈춰 선다', () => {
   assert.equal(pet.moving, false);
 });
 
-test('집어 들면 커서를 따라오고, 놓으면 그 자리에 선다', () => {
+test('집어 들면 커서를 따라오고, 놓으면 살짝 처졌다 선다', () => {
   const world = createWorld();
   const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
   run(world, cast, { frames: 700, rng: () => 0.1 });
 
   // 잡고 화면 위쪽으로 끌어올린다
-  const held = run(world, cast, { frames: 20, t0: 40_000, drag: () => ({ key: 'a', x: 120, y: 40 }) });
+  const held = run(world, cast, { frames: 20, t0: 22_000, drag: () => ({ key: 'a', x: 120, y: 40 }) });
   const up = find(held, 'a');
   assert.equal(up.act, 'held');
   assert.equal(up.x, 120);
   assert.equal(up.y, 40);
 
-  // 놓는다 — **떨어지지 않는다.** 위아래로 자유롭게 다니는 화면에는 바닥이 없다
-  const dropped = find(run(world, cast, { frames: 2, t0: 40_400 }), 'a');
-  assert.equal(dropped.act, 'land');
-  assert.equal(Math.round(dropped.y), 40, `놓았는데 자리가 움직였다: ${dropped.y}`);
-  assert.equal(Math.round(dropped.x), 120);
+  // 놓으면 **곧장 서지 않고 조금 처진다** — 놓은 자리에 딱 붙어 서면 손을 떠난 순간이 없다
+  const dropped = find(run(world, cast, { frames: 2, t0: 22_400 }), 'a');
+  assert.equal(dropped.act, 'drop');
+  assert.ok(dropped.y > 40, `놓았는데 안 처진다: ${dropped.y}`);
+  assert.equal(Math.round(dropped.x), 120, '옆으로 흘렀다');
 
-  // 멈칫하는 동안에도 그 자리다
-  const still = find(run(world, cast, { frames: 10, t0: 40_500 }), 'a');
-  assert.equal(Math.round(still.y), 40);
+  // 처지는 것은 잠깐이고 곧 선다. **놓은 자리 근처를 벗어나지 않는다**
+  const stood = find(run(world, cast, { frames: 25, t0: 22_450 }), 'a');
+  assert.equal(stood.act, 'land');
+  assert.ok(stood.y > 40 && stood.y <= 40 + 16, `너무 멀리 떨어졌다: ${stood.y}`);
 
   // 멈칫이 끝나면 거기서부터 다시 걷는다 — 원래 있던 곳으로 되돌아가지 않는다
-  const after = find(run(world, cast, { frames: 30, t0: 41_000 }), 'a');
+  const after = find(run(world, cast, { frames: 30, t0: 23_200 }), 'a');
   assert.equal(after.act, 'walk');
-  assert.ok(Math.abs(after.y - 40) < 12, `놓은 높이를 버렸다: ${after.y}`);
+  assert.ok(Math.abs(after.y - 54) < 14, `놓은 높이를 버렸다: ${after.y}`);
+});
+
+test('흔들어 놓으면 어지러워하고, 그냥 옮기면 안 그렇다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
+  run(world, cast, { frames: 60, rng: () => 0.4 });
+
+  // 한 번에 옮기기만 한 경우 — 별이 돌면 자리를 바꿀 때마다 어지러운 셈이 된다
+  run(world, cast, { frames: 10, t0: 60_000, drag: () => ({ key: 'a', x: 300, y: 90 }) });
+  const calm = find(run(world, cast, { frames: 40, t0: 60_200 }), 'a');
+  assert.notEqual(calm.act, 'dizzy');
+
+  // 좌우로 흔든 경우. **놓고 나서 처지고(≈260ms) 서는(420ms) 것까지 지나야** 비틀거린다
+  run(world, cast, { frames: 40, t0: 61_000, drag: (i) => ({ key: 'a', x: i % 2 ? 120 : 320, y: 90 }) });
+  const shaken = find(run(world, cast, { frames: 60, t0: 61_700 }), 'a');
+  assert.equal(shaken.act, 'dizzy', '흔들었는데 멀쩡하다');
+
+  // 어지러움은 잠깐이고 곧 다시 걷는다
+  const over = find(run(world, cast, { frames: 40, t0: 64_000 }), 'a');
+  assert.notEqual(over.act, 'dizzy');
+});
+
+test('일하거나 기다리는 중이면 흔들려도 어지러워하지 않는다', () => {
+  const world = createWorld();
+  const busy = strollCast(rooms(['proj', worker('a', 'typing')]));
+  run(world, busy, { frames: 60, rng: () => 0.4 });
+  run(world, busy, { frames: 40, t0: 70_000, drag: (i) => ({ key: 'a', x: i % 2 ? 120 : 320, y: 90 }) });
+  const pet = find(run(world, busy, { frames: 60, t0: 70_700 }), 'a');
+  // 무슨 상태인지가 장난에 가려지면 이 화면이 파는 유일한 것을 잃는다
+  assert.equal(pet.act, 'work');
+});
+
+test('걸으면 자국이 남고 제 시간에 지워진다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
+  const pet = find(run(world, cast, { frames: 120, rng: () => 0.4 }), 'a');
+  // 쉬는 중일 수 있으므로 **걷게 세워 둔다** — 자국은 걸어야 남는 것이라 쉬는 참을 재면 안 된다
+  pet.until = 0;
+  pet.act = 'walk';
+  pet.gx = W - 20;
+  pet.gy = pet.y;
+  run(world, cast, { frames: 90, t0: 20_000 });
+  assert.ok(world.tracks.length > 0, '걸었는데 자국이 없다');
+  // 쌓이기만 하면 화면이 자국으로 덮인다
+  assert.ok(world.tracks.length <= 90, `자국이 너무 많다: ${world.tracks.length}`);
+
+  const before = world.tracks.length;
+  // 아무도 안 움직인 채로 시간만 흐르면 자국은 사라진다
+  stepStroll(world, cast, { w: W, h: H, now: 60_000, dt: 16 });
+  assert.ok(world.tracks.length < before, `자국이 안 지워진다: ${before} → ${world.tracks.length}`);
 });
 
 test('위아래로도 다닌다 — 아래쪽 띠에 붙어 있지 않는다', () => {
@@ -292,7 +343,8 @@ test('프레임 사이에 튀지 않는다 — 창이 가려졌다 돌아와도'
     const pets = stepStroll(world, cast, { w: W, h: H, now: 60_000 + i * 16, dt });
     for (const p of pets) {
       const prev = last.get(p.key);
-      if (prev != null) assert.ok(Math.abs(p.x - prev) <= 1.2, `${p.key}가 튀었다: ${prev} → ${p.x}`);
+      // 뛸 때는 그만큼 더 간다(RUN_MULT) — 한 프레임 상한 64ms에 뛰는 속도를 곱한 값이다
+      if (prev != null) assert.ok(Math.abs(p.x - prev) <= 2.8, `${p.key}가 튀었다: ${prev} → ${p.x}`);
       last.set(p.key, p.x);
     }
   }
@@ -339,4 +391,116 @@ test('클릭 판정은 스프라이트보다 조금 넉넉하다', () => {
   // 발밑은 잡히고 머리 위 한참은 안 잡힌다
   assert.ok(petAt([pet], 200, 98, 2));
   assert.equal(petAt([pet], 200, 20, 2), null);
+});
+
+test('마주 서면 말을 튼다 — 한 마디씩 주고받고 헤어진다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle'), worker('b', 'idle')]));
+  run(world, cast, { frames: 120, rng: () => 0.4 });
+
+  // 둘을 나란히 세워 둔다 (실제로도 목적지가 겹치면 이렇게 된다)
+  const pets = stepStroll(world, cast, { w: W, h: H, now: 100_000, dt: 16 });
+  for (const p of pets) {
+    p.act = 'walk';
+    p.moving = false;
+    p.until = 200_000;
+    p.y = 120;
+    p.chatCool = 0;
+  }
+  pets[0].x = 100;
+  pets[1].x = 108;
+
+  const talking = stepStroll(world, cast, { w: W, h: H, now: 100_016, dt: 16 });
+  assert.ok(
+    talking.every((p) => p.talk),
+    '가까이 섰는데 말을 안 튼다',
+  );
+  assert.equal(new Set(talking.map((p) => p.talk.pairKey)).size, 1, '서로 다른 상대와 말한다');
+  assert.deepEqual(talking.map((p) => p.talk.role).sort(), [0, 1], '역할이 안 갈렸다');
+
+  // 먼저 말하는 쪽이 있고, 그다음이 대답이다 — 둘이 동시에 떠들면 말풍선이 겹친다
+  const first = talking.find((p) => p.talk.role === 0);
+  const second = talking.find((p) => p.talk.role === 1);
+  assert.ok(saying(first, 100_100), '먼저 말할 쪽이 조용하다');
+  assert.equal(saying(second, 100_100), null, '둘이 동시에 떠든다');
+  assert.ok(saying(second, 102_200), '대답이 없다');
+
+  // 잡담은 끝난다
+  const done = find(run(world, cast, { frames: 30, t0: 105_000 }), 'a');
+  assert.equal(done.talk, null, '잡담이 안 끝난다');
+});
+
+test('일을 받으면 잡담이 즉시 걷힌다', () => {
+  const world = createWorld();
+  const idle = strollCast(rooms(['proj', worker('a', 'idle'), worker('b', 'idle')]));
+  run(world, idle, { frames: 120, rng: () => 0.4 });
+  const pets = stepStroll(world, idle, { w: W, h: H, now: 110_000, dt: 16 });
+  for (const p of pets) {
+    p.act = 'walk';
+    p.moving = false;
+    p.until = 200_000;
+    p.y = 120;
+    p.chatCool = 0;
+  }
+  pets[0].x = 100;
+  pets[1].x = 108;
+  stepStroll(world, idle, { w: W, h: H, now: 110_016, dt: 16 });
+
+  const busy = strollCast(rooms(['proj', worker('a', 'typing'), worker('b', 'idle')]));
+  const pet = find(stepStroll(world, busy, { w: W, h: H, now: 110_032, dt: 16 }), 'a');
+  assert.equal(pet.talk, null, '일을 받았는데 아직 떠든다');
+  assert.equal(pet.act, 'work');
+});
+
+test('커서가 가까이 오면 멈춰 쳐다보고, 곧 제 갈 길을 간다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
+  const pet = find(run(world, cast, { frames: 120, rng: () => 0.4 }), 'a');
+  pet.until = 0;
+  pet.act = 'walk';
+  pet.gx = W - 20;
+  pet.gy = pet.y;
+
+  const at = { x: pet.x + 4, y: pet.y - 6 };
+  const looking = find(
+    stepStroll(world, cast, { w: W, h: H, now: 120_000, dt: 16, pointer: at }),
+    'a',
+  );
+  assert.equal(looking.act, 'look');
+  assert.equal(looking.moving, false);
+
+  // 커서가 계속 옆에 있어도 잠깐이면 다시 걷는다 — 마우스를 놓아 두었다고 굳으면 안 된다
+  let last = null;
+  for (let i = 0; i < 130; i++) {
+    last = find(stepStroll(world, cast, { w: W, h: H, now: 120_016 + i * 16, dt: 16, pointer: at }), 'a');
+  }
+  assert.notEqual(last.act, 'look', '커서 옆에서 영영 굳었다');
+});
+
+test('일하는 게는 커서가 와도 쳐다보지 않는다', () => {
+  const world = createWorld();
+  const busy = strollCast(rooms(['proj', worker('a', 'typing')]));
+  const pet = find(run(world, busy, { frames: 200, rng: () => 0.4 }), 'a');
+  const at = { x: pet.x, y: pet.y - 6 };
+  const still = find(stepStroll(world, busy, { w: W, h: H, now: 130_000, dt: 16, pointer: at }), 'a');
+  assert.equal(still.act, 'work');
+});
+
+test('오래 할 일이 없으면 기지개를 켜거나 존다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
+  run(world, cast, { frames: 120, rng: () => 0.4 });
+
+  // 한참 지난 뒤 다음 목적지를 고르려는 참
+  let pet = null;
+  for (let i = 0; i < 40; i++) {
+    pet = find(stepStroll(world, cast, { w: W, h: H, now: 300_000 + i * 16, dt: 16, rng: () => 0.9 }), 'a');
+    if (pet.act === 'stretch' || pet.act === 'nap') break;
+  }
+  assert.ok(pet.act === 'stretch' || pet.act === 'nap', `안 쉰다: ${pet.act}`);
+
+  // 일이 들어오면 벌떡 일어난다
+  const busy = strollCast(rooms(['proj', worker('a', 'typing')]));
+  const up = find(stepStroll(world, busy, { w: W, h: H, now: 300_700, dt: 16 }), 'a');
+  assert.equal(up.act, 'work', '자다가 일을 못 받는다');
 });

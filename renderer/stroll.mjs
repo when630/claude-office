@@ -8,6 +8,7 @@
 // 그래서 이 파일은 캔버스를 모르고 `now`와 `dt`를 인자로 받는다 — main/notify.mjs가
 // Electron을 모르는 것과 같은 이유이고, 그래서 test/stroll.test.mjs가 돈다.
 import { miniRoster } from './render.mjs';
+import { chatLines, hashStr } from './talk.mjs';
 import { STROLL_DEFAULTS } from '../shared/stroll-choices.mjs';
 
 // 한 화면에 세울 수 있는 인원의 기본값. 세션이 스물이어도 바탕화면이 게로 덮이면 안 된다.
@@ -52,6 +53,40 @@ const REST_SPAN = 2600;
 // 그 자리에서 꺼진 것으로 보였다(굽어서 확인했다).
 const SINK_H = 22;
 const SINK_SPEED = 0.045;
+// 손에서 놓았을 때 처지는 높이. **곧장 그 자리에 서면 놓은 것이 아니라 붙인 것으로 보인다** —
+// 짧게 떨어져야 손을 떠난 순간이 생긴다.
+const DROP_SHORT = 14;
+// 집어 든 채로 이만큼 움직이면 어지러워한다(논리 px 누적). 옮기기만 한 게까지 어지럽게
+// 만들면 자리를 바꿀 때마다 별이 돌아, 어지러움이 상태가 아니라 배경 무늬가 된다.
+const SHAKE_LIMIT = 420;
+const DIZZY_MS = 1800;
+// 뛰기 — 목적지를 고를 때 이 확률로 달린다. 속도는 이만큼 곱한다.
+const RUN_CHANCE = 0.28;
+const RUN_MULT = 2.3;
+// 커서가 이만큼 가까우면 걷다 말고 쳐다본다. 커서를 놓아 두기만 해도 게가 계속 멈춰 서면
+// 산책이 아니게 되므로 **가까운 동안만** 멈추고, 커서가 가만히 있으면 곧 제 갈 길을 간다.
+const LOOK_NEAR = 34;
+const LOOK_MS = 1400;
+// 잡담 — 이만큼 가까이 서면 말을 튼다. 한 마디씩 주고받고 헤어진다.
+const CHAT_NEAR = 20;
+const CHAT_MS = 4200;
+const CHAT_SAY_MS = 1900; // 한 사람이 말하고 있는 시간
+const CHAT_COOL_MS = 9000; // 헤어진 뒤 다시 말 걸기까지
+// 술래잡기 — 쉬고 있는 둘을 골라 잠깐 쫓게 한다
+const CHASE_CHANCE = 0.0016; // 프레임마다 굴린다(30fps에서 20초에 한 번쯤)
+const CHASE_MS = 5200;
+const CHASE_CATCH = 12;
+// 쉬는 모습 — 할 일 없이 이만큼 지나면 기지개를 켜거나 잠깐 존다
+// 26초로 두었더니 걷는 중간중간 자꾸 기지개가 나와, 산책이 아니라 몸풀기가 됐다
+const REST_LONG_MS = 62_000;
+const STRETCH_MS = 1300;
+const NAP_MS = 9000;
+const NAP_CHANCE = 0.45;
+// 발자국. 이만큼 걸을 때마다 하나 남고(뛰면 더 성글게), 이 시간 동안 흐려진다.
+const TRACK_GAP = 7;
+const TRACK_GAP_RUN = 11;
+const TRACK_MS = 1100;
+const TRACK_MAX = 90;
 
 // 화면에 내보낼 게를 급한 순으로. **미니 창의 줄 세우기를 그대로 쓴다** — "무엇이 급한가"의
 // 답이 화면마다 갈리면 같은 앱이 자기 모순에 빠진다(shared/status.mjs가 있는 이유와 같다).
@@ -97,7 +132,22 @@ function outsideArea(pet, area) {
 }
 
 export function createWorld() {
-  return { pets: new Map(), w: 0, h: 0 };
+  // tracks는 게가 밟고 지나간 자국이다. 게가 사라져도 자국은 제 시간까지 남으므로
+  // pet에 딸리지 않고 세계가 들고 있는다.
+  return { pets: new Map(), tracks: [], w: 0, h: 0 };
+}
+
+// 걸은 자리에 자국을 남긴다. **일정 거리마다**이지 일정 시간마다가 아니다 —
+// 시간으로 재면 뛸 때 자국이 촘촘해져 발자국이 아니라 줄이 된다.
+function leaveTrack(world, pet, moved, now) {
+  pet.walked = (pet.walked ?? 0) + moved;
+  const gap = pet.dash ? TRACK_GAP_RUN : TRACK_GAP;
+  if (pet.walked < gap) return;
+  pet.walked = 0;
+  // 좌우 번갈아 찍는다 — 한 점만 남기면 자국이 아니라 흘린 부스러기로 보인다
+  pet.foot = pet.foot === 1 ? -1 : 1;
+  world.tracks.push({ x: pet.x + pet.foot * 3, y: pet.y, t0: now, run: !!pet.dash });
+  if (world.tracks.length > TRACK_MAX) world.tracks.splice(0, world.tracks.length - TRACK_MAX);
 }
 
 // 게 하나를 만든다 — **설 자리 위에 포탈이 열리고 거기서 떨어진다.**
@@ -147,7 +197,73 @@ function portalOpen(age) {
 }
 
 // 한 프레임. `drag`는 지금 손에 잡힌 게({ key, x, y })이고 없으면 null이다.
-export function stepStroll(world, cast, { w, h, now, dt, drag = null, rng = Math.random, speed = 1 } = {}) {
+// ── 놀이
+//
+// **전부 `idle`일 때만 걸린다.** 일하는 중이거나 나를 기다리는 게가 잡담을 하거나 졸고 있으면
+// 그 순간 이 화면은 상태를 알려 주는 창이 아니라 그냥 장식이 된다. 놀이에 들어가는 판정마다
+// `wantAct(...) === 'walk'`를 확인하는 이유다.
+
+// 지금 놀 수 있는 게인가 — 쉬는 중이고, 이미 다른 놀이에 붙잡혀 있지 않다.
+function freeToPlay(pet, live, now) {
+  if (pet.act !== 'walk' && pet.act !== 'look') return false;
+  if (pet.talk || pet.chase) return false;
+  const entry = live.get(pet.key);
+  return !!entry && wantAct(entry.worker) === 'walk' && (pet.chatCool ?? 0) < now;
+}
+
+// 가까이 선 둘을 짝지어 말을 트게 한다. **한 프레임에 한 쌍만** — 여럿이 동시에 말풍선을
+// 띄우면 바탕화면이 대화창이 된다.
+function pairChats(world, live, now) {
+  const idle = [...world.pets.values()].filter((p) => freeToPlay(p, live, now) && !p.moving);
+  for (let i = 0; i < idle.length; i++) {
+    for (let j = i + 1; j < idle.length; j++) {
+      const a = idle[i];
+      const b = idle[j];
+      if (Math.hypot(a.x - b.x, a.y - b.y) > CHAT_NEAR) continue;
+      // 역할은 키 순서로 고정한다 — 프레임마다 누가 먼저 말하는지가 뒤바뀌면 안 된다
+      const [first, second] = a.key < b.key ? [a, b] : [b, a];
+      const pairKey = `${first.key}|${second.key}`;
+      first.talk = { pairKey, role: 0, t0: now };
+      second.talk = { pairKey, role: 1, t0: now };
+      return;
+    }
+  }
+}
+
+// 지금 이 게가 하고 있는 말. 없으면 null.
+export function saying(pet, now) {
+  if (!pet.talk) return null;
+  const age = now - pet.talk.t0;
+  const mine = pet.talk.role === 0 ? age < CHAT_SAY_MS : age >= CHAT_SAY_MS && age < CHAT_SAY_MS * 2;
+  if (!mine) return null;
+  const lines = chatLines(pet.talk.pairKey, Math.floor(pet.talk.t0 / 1000));
+  return lines[pet.talk.role] || null;
+}
+
+// 쉬고 있는 둘을 골라 술래잡기를 시킨다.
+function startChase(world, live, now, rng) {
+  if (rng() >= CHASE_CHANCE) return;
+  const idle = [...world.pets.values()].filter((p) => freeToPlay(p, live, now));
+  if (idle.length < 2) return;
+  const a = idle[Math.floor(rng() * idle.length) % idle.length];
+  const rest = idle.filter((p) => p !== a);
+  const b = rest[Math.floor(rng() * rest.length) % rest.length];
+  if (!a || !b) return;
+  a.chase = { key: b.key, role: 'it', until: now + CHASE_MS };
+  b.chase = { key: a.key, role: 'run', until: now + CHASE_MS };
+}
+
+// 커서와 게 사이 거리. 논리 좌표끼리 잰다.
+function nearPointer(pet, pointer) {
+  if (!pointer) return false;
+  return Math.hypot(pointer.x - pet.x, pointer.y - (pet.y - 6)) < LOOK_NEAR;
+}
+
+export function stepStroll(
+  world,
+  cast,
+  { w, h, now, dt, drag = null, rng = Math.random, speed = 1, pointer = null } = {},
+) {
   world.w = w;
   world.h = h;
   const area = strollArea(w, h);
@@ -160,6 +276,10 @@ export function stepStroll(world, cast, { w, h, now, dt, drag = null, rng = Math
   }
 
   const step = Math.min(dt, 64); // 창이 가려졌다 돌아왔을 때 한 프레임에 순간이동하지 않게
+
+  // 놀 짝을 먼저 정한다 — 게 하나씩 도는 아래 루프에서는 둘을 같이 볼 수 없다
+  pairChats(world, live, now);
+  startChase(world, live, now, rng);
 
   for (const pet of [...world.pets.values()]) {
     // 포탈은 **어느 상태에 있든 제 시간표대로 닫힌다.** 떨어지는 동안만 갱신했더니 착지 뒤
@@ -183,6 +303,9 @@ export function stepStroll(world, cast, { w, h, now, dt, drag = null, rng = Math
     }
 
     if (drag && drag.key === pet.key) {
+      // 흔들린 거리를 잰다 — 놓을 때 어지러운지가 여기서 정해진다
+      if (pet.act === 'held') pet.shake = (pet.shake ?? 0) + Math.abs(drag.x - pet.x) + Math.abs(drag.y - pet.y);
+      else pet.shake = 0;
       pet.act = 'held';
       pet.x = drag.x;
       pet.y = drag.y;
@@ -191,22 +314,55 @@ export function stepStroll(world, cast, { w, h, now, dt, drag = null, rng = Math
       continue;
     }
 
-    // 손에서 놓인 순간. **놓은 자리에 그대로 선다** — 위아래로 자유롭게 다니는 화면에는
-    // 바닥이 없으므로 떨어질 곳도 없다. 잠깐 멈칫했다가 거기서부터 다시 걷는다.
+    // 손에서 놓인 순간. **곧장 서지 않고 조금 처진다** — 놓은 자리에 딱 붙어 서면 손을
+    // 떠난 순간이 없어서, 놓은 것이 아니라 붙여 둔 것으로 보인다.
+    // 많이 흔들렸으면 어지러운 채로 내려온다.
     if (pet.act === 'held') {
-      pet.act = 'land';
-      pet.until = now + LAND_MS;
-      clampToArea(pet, area);
+      pet.act = 'drop';
+      pet.vy = 0;
+      pet.gy = Math.min(area.y1, pet.y + DROP_SHORT);
+      pet.dizzyUntil = (pet.shake ?? 0) > SHAKE_LIMIT ? now + DIZZY_MS : 0;
+      pet.shake = 0;
+      pet.x = Math.min(Math.max(pet.x, area.x0), area.x1);
+    }
+
+    // 놓인 뒤 짧게 떨어지는 중
+    if (pet.act === 'drop') {
+      pet.moving = false;
+      pet.vy += GRAVITY * step;
+      pet.y += pet.vy * step;
+      if (pet.y >= pet.gy) {
+        pet.y = pet.gy;
+        pet.vy = 0;
+        pet.act = 'land';
+        pet.until = now + LAND_MS;
+      }
+      continue;
     }
 
     if (pet.act === 'land') {
       pet.moving = false;
       if (now >= pet.until) {
-        pet.act = 'walk';
-        aim(pet, area, rng);
+        // 흔들려서 내려왔으면 서자마자 비틀거린다
+        pet.act = pet.dizzyUntil > now ? 'dizzy' : 'walk';
+        if (pet.act === 'walk') aim(pet, area, rng);
         pet.until = 0;
       }
       continue;
+    }
+
+    // 흔들린 뒤에는 별을 돌리며 비틀거린다. **일이 들어오면 즉시 걷어낸다** —
+    // 무슨 상태인지가 장난에 가려지면 이 화면이 파는 유일한 것을 잃는다.
+    if (pet.act === 'dizzy') {
+      const busy = !gone && wantAct(pet.entry.worker) !== 'walk';
+      if (busy || now >= pet.dizzyUntil) {
+        pet.dizzyUntil = 0;
+        pet.act = 'walk';
+        aim(pet, area, rng);
+      } else {
+        pet.moving = false;
+        continue;
+      }
     }
 
     // 포탈에서 떨어지는 중. 포탈이 다 열릴 때까지는 아직 나오지 않는다.
@@ -241,6 +397,14 @@ export function stepStroll(world, cast, { w, h, now, dt, drag = null, rng = Math
 
     const want = gone ? 'walk' : wantAct(pet.entry.worker);
 
+    // **놀이는 일 앞에서 즉시 걷힌다.** 일을 받았는데 아직 잡담 중이거나 졸고 있으면
+    // 그 세션이 무엇을 하고 있는지가 장난에 가려진다.
+    if (want !== 'walk' && (pet.talk || pet.chase || pet.act === 'nap' || pet.act === 'stretch')) {
+      pet.talk = null;
+      pet.chase = null;
+      if (pet.act === 'nap' || pet.act === 'stretch') pet.act = 'walk';
+    }
+
     // 노트북 — 일을 받으면 펴고, 일이 끝나면 접는다. **접는 중에도 자리를 뜨지 않는다**
     if (want === 'work') {
       pet.lap = Math.min(1, pet.lap + step / OPEN_MS);
@@ -261,21 +425,105 @@ export function stepStroll(world, cast, { w, h, now, dt, drag = null, rng = Math
       continue;
     }
 
+    // 잡담 중 — 마주 보고 한 마디씩 주고받는다. 그동안은 걷지 않는다.
+    if (pet.talk) {
+      if (now - pet.talk.t0 < CHAT_MS) {
+        pet.act = 'chat';
+        pet.moving = false;
+        continue;
+      }
+      pet.talk = null;
+      pet.chatCool = now + CHAT_COOL_MS; // 헤어지자마자 또 말을 걸면 두 마리가 붙박이가 된다
+    }
+
+    // 술래잡기 — 술래는 상대를 향해, 도망자는 반대쪽으로 달린다
+    if (pet.chase) {
+      const other = world.pets.get(pet.chase.key);
+      const caught = other && Math.hypot(other.x - pet.x, other.y - pet.y) < CHASE_CATCH;
+      if (!other || now >= pet.chase.until || caught) {
+        pet.chase = null;
+        pet.chatCool = now + CHAT_COOL_MS;
+        pet.dash = false;
+        // 잡히면 둘 다 잠깐 폴짝 뛰고 흩어진다
+        pet.act = 'land';
+        pet.until = now + LAND_MS;
+        continue;
+      }
+      pet.act = 'walk';
+      pet.dash = true;
+      if (pet.chase.role === 'it') {
+        pet.gx = other.x;
+        pet.gy = other.y;
+      } else {
+        // 도망은 술래 반대쪽 — 화면 밖으로 나가지 않게 안으로 당긴다
+        pet.gx = Math.min(Math.max(pet.x + (pet.x - other.x), area.x0), area.x1);
+        pet.gy = Math.min(Math.max(pet.y + (pet.y - other.y), area.y0), area.y1);
+      }
+      const was = { x: pet.x, y: pet.y };
+      advance(pet, step, NEAR, speed * RUN_MULT);
+      leaveTrack(world, pet, Math.abs(pet.x - was.x) + Math.abs(pet.y - was.y), now);
+      continue;
+    }
+
+    // 커서가 가까이 오면 걷다 말고 **멈춰서 쳐다본다.** 커서가 계속 옆에 있어도 잠깐이면
+    // 다시 걷는다 — 마우스를 어디 놓아 두었다고 게가 영영 서 있으면 산책이 아니다.
+    if (pointer && nearPointer(pet, pointer)) {
+      if (pet.lookAt == null) pet.lookAt = now;
+      if (now - pet.lookAt < LOOK_MS) {
+        pet.act = 'look';
+        pet.moving = false;
+        continue;
+      }
+    } else {
+      pet.lookAt = null;
+    }
+
+    // 기지개와 낮잠 — 할 일 없이 오래 지나면 나온다. 자다가 일이 들어오면 위에서 걷어진다.
+    if (pet.act === 'stretch' || pet.act === 'nap') {
+      pet.moving = false;
+      if (now < pet.until) continue;
+      pet.act = 'walk';
+      pet.restSince = now;
+      aim(pet, area, rng);
+      pet.until = 0;
+    }
+    if (pet.restSince == null) pet.restSince = now;
+    if (now - pet.restSince > REST_LONG_MS && now >= pet.until) {
+      const nap = rng() < NAP_CHANCE;
+      pet.act = nap ? 'nap' : 'stretch';
+      pet.until = now + (nap ? NAP_MS : STRETCH_MS);
+      pet.moving = false;
+      pet.restSince = now;
+      continue;
+    }
+
     // 산책 — 목적지까지 걷고, 닿으면 잠깐 쉬었다 새 목적지를 고른다
     pet.act = 'walk';
     if (now < pet.until) {
       pet.moving = false;
       continue;
     }
-    if (advance(pet, step, NEAR, speed)) {
+    const was = { x: pet.x, y: pet.y };
+    if (advance(pet, step, NEAR, speed * (pet.dash ? RUN_MULT : 1))) {
       pet.moving = false;
+      pet.dash = false;
       pet.until = now + REST_MIN + rng() * REST_SPAN;
       aim(pet, area, rng);
+    } else {
+      leaveTrack(world, pet, Math.abs(pet.x - was.x) + Math.abs(pet.y - was.y), now);
     }
   }
 
+  // 자국은 제 시간이 지나면 지운다. 게가 사라져도 그 자국은 남아 흐려진다.
+  if (world.tracks.length) world.tracks = world.tracks.filter((k) => now - k.t0 < TRACK_MS);
+
   // 아래에 있는 게를 나중에 그려야 앞에 온다 — 세로로도 다니게 된 뒤로 이 순서가 곧 원근이다
   return [...world.pets.values()].sort((a, b) => a.y - b.y || (a.key < b.key ? -1 : 1));
+}
+
+// 지금 화면에 남아 있는 발자국. 그리는 쪽은 이것만 보면 된다.
+export function strollTracks(world, now, ttl = TRACK_MS) {
+  return (world.tracks ?? []).map((k) => ({ ...k, fade: Math.max(0, 1 - (now - k.t0) / ttl) }));
 }
 
 // 목적지로 한 걸음. 닿았으면 true.
@@ -308,6 +556,9 @@ function advance(pet, step, near, speed = 1) {
 // 다음 목적지. **너무 가까운 곳은 고르지 않는다** — 한 걸음 걷고 멈추기를 반복하면
 // 걷는 것이 아니라 떠는 것으로 보인다.
 function aim(pet, area, rng = Math.random) {
+  // 가끔 달린다. **목적지를 고를 때 정한다** — 걷는 도중에 갑자기 빨라지면 걸음이 아니라
+  // 화면이 끊긴 것으로 보인다.
+  pet.dash = rng() < RUN_CHANCE;
   const spanX = area.x1 - area.x0;
   const spanY = area.y1 - area.y0;
   const least = Math.min(60, Math.max(8, spanX / 3));
