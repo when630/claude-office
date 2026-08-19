@@ -344,8 +344,8 @@ function drawTracks(ctx, tracks) {
 const PICK = '#f4f6fb';
 // 보내는 명령의 파문만 색이 다르다 — 고르는 것과 보내는 것은 다른 일이다.
 // 상태 팔레트(노랑=대기·초록=완료·빨강=실패·파랑=작업)와 겹치지 않는 민트를 쓴다.
-const PING_MOVE = '#8fd6b4';
-const PING_MS = 460;
+const MARK_MOVE = '#8fd6b4';
+const MARK_MS = 620;
 
 function drawPicked(ctx, pet) {
   const x = Math.round(pet.x);
@@ -359,43 +359,48 @@ function drawPicked(ctx, pet) {
   ctx.globalAlpha = 1;
 }
 
-// 지휘 중의 커서. **OS 커서를 감추고 직접 그린다**(stroll.html의 `body.cmd`) — 화살표
-// 그대로면 지금 지휘 중인지가 화면에 안 보이고, CSS `crosshair`는 사람마다 모양이 다르다.
-// 가운데를 비운 십자라서 그 아래 게가 가려지지 않는다.
+// 지휘 중의 커서. **OS 커서를 감추고 이것을 그린다**(stroll-app의 setCommand) —
+// 모양과 그 이유는 shared/pixels.mjs의 CURSOR_ARROW에 적혀 있다. 가리키는 지점이
+// 스프라이트의 왼쪽 위이므로 커서 좌표에 그대로 얹는다.
 function drawCursor(ctx, at, ready) {
   const x = Math.round(at.x);
   const y = Math.round(at.y);
-  const arm = 7;
-  const gap = 3;
-  ctx.globalAlpha = 0.95;
-  rect(ctx, x - gap - arm, y, arm, 1, PICK);
-  rect(ctx, x + gap + 1, y, arm, 1, PICK);
-  rect(ctx, x, y - gap - arm, 1, arm, PICK);
-  rect(ctx, x, y + gap + 1, 1, arm, PICK);
-  rect(ctx, x, y, 1, 1, PICK); // 가운데 점 — 어디를 가리키는지가 이 한 픽셀이다
-  // 고른 게가 있으면 네 귀퉁이를 찍어 "보낼 수 있다"를 알린다
-  if (ready) {
-    rect(ctx, x - 4, y - 4, 1, 1, PICK);
-    rect(ctx, x + 4, y - 4, 1, 1, PICK);
-    rect(ctx, x - 4, y + 4, 1, 1, PICK);
-    rect(ctx, x + 4, y + 4, 1, 1, PICK);
-  }
-  ctx.globalAlpha = 1;
+  drawSprite(ctx, SPR.cursor, x, y);
+  // 고른 게가 있으면 화살표 옆에 점을 하나 찍어 "보낼 수 있다"를 알린다
+  if (ready) rect(ctx, x + 13, y + 3, 2, 2, MARK_MOVE);
 }
 
-// 누른 자리에 남는 파문. 명령이 닿았다는 대답이라 **퍼지면서 옅어진다** —
-// 점 하나만 찍으면 눌렸는지 안 눌렸는지가 프레임 한 장에 갇힌다.
-function drawPings(ctx, pings, now) {
-  for (const p of pings) {
-    const k = (now - p.t0) / PING_MS;
-    if (k < 0 || k > 1) continue;
-    const r = 3 + k * 9;
-    ctx.globalAlpha = (1 - k) * 0.85;
-    // 원 대신 네 변만 — 이 크기에서 픽셀 원은 톱니로 보인다
-    rect(ctx, p.x - r, p.y - r * 0.6, r * 2, 1, p.move ? PING_MOVE : PICK);
-    rect(ctx, p.x - r, p.y + r * 0.6, r * 2, 1, p.move ? PING_MOVE : PICK);
-    rect(ctx, p.x - r, p.y - r * 0.6, 1, r * 1.2, p.move ? PING_MOVE : PICK);
-    rect(ctx, p.x + r, p.y - r * 0.6, 1, r * 1.2 + 1, p.move ? PING_MOVE : PICK);
+// 누른 자리에 남는 표식. **밖에서 안으로 모여 콕 찍힌다** — 퍼지는 파문으로 그렸더니
+// 명령이 그 지점에 꽂히는 것이 아니라 거기서 무언가 번지는 것으로 보였다.
+// 다 모이면 가운데에 점이 남고, 그 상태로 잠깐 있다가 사라진다.
+function drawMarks(ctx, marks, now) {
+  for (const m of marks) {
+    const age = (now - m.t0) / MARK_MS;
+    if (age < 0 || age > 1) continue;
+    const color = m.move ? MARK_MOVE : PICK;
+    // 앞의 절반 동안 모여들고, 남은 절반에 옅어진다
+    const k = Math.min(1, age / 0.5);
+    const d = 9 - k * 5;
+    ctx.globalAlpha = age > 0.5 ? 1 - (age - 0.5) / 0.5 : 1;
+
+    // **찍힌 지점은 처음부터 있다.** 다 모인 뒤에야 점을 찍어 봤더니 어디를 눌렀는지가
+    // 마지막 순간에만 보여서, 모여드는 동안은 무엇을 하는 표시인지 알 수 없었다.
+    rect(ctx, m.x - 1, m.y, 3, 1, color);
+    rect(ctx, m.x, m.y - 1, 1, 3, color);
+
+    // 네 귀퉁이에서 모여드는 ㄱ자 — 세로는 조금 눌러 찍는다(위에서 내려다본 화면이다)
+    for (const [sx, sy] of [
+      [-1, -1],
+      [1, -1],
+      [-1, 1],
+      [1, 1],
+    ]) {
+      const cx = Math.round(m.x + sx * d);
+      const cy = Math.round(m.y + sy * d * 0.7);
+      rect(ctx, cx, cy, 1, 1, color);
+      rect(ctx, cx - (sx < 0 ? 0 : 1), cy, 2, 1, color);
+      rect(ctx, cx, cy - (sy < 0 ? 0 : 1), 1, 2, color);
+    }
     ctx.globalAlpha = 1;
   }
 }
@@ -419,7 +424,7 @@ function drawBox(ctx, box) {
 
 // 한 프레임. `pets`는 stepStroll이 돌려준 그리기 순서 그대로다.
 export function renderStroll(ctx, pets, opts) {
-  const { scale, dpr, t, hover, tracks = [], selected = null, box = null, cursor = null, pings = [] } = opts;
+  const { scale, dpr, t, hover, tracks = [], selected = null, box = null, cursor = null, marks = [] } = opts;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
@@ -434,7 +439,7 @@ export function renderStroll(ctx, pets, opts) {
     const at = drawPet(ctx, pet, t, opts);
     if (hover === pet.key && !opts.command) tags.push({ pet, at });
   }
-  if (pings.length) drawPings(ctx, pings, t);
+  if (marks.length) drawMarks(ctx, marks, t);
   if (box) drawBox(ctx, box);
   // 커서는 맨 위다 — 게에도 상자에도 가리면 안 된다
   if (cursor) drawCursor(ctx, cursor, cursor.ready);

@@ -61,12 +61,12 @@ let frozen = false; // 헤드리스로 굽을 때만 켠다 (__stroll.freeze)
 let command = false; // 지금 지휘 모드인가
 let box = null; // 그리는 중인 선택 상자 (창 좌표)
 const selected = new Set(); // 고른 게의 key
-let pings = []; // 누른 자리에 남는 파문 (논리 좌표)
+let marks = []; // 누른 자리에 찍히는 표식 (논리 좌표)
 
-// 파문 하나. 오래된 것은 그릴 때 걸러지므로 여기서는 개수만 막는다.
-function ping(x, y, move) {
-  pings.push({ x: x / scale, y: y / scale, t0: performance.now(), move });
-  if (pings.length > 8) pings = pings.slice(-8);
+// 표식 하나. 오래된 것은 그릴 때 걸러지므로 여기서는 개수만 막는다.
+function mark(x, y, move) {
+  marks.push({ x: x / scale, y: y / scale, t0: performance.now(), move });
+  if (marks.length > 8) marks = marks.slice(-8);
 }
 
 function logical() {
@@ -148,7 +148,7 @@ function tick(now) {
     box: box && { x0: box.x0 / scale, y0: box.y0 / scale, x1: box.x1 / scale, y1: box.y1 / scale },
     command,
     cursor: command && pointer ? { x: pointer.x / scale, y: pointer.y / scale, ready: selected.size > 0 } : null,
-    pings,
+    marks,
   });
 }
 tick.last = 0;
@@ -199,7 +199,7 @@ window.addEventListener('mousedown', (e) => {
     if (e.button === 2) {
       if (selected.size) {
         orderMove(world, selected, e.clientX / scale, e.clientY / scale, logical().w, logical().h);
-        ping(e.clientX, e.clientY, true);
+        mark(e.clientX, e.clientY, true);
       }
       return;
     }
@@ -238,7 +238,7 @@ window.addEventListener('mouseup', () => {
       });
       for (const p of inBox) selected.add(p.key);
     }
-    ping(box.x1, box.y1, false);
+    mark(box.x1, box.y1, false);
     box = null;
     return;
   }
@@ -301,6 +301,9 @@ window.__stroll = {
   world: () => world,
   selected: () => [...selected],
   cmd: () => ({ command, box: !!box, passThrough }),
+  marks: (list) => {
+    marks = list;
+  },
   freeze: (on) => {
     frozen = on !== false;
   },
