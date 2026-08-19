@@ -104,6 +104,9 @@ export const SPR = {
   pencup: sprite(PX.PENCUP),
   docs: sprite(PX.DOCS),
 
+  // 지휘 중의 포인터 (산책 모드)
+  cursor: sprite(PX.CURSOR_ARROW),
+
   // 말풍선 기호
   gQuestion: glyph(PX.G_QUESTION, '#1d2026'),
   gBang: glyph(PX.G_BANG, '#c8452b'),

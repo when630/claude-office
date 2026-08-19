@@ -250,7 +250,9 @@ function drawPet(ctx, pet, t, opts) {
   }
   // 마우스를 게 위에 얹고 있으면 하트를 띄운다 — 쓰다듬는 것에 대한 대답이다.
   // **상태 기호보다 뒤다**: 나를 기다리는 게가 하트를 띄우고 있으면 그건 오작동이다.
-  const glyphKey = glyphKeyFor(worker) ?? (hover === worker.key && pet.act !== 'work' ? 'gHeart' : null);
+  // 지휘 중에는 하트도 이름표도 안 띄운다 — 고르고 보내는 동안 머리 위가 붐비면 조작이 가린다
+  const petting = hover === worker.key && pet.act !== 'work' && !opts.command;
+  const glyphKey = glyphKeyFor(worker) ?? (petting ? 'gHeart' : null);
   const glyph = glyphKey ? SPR[glyphKey] : null;
   if (glyph) {
     const float = worker.mood === 'waiting' ? Math.round(Math.sin(t / 260) * 1.5) : Math.round(Math.sin(t / 900) * 1);
@@ -334,21 +336,160 @@ function drawTracks(ctx, tracks) {
   }
 }
 
+// 고른 게의 발밑 표시와 선택 상자.
+//
+// 색은 **흰색이다.** 게임 관례는 초록이지만 이 화면에서 초록은 "완료"가 쓰고 있고,
+// 노랑은 대기, 빨강은 실패다(sprites.mjs의 긴 주석). 고르는 것은 상태가 아니라 내가 지금
+// 하고 있는 조작이므로, 상태 팔레트 바깥의 색이라야 서로 헷갈리지 않는다.
+const PICK = '#f4f6fb';
+// 보내는 명령의 파문만 색이 다르다 — 고르는 것과 보내는 것은 다른 일이다.
+// 상태 팔레트(노랑=대기·초록=완료·빨강=실패·파랑=작업)와 겹치지 않는 민트를 쓴다.
+const MARK_MOVE = '#8fd6b4';
+const MARK_MS = 620;
+
+function drawPicked(ctx, pet) {
+  const x = Math.round(pet.x);
+  const y = Math.round(pet.y);
+  ctx.globalAlpha = 0.85;
+  // 발밑을 감싸는 낮은 괄호 — 몸을 두르면 게가 상자에 갇힌 것으로 보인다
+  rect(ctx, x - 9, y, 3, 1, PICK);
+  rect(ctx, x + 6, y, 3, 1, PICK);
+  rect(ctx, x - 9, y - 2, 1, 3, PICK);
+  rect(ctx, x + 8, y - 2, 1, 3, PICK);
+  ctx.globalAlpha = 1;
+}
+
+// 지휘 중의 커서. **OS 커서를 감추고 이것을 그린다**(stroll-app의 setCommand) —
+// 모양과 그 이유는 shared/pixels.mjs의 CURSOR_ARROW에 적혀 있다. 가리키는 지점이
+// 스프라이트의 왼쪽 위이므로 커서 좌표에 그대로 얹는다.
+function drawCursor(ctx, at, ready) {
+  const x = Math.round(at.x);
+  const y = Math.round(at.y);
+  drawSprite(ctx, SPR.cursor, x, y);
+  // 고른 게가 있으면 화살표 옆에 점을 하나 찍어 "보낼 수 있다"를 알린다
+  if (ready) rect(ctx, x + 11, y + 2, 2, 2, MARK_MOVE);
+}
+
+// 누른 자리에 남는 표식. **보내는 것과 고르는 것은 다른 그림이다** — 같은 모양을 색만 바꿔
+// 썼더니 무슨 명령을 내렸는지가 색 하나에 달려 있었다.
+function drawMarks(ctx, marks, now) {
+  for (const m of marks) {
+    const age = (now - m.t0) / MARK_MS;
+    if (age < 0 || age > 1) continue;
+    if (m.group) drawGroupMark(ctx, m, age);
+    else drawMoveMark(ctx, m, age);
+  }
+}
+
+// 바닥에 놓인 원. **세로로 눌러 그린다** — 위에서 비스듬히 내려다본 화면이라 정원으로 그리면
+// 바닥이 아니라 허공에 뜬 고리가 된다(포탈과 같은 사정이다).
+function ring(ctx, cx, cy, r, color, squash = 0.62) {
+  if (r < 1) return;
+  // 촘촘히 돌아야 각이 안 진다 — 성글게 찍으면 원이 아니라 팔각형이 된다
+  const steps = Math.max(16, Math.round(r * 12));
+  for (let i = 0; i < steps; i++) {
+    const a = (i / steps) * Math.PI * 2;
+    rect(ctx, cx + Math.cos(a) * r, cy + Math.sin(a) * r * squash, 1, 1, color);
+  }
+}
+
+// 보내기 — **화살표가 내리꽂히고, 그 자리에서 원이 조여든다.**
+//
+// 처음엔 천천히 내려와 바닥에 `ㅗ` 자국을 남겼는데, 찍는 것이 아니라 조심스레 놓는 것으로
+// 보였고 자국도 지저분했다. 빠르게 떨어뜨려 튕기게 하고, 닿은 자리에는 줄어드는 원만 남긴다.
+function drawMoveMark(ctx, m, age) {
+  const x = Math.round(m.x);
+  const y = Math.round(m.y);
+  const HIT = 0.22; // 이때 바닥에 닿는다
+
+  // 화살표 — 내려오고, 닿는 순간 한 번 튕겼다 사라진다
+  if (age < HIT + 0.28) {
+    const k = Math.min(1, age / HIT);
+    const drop = (1 - k) * (1 - k) * 12; // 끝에서 빨라진다
+    const bounce = age > HIT ? Math.sin(((age - HIT) / 0.28) * Math.PI) * 2.5 : 0;
+    const ay = Math.round(y - 6 - drop - bounce);
+    ctx.globalAlpha = age > HIT ? 1 - (age - HIT) / 0.28 : 1;
+    rect(ctx, x - 2, ay, 5, 1, MARK_MOVE);
+    rect(ctx, x - 1, ay + 1, 3, 1, MARK_MOVE);
+    rect(ctx, x, ay + 2, 1, 1, MARK_MOVE);
+    ctx.globalAlpha = 1;
+  }
+
+  // 닿은 자리 — 원이 조여들며 옅어진다. 다 조여들면 점 하나가 남는다.
+  if (age >= HIT) {
+    const k = (age - HIT) / (1 - HIT);
+    ctx.globalAlpha = 1 - k * k;
+    ring(ctx, x, y, 7 - k * 5, MARK_MOVE);
+    ctx.globalAlpha = 1;
+  }
+}
+
+// 고르기 — **그린 상자가 고른 게들을 감싸며 조여든다.** 고르는 것은 한 점을 찍는 일이 아니라
+// 여럿을 하나로 묶는 일이라, 상자가 대상에 달라붙는 것이 그 동작 자체다.
+function drawGroupMark(ctx, m, age) {
+  const k = Math.min(1, age / 0.45);
+  const e = 1 - (1 - k) * (1 - k); // 끝에서 부드럽게 멎는다
+  const at = (a, b) => a + (b - a) * e;
+  const x0 = at(m.from.x0, m.to.x0);
+  const y0 = at(m.from.y0, m.to.y0);
+  const x1 = at(m.from.x1, m.to.x1);
+  const y1 = at(m.from.y1, m.to.y1);
+  ctx.globalAlpha = age > 0.45 ? 1 - (age - 0.45) / 0.55 : 0.9;
+  // 네 귀퉁이만 — 네 변을 다 그리면 아직 끌고 있는 선택 상자와 구분이 안 된다
+  const arm = Math.max(2, Math.min(5, (x1 - x0) / 4));
+  for (const [px, sx] of [
+    [x0, 1],
+    [x1, -1],
+  ]) {
+    for (const [py, sy] of [
+      [y0, 1],
+      [y1, -1],
+    ]) {
+      rect(ctx, sx > 0 ? px : px - arm, py, arm, 1, PICK);
+      rect(ctx, px, sy > 0 ? py : py - arm, 1, arm, PICK);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawBox(ctx, box) {
+  const x0 = Math.round(Math.min(box.x0, box.x1));
+  const x1 = Math.round(Math.max(box.x0, box.x1));
+  const y0 = Math.round(Math.min(box.y0, box.y1));
+  const y1 = Math.round(Math.max(box.y0, box.y1));
+  const w = Math.max(1, x1 - x0);
+  const h = Math.max(1, y1 - y0);
+  ctx.globalAlpha = 0.12;
+  rect(ctx, x0, y0, w, h, PICK);
+  ctx.globalAlpha = 0.8;
+  rect(ctx, x0, y0, w, 1, PICK);
+  rect(ctx, x0, y1, w, 1, PICK);
+  rect(ctx, x0, y0, 1, h, PICK);
+  rect(ctx, x1, y0, 1, h + 1, PICK);
+  ctx.globalAlpha = 1;
+}
+
 // 한 프레임. `pets`는 stepStroll이 돌려준 그리기 순서 그대로다.
 export function renderStroll(ctx, pets, opts) {
-  const { scale, dpr, t, hover, tracks = [] } = opts;
+  const { scale, dpr, t, hover, tracks = [], selected = null, box = null, cursor = null, marks = [] } = opts;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
   ctx.imageSmoothingEnabled = false;
 
   drawTracks(ctx, tracks);
+  // 선택 표시는 **게보다 먼저** — 발밑 표시가 몸 위에 얹히면 다리가 잘려 보인다
+  if (selected?.size) for (const pet of pets) if (selected.has(pet.key)) drawPicked(ctx, pet);
 
   const tags = [];
   for (const pet of pets) {
     const at = drawPet(ctx, pet, t, opts);
-    if (hover === pet.key) tags.push({ pet, at });
+    if (hover === pet.key && !opts.command) tags.push({ pet, at });
   }
+  if (marks.length) drawMarks(ctx, marks, t);
+  if (box) drawBox(ctx, box);
+  // 커서는 맨 위다 — 게에도 상자에도 가리면 안 된다
+  if (cursor) drawCursor(ctx, cursor, cursor.ready);
   // 이름표는 게를 다 그린 뒤에 — 옆 게가 남의 이름표를 덮으면 안 된다
   for (const tag of tags) drawTag(ctx, tag.pet, tag.at, opts);
   ctx.setTransform(1, 0, 0, 1, 0, 0);

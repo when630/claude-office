@@ -81,6 +81,8 @@ const VISIT_CHANCE = 0.34;
 const CHASE_CHANCE = 0.006; // 프레임마다 굴린다(30fps에서 5~6초에 한 번쯤)
 const CHASE_MS = 5200;
 const CHASE_CATCH = 12;
+// 명령받은 자리에 여럿이 설 때 벌어지는 간격 — 한 점으로 보내면 겹쳐 서서 몇 마리인지 안 보인다
+const ORDER_SPREAD = 15;
 // 폴짝. 잡히거나 반가울 때 한 번 뛴다. **얼마나 뜨는지는 여기서 안 정한다** —
 // `pet.hop`은 0에서 1까지의 정도이고, 몇 px로 그릴지는 그리는 쪽이 안다(stroll-view의 HOP_H).
 const HOP_MS = 380;
@@ -214,7 +216,7 @@ function portalOpen(age) {
 // 지금 놀 수 있는 게인가 — 쉬는 중이고, 이미 다른 놀이에 붙잡혀 있지 않다.
 function freeToPlay(pet, live, now) {
   if (pet.act !== 'walk' && pet.act !== 'look') return false;
-  if (pet.talk || pet.chase) return false;
+  if (pet.talk || pet.chase || pet.order) return false;
   const entry = live.get(pet.key);
   return !!entry && wantAct(entry.worker) === 'walk' && (pet.chatCool ?? 0) < now;
 }
@@ -261,6 +263,41 @@ function startChase(world, live, now, rng) {
   if (!a || !b) return;
   a.chase = { key: b.key, role: 'it', until: now + CHASE_MS };
   b.chase = { key: a.key, role: 'run', until: now + CHASE_MS };
+}
+
+// ── 지휘 (Ctrl+Shift로 고르고 우클릭으로 보낸다)
+
+// 고른 게들을 한 자리로 보낸다. **한 점이 아니라 그 둘레에 흩어 세운다** — 같은 좌표를
+// 주면 전부 겹쳐 서서 몇 마리를 보냈는지 화면에서 셀 수 없다.
+export function orderMove(world, keys, x, y, w, h) {
+  const area = strollArea(w, h);
+  const list = [...keys].map((k) => world.pets.get(k)).filter((p) => p && p.act !== 'sink');
+  const ring = Math.ceil(Math.sqrt(list.length));
+  list.forEach((pet, i) => {
+    // 격자로 흩는다 — 원으로 두르면 가운데가 비어 "모였다"로 안 보인다
+    const dx = (i % ring) - (ring - 1) / 2;
+    const dy = Math.floor(i / ring) - (ring - 1) / 2;
+    pet.order = {
+      gx: Math.min(Math.max(x + dx * ORDER_SPREAD, area.x0), area.x1),
+      gy: Math.min(Math.max(y + dy * ORDER_SPREAD * 0.7, area.y0), area.y1),
+    };
+    // 명령을 받으면 놀이는 그만둔다 — 부른 곳으로 가는 것이 먼저다
+    pet.talk = null;
+    pet.chase = null;
+    pet.until = 0;
+    pet.dash = list.length > 2 || Math.hypot(pet.x - x, pet.y - y) > 120;
+  });
+  return list.length;
+}
+
+// 상자 안에 든 게들. 좌표는 논리 단위다.
+export function petsInBox(pets, box) {
+  const x0 = Math.min(box.x0, box.x1);
+  const x1 = Math.max(box.x0, box.x1);
+  const y0 = Math.min(box.y0, box.y1);
+  const y1 = Math.max(box.y0, box.y1);
+  // 게의 몸을 기준으로 본다 — 발끝만 재면 상자로 몸통을 감싸도 안 잡힌다
+  return pets.filter((p) => p.x >= x0 - 8 && p.x <= x1 + 8 && p.y >= y0 - 14 && p.y <= y1 + 3);
 }
 
 // 커서와 게 사이 거리. 논리 좌표끼리 잰다.
@@ -403,6 +440,25 @@ export function stepStroll(
     if (outsideArea(pet, area)) {
       clampToArea(pet, area);
       aim(pet, area, rng, world);
+    }
+
+    // 부른 곳으로 가는 중 — **일보다 먼저다.** 일하는 게도 노트북을 접고 걸어가고,
+    // 도착하면 아래에서 다시 편다(그동안만 상태가 가려진다).
+    if (pet.order) {
+      pet.lap = Math.max(0, pet.lap - step / SHUT_MS);
+      pet.gx = pet.order.gx;
+      pet.gy = pet.order.gy;
+      pet.act = 'walk';
+      const was = { x: pet.x, y: pet.y };
+      if (advance(pet, step, NEAR, speed * (pet.dash ? RUN_MULT : 1))) {
+        pet.order = null;
+        pet.dash = false;
+        pet.moving = false;
+        pet.until = now + REST_MIN;
+      } else {
+        leaveTrack(world, pet, Math.abs(pet.x - was.x) + Math.abs(pet.y - was.y), now);
+      }
+      continue;
     }
 
     const want = gone ? 'walk' : wantAct(pet.entry.worker);

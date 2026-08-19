@@ -25,7 +25,8 @@ globalThis.document = {
   }),
 };
 
-const { createWorld, stepStroll, strollCast, wantAct, saying, petAt, petHitBox, strollArea, STROLL_MAX } = await import(
+const { createWorld, stepStroll, strollCast, wantAct, saying, petAt, petHitBox, petsInBox, orderMove, strollArea, STROLL_MAX } =
+  await import(
   '../renderer/stroll.mjs'
 );
 
@@ -539,4 +540,101 @@ test('폴짝 뛰면 떴다 내려온다', () => {
   const done = find(stepStroll(world, cast, { w: W, h: H, now: 500_400, dt: 16 }), 'a');
   assert.equal(done.hop, 0, '뜬 채로 끝난다');
   assert.notEqual(done.act, 'hop');
+});
+
+test('상자 안의 게만 고른다', () => {
+  const pets = [
+    { key: 'in', x: 100, y: 100 },
+    { key: 'edge', x: 140, y: 100 },
+    { key: 'far', x: 300, y: 100 },
+    { key: 'above', x: 100, y: 40 },
+  ];
+  const picked = petsInBox(pets, { x0: 80, y0: 80, x1: 150, y1: 110 }).map((p) => p.key);
+  assert.ok(picked.includes('in'));
+  assert.ok(picked.includes('edge'));
+  assert.ok(!picked.includes('far'), '상자 밖인데 잡혔다');
+  assert.ok(!picked.includes('above'), '상자 위인데 잡혔다');
+
+  // 거꾸로 그린 상자도 같아야 한다 — 오른쪽 아래에서 왼쪽 위로 끄는 사람이 있다
+  const flipped = petsInBox(pets, { x0: 150, y0: 110, x1: 80, y1: 80 }).map((p) => p.key);
+  assert.deepEqual(flipped.sort(), picked.sort());
+});
+
+test('부른 자리로 걸어가고, 도착하면 명령이 풀린다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
+  run(world, cast, { frames: 120, rng: () => 0.4 });
+
+  const n = orderMove(world, ['a'], 60, 150, W, H);
+  assert.equal(n, 1);
+  const pet = world.pets.get('a');
+  assert.ok(pet.order, '명령이 안 실렸다');
+
+  const walking = find(run(world, cast, { frames: 20, t0: 500_000 }), 'a');
+  assert.equal(walking.act, 'walk');
+  assert.ok(walking.moving, '부르는데 안 움직인다');
+
+  // **명령이 풀리는 순간을 잡는다** — 그 뒤로는 자유 산책이라 어디로 가 있든 상관없다
+  let arrived = null;
+  for (let i = 0; i < 2000 && !arrived; i++) {
+    const p = find(stepStroll(world, cast, { w: W, h: H, now: 500_400 + i * 16, dt: 16 }), 'a');
+    if (!p.order) arrived = p;
+  }
+  assert.ok(arrived, '부른 자리에 영영 못 간다');
+  assert.ok(Math.hypot(arrived.x - 60, arrived.y - 150) < 8, `엉뚱한 데 섰다: ${arrived.x},${arrived.y}`);
+});
+
+test('여럿을 부르면 겹치지 않게 흩어 선다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a'), worker('b'), worker('c'), worker('d')]));
+  run(world, cast, { frames: 120, rng: () => 0.4 });
+
+  orderMove(world, ['a', 'b', 'c', 'd'], 200, 120, W, H);
+  const goals = ['a', 'b', 'c', 'd'].map((k) => world.pets.get(k).order);
+  const seen = new Set(goals.map((g) => `${Math.round(g.gx)},${Math.round(g.gy)}`));
+  assert.equal(seen.size, 4, '넷이 같은 점으로 간다');
+  // 그래도 부른 자리 근처여야 한다
+  for (const g of goals) assert.ok(Math.hypot(g.gx - 200, g.gy - 120) < 40, `너무 멀리 흩어졌다: ${g.gx},${g.gy}`);
+});
+
+test('일하는 게도 부르면 노트북을 접고 간다 — 도착하면 다시 편다', () => {
+  const world = createWorld();
+  const busy = strollCast(rooms(['proj', worker('a', 'typing')]));
+  run(world, busy, { frames: 200, rng: () => 0.4 });
+  const before = find(run(world, busy, { frames: 1, t0: 600_000 }), 'a');
+  assert.equal(before.act, 'work');
+  assert.ok(before.lap > 0.9);
+
+  orderMove(world, ['a'], 40, 160, W, H);
+  const moving = find(run(world, busy, { frames: 40, t0: 600_016 }), 'a');
+  assert.equal(moving.act, 'walk', '부르는데 앉아 있다');
+  assert.ok(moving.lap < 0.5, `노트북을 안 접었다: ${moving.lap}`);
+
+  // 도착하면 다시 일한다 — 이동 때문에 상태가 영영 가려지지는 않는다
+  const back = find(run(world, busy, { frames: 2000, t0: 601_000 }), 'a');
+  assert.equal(back.act, 'work');
+  assert.ok(back.lap > 0.9, `도착했는데 노트북을 안 편다: ${back.lap}`);
+});
+
+test('부른 게는 노는 데 끼지 않는다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle'), worker('b', 'idle')]));
+  run(world, cast, { frames: 120, rng: () => 0.4 });
+  const pets = stepStroll(world, cast, { w: W, h: H, now: 700_000, dt: 16 });
+  for (const p of pets) {
+    p.act = 'walk';
+    p.moving = false;
+    p.until = 800_000;
+    p.y = 120;
+    p.chatCool = 0;
+  }
+  pets[0].x = 100;
+  pets[1].x = 106;
+  orderMove(world, [pets[0].key], 300, 150, W, H);
+
+  const after = stepStroll(world, cast, { w: W, h: H, now: 700_016, dt: 16 });
+  assert.ok(
+    after.every((p) => !p.talk),
+    '부른 게가 잡담에 붙잡혔다',
+  );
 });

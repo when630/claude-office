@@ -95,6 +95,12 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   `resizable: false`이고 자리는 `fitStroll`이 작업 영역에 맞춰 다시 잡는다.
   Windows만 `focusable: false`다 — 게를 끌어도 작업 중인 창의 초점을 뺏지 않아야 하는데,
   맥에서는 초점을 못 받는 창이 마우스 눌림을 받는 보장이 없어 집어 드는 것 자체를 잃는다
+- **지휘(Ctrl+Shift)는 창에 키를 물어보지 않는다.** 산책 창은 초점을 안 받으므로 keydown이
+  올 자리가 없는데, **클릭을 통과시키는 중에 전달되는 mousemove에는 수식키 상태가 실려 온다**
+  (`forward: true`). 그래서 `e.ctrlKey && e.shiftKey`만 보면 되고 별도 창도 전역 단축키도
+  필요 없다. 확인할 때 **합성 커서 이동(SetCursorPos)으로는 안 실린다** — 키 플래그가 채워진
+  실제 마우스 입력(mouse_event/SendInput)이라야 한다. 처음엔 이것 때문에 안 되는 줄 알았다.
+  누른 동안에는 창이 클릭을 먹으므로 **떼는 순간 통과로 돌려놓는 것**이 이 기능의 전부다
 - **모습은 셋 중 하나다**(`settings.mode` — `normal` · `mini` · `stroll`). 배타라는 약속은
   `setMode` 한 곳에만 있다. 옛 설정의 `mini: true`는 `sanitizeMode`가 읽어 준다 —
   트레이 상주 앱이라 남의 설정을 잃는 것이 곧 회귀다
