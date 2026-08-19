@@ -4,14 +4,25 @@
 // 갈라 쓰는 값이 있었지만, 산책에는 **DOM이 캔버스 하나뿐**이다. 같은 app.mjs를 태우면
 // 쓰지도 않을 2천 줄이 창마다 한 벌씩 돌게 된다.
 import { OFFICE_FONT_PX, OFFICE_FONT_FAMILY } from './render.mjs';
-import { createWorld, stepStroll, strollCast, petAt, STROLL_MAX } from './stroll.mjs';
+import { createWorld, stepStroll, strollCast, petAt } from './stroll.mjs';
 import { renderStroll } from './stroll-view.mjs';
+import {
+  STROLL_MAXES,
+  STROLL_SCALES,
+  STROLL_SPEEDS,
+  STROLL_DEFAULTS,
+  pickStroll,
+} from '../shared/stroll-choices.mjs';
 
 const canvas = document.getElementById('stroll');
 const ctx = canvas.getContext('2d');
 
-// 게를 몇 배로 그릴까. 2배(32px)가 바탕화면에서 눈에 걸리면서도 창을 가리지 않는 크기다.
-const SCALE = 2;
+// 게를 몇 배로 그릴까. 2배(32px)가 바탕화면에서 눈에 걸리면서도 창을 가리지 않는 기본값이고,
+// 화면 크기와 취향을 타는 값이라 설정 창에서 고른다(설정 > 일반 > 바탕화면 산책).
+// **창이 뜬 뒤로는 안 바뀐다** — 세 모습이 배타적이라 산책 중에는 설정 창이 떠 있지 않고,
+// 다음에 갈아탈 때 새 창이 저장된 값을 읽어 온다.
+let scale = STROLL_DEFAULTS.strollScale;
+let speed = STROLL_DEFAULTS.strollSpeed;
 // 프레임 제한. 걷기·타이핑이 150ms 단위라 30fps면 충분하고, 화면을 덮는 투명 창을
 // 60fps로 다시 칠하면 아무것도 안 하는 동안에도 GPU가 계속 돈다.
 const FRAME_MS = 33;
@@ -21,7 +32,7 @@ const CLICK_MS = 400;
 
 let dpr = Math.min(window.devicePixelRatio || 1, 2);
 let state = { rooms: [] };
-let limit = STROLL_MAX;
+let limit = STROLL_DEFAULTS.strollMax;
 const world = createWorld();
 let pets = [];
 
@@ -32,7 +43,7 @@ let drag = null; // stepStroll에 넘길 { key, x, y }
 let passThrough = true; // 지금 창이 클릭을 통과시키고 있는가
 
 function logical() {
-  return { w: canvas.clientWidth / SCALE, h: canvas.clientHeight / SCALE };
+  return { w: canvas.clientWidth / scale, h: canvas.clientHeight / scale };
 }
 
 function resize() {
@@ -59,14 +70,14 @@ function tick(now) {
   const { w, h } = logical();
   if (!w || !h) return;
 
-  pets = stepStroll(world, strollCast(state.rooms, limit), { w, h, now: Date.now(), dt, drag });
+  pets = stepStroll(world, strollCast(state.rooms, limit), { w, h, now: Date.now(), dt, drag, speed });
 
   // **커서 밑을 매 프레임 다시 본다.** 마우스가 가만히 있어도 게가 걸어와 커서 밑으로
   // 들어올 수 있는데, 그때 mousemove는 오지 않는다.
   if (grab) {
     hover = grab.key;
   } else if (pointer) {
-    const hit = petAt(pets, pointer.x, pointer.y, SCALE);
+    const hit = petAt(pets, pointer.x, pointer.y, scale);
     hover = hit?.key ?? null;
     setPassThrough(!hit);
   } else {
@@ -75,7 +86,7 @@ function tick(now) {
   }
 
   renderStroll(ctx, pets, {
-    scale: SCALE,
+    scale,
     dpr,
     t: now,
     hover,
@@ -93,7 +104,7 @@ window.addEventListener('mousemove', (e) => {
   pointer = { x: e.clientX, y: e.clientY };
   if (!grab) return;
   if (Math.abs(e.clientX - grab.at.x) > DRAG_SLOP || Math.abs(e.clientY - grab.at.y) > DRAG_SLOP) grab.moved = true;
-  drag = { key: grab.key, x: (e.clientX + grab.dx) / SCALE, y: (e.clientY + grab.dy) / SCALE };
+  drag = { key: grab.key, x: (e.clientX + grab.dx) / scale, y: (e.clientY + grab.dy) / scale };
 });
 
 window.addEventListener('mouseleave', () => {
@@ -102,13 +113,13 @@ window.addEventListener('mouseleave', () => {
 
 window.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return;
-  const hit = petAt(pets, e.clientX, e.clientY, SCALE);
+  const hit = petAt(pets, e.clientX, e.clientY, scale);
   if (!hit) return;
   grab = {
     key: hit.key,
     // 잡은 지점을 유지한다 — 안 그러면 게가 커서 중심으로 튄다
-    dx: hit.x * SCALE - e.clientX,
-    dy: hit.y * SCALE - e.clientY,
+    dx: hit.x * scale - e.clientX,
+    dy: hit.y * scale - e.clientY,
     at: { x: e.clientX, y: e.clientY },
     t: Date.now(),
     moved: false,
@@ -140,11 +151,15 @@ function connect() {
   window.office
     .getView?.()
     .then((v) => {
-      const n = Number(v?.strollMax);
-      if (Number.isFinite(n) && n > 0) limit = Math.min(24, Math.round(n));
+      // main이 이미 걸러 둔 값이지만(sanitizeView) 한 번 더 본다 — 이 창은 설정 창 없이
+      // 뜨므로 값이 이상해도 사람이 고칠 자리가 여기엔 없다
+      limit = pickStroll(v?.strollMax, STROLL_MAXES, limit);
+      scale = pickStroll(v?.strollScale, STROLL_SCALES, scale);
+      speed = pickStroll(v?.strollSpeed, STROLL_SPEEDS, speed);
+      resize();
     })
     .catch(() => {
-      /* 설정을 못 읽으면 기본 인원으로 돈다 */
+      /* 설정을 못 읽으면 기본값으로 돈다 */
     });
 }
 
@@ -155,8 +170,11 @@ resize();
 connect();
 requestAnimationFrame(tick);
 
-// 헤드리스로 굽을 때 쓰는 입구 — 큰 창의 `__office.push`와 같은 자리다
+// 헤드리스로 굽을 때 쓰는 입구 — 큰 창의 `__office.push`와 같은 자리다.
+// `tuning`은 설정이 실제로 먹었는지 보는 자리다: 이 창에는 설정 UI가 없어서 눈으로는
+// 크기가 커진 것과 화면이 작아진 것을 구분할 수 없다.
 window.__stroll = {
   push: (next) => applyState(next),
   pets: () => pets,
+  tuning: () => ({ scale, speed, limit }),
 };

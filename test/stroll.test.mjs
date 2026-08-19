@@ -97,18 +97,51 @@ test('무엇을 하고 있어야 하는가 — 일을 받으면 앉고 나머지
   assert.equal(wantAct(worker('a', 'stopped')), 'halt');
 });
 
-test('화면 밖에서 걸어 들어와 산책을 시작한다', () => {
+test('모드를 켜는 순간 있던 세션은 걸어 들어오지 않는다', () => {
   const world = createWorld();
+  // 산책으로 갈아타는 것은 "지금 사무실을 내놓는" 일이다 — 일하던 게가 화면 밖에서
+  // 걸어 들어오는 동안 노트북을 안 펴고 있으면 그건 지금 상태가 아니다
+  const cast = strollCast(rooms(['proj', worker('a', 'typing'), worker('b', 'idle')]));
+  const pets = stepStroll(world, cast, { w: W, h: H, now: 10_000, dt: 16, rng: () => 0.4 });
+  for (const p of pets) {
+    assert.notEqual(p.act, 'in', `${p.key}가 밖에서 걸어 들어온다`);
+    assert.ok(p.x > 0 && p.x < W, `${p.key}가 화면 밖에 있다: ${p.x}`);
+  }
+  // 그리고 일하던 것은 곧장 노트북을 편다
+  const busy = find(run(world, cast, { frames: 60, t0: 10_100 }), 'a');
+  assert.equal(busy.act, 'work');
+  assert.ok(busy.lap > 0.9, `노트북이 안 펴졌다: ${busy.lap}`);
+});
+
+test('나중에 합류한 세션은 화면 밖에서 걸어 들어온다', () => {
+  const world = createWorld();
+  const none = [];
+  stepStroll(world, none, { w: W, h: H, now: 10_000, dt: 16 });
+
   const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
-  let pets = stepStroll(world, cast, { w: W, h: H, now: 10_000, dt: 16, rng: () => 0.1 });
-  const first = find(pets, 'a');
+  const first = find(stepStroll(world, cast, { w: W, h: H, now: 10_016, dt: 16, rng: () => 0.1 }), 'a');
   assert.equal(first.act, 'in');
   assert.ok(first.x < 0 || first.x > W, `화면 안에서 나타났다: ${first.x}`);
 
-  pets = run(world, cast, { frames: 700, rng: () => 0.1 });
-  const pet = find(pets, 'a');
+  const pet = find(run(world, cast, { frames: 700, t0: 10_100, rng: () => 0.1 }), 'a');
   assert.ok(pet.x > 0 && pet.x < W, `화면 안으로 못 들어왔다: ${pet.x}`);
   assert.notEqual(pet.act, 'in');
+});
+
+test('걸어 들어오는 중에 일을 받으면 그 자리에서 노트북을 편다', () => {
+  const world = createWorld();
+  stepStroll(world, [], { w: W, h: H, now: 20_000, dt: 16 });
+  const idle = strollCast(rooms(['proj', worker('a', 'idle')]));
+  // 화면 안으로 발을 들일 만큼만 걷게 둔다
+  const walking = find(run(world, idle, { frames: 120, t0: 20_016, rng: () => 0.1 }), 'a');
+  assert.equal(walking.act, 'in');
+  assert.ok(walking.x > 0, `아직 화면 밖이다: ${walking.x}`);
+  const at = walking.x;
+
+  const busy = strollCast(rooms(['proj', worker('a', 'typing')]));
+  const pet = find(run(world, busy, { frames: 60, t0: 22_000 }), 'a');
+  assert.equal(pet.act, 'work', '등장을 끝까지 마치느라 일을 못 받았다');
+  assert.ok(Math.abs(pet.x - at) < 2, `일을 받고도 더 걸어갔다: ${at} → ${pet.x}`);
 });
 
 test('일이 들어오면 걷다 말고 그 자리에서 노트북을 편다', () => {

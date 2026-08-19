@@ -31,6 +31,13 @@ import {
 } from '../shared/i18n.mjs';
 import { accelLabel, modHint } from '../shared/accel.mjs';
 import { showsBroken } from '../shared/status.mjs';
+import {
+  STROLL_MAXES,
+  STROLL_SCALES,
+  STROLL_SPEEDS,
+  STROLL_DEFAULTS,
+  pickStroll,
+} from '../shared/stroll-choices.mjs';
 
 const canvas = document.getElementById('office');
 const ctx = canvas.getContext('2d');
@@ -1583,6 +1590,7 @@ function roomSig() {
 }
 
 // main도 같은 값을 걸러내지만(sanitizeView), 렌더러는 IPC 없이도 돌아야 하므로 여기서도 본다.
+
 function normalizeView(v) {
   const list = (x) => (Array.isArray(x) ? x.filter((k) => typeof k === 'string' && k) : []);
   // 방을 앉힌 칸 — `{ 방 이름: [열, 행] }`. 모양이 깨진 항목만 버리고 나머지는 살린다
@@ -1608,6 +1616,11 @@ function normalizeView(v) {
     // 양쪽 열이 열려 있는지. 기본이 열림이라 옛 설정에도 값이 없어도 된다.
     railOpen: v?.railOpen !== false,
     panelOpen: v?.panelOpen !== false,
+    // 산책 모드의 셋. 이 창은 산책을 그리지 않지만 **설정 창이 여기 있다** — 값을 들고
+    // 있어야 select가 지금 값에 맞춰 서고, 실제로 쓰는 것은 산책 창이다(stroll-app.mjs).
+    strollMax: pickStroll(v?.strollMax, STROLL_MAXES, STROLL_DEFAULTS.strollMax),
+    strollScale: pickStroll(v?.strollScale, STROLL_SCALES, STROLL_DEFAULTS.strollScale),
+    strollSpeed: pickStroll(v?.strollSpeed, STROLL_SPEEDS, STROLL_DEFAULTS.strollSpeed),
   };
 }
 
@@ -1810,6 +1823,35 @@ function generalPane() {
         )}</select>
       </div>
     </section>
+
+    <section class="block">
+      <h3>${t('cfg.strollSection')}${hintBtn('cfg.strollHint')}</h3>
+      <div class="cfg-row">
+        <label for="cfg-stroll-max"><b>${t('cfg.strollMax')}</b></label>
+        <select id="cfg-stroll-max">${options(
+          STROLL_MAXES.map((n) => [n, t('cfg.strollMaxValue', { n })]),
+          cfg.strollMax,
+        )}</select>
+      </div>
+      <div class="cfg-row">
+        <label for="cfg-stroll-scale"><b>${t('cfg.strollScale')}</b></label>
+        <select id="cfg-stroll-scale">${options(
+          STROLL_SCALES.map((n) => [n, t(`strollSize.x${n}`)]),
+          cfg.strollScale,
+        )}</select>
+      </div>
+      <div class="cfg-row">
+        <label for="cfg-stroll-speed"><b>${t('cfg.strollSpeed')}</b></label>
+        <select id="cfg-stroll-speed">${options(
+          [
+            [0.6, t('strollSpeed.slow')],
+            [1, t('strollSpeed.normal')],
+            [1.6, t('strollSpeed.fast')],
+          ],
+          cfg.strollSpeed,
+        )}</select>
+      </div>
+    </section>
   `;
 }
 
@@ -1974,6 +2016,13 @@ cfgBody.addEventListener('change', (e) => {
   }
   if (el.id === 'cfg-names') {
     saveView({ names: el.value });
+    return;
+  }
+  // 산책 셋. 이 창은 산책을 그리지 않으므로 화면에 곧장 반영될 것은 없다 —
+  // 모드가 배타적이라 다음에 산책으로 갈아탈 때 새 창이 저장된 값을 읽어 간다.
+  const stroll = { 'cfg-stroll-max': 'strollMax', 'cfg-stroll-scale': 'strollScale', 'cfg-stroll-speed': 'strollSpeed' };
+  if (stroll[el.id]) {
+    saveView({ [stroll[el.id]]: Number(el.value) });
     return;
   }
   if (el.dataset?.notify) {

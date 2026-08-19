@@ -254,9 +254,11 @@ across it.
   session selected
 - Anywhere that is not a crab **clicks straight through** to whatever is underneath — the sheet is
   not there as far as your mouse is concerned
-- Crowded machines stay readable: at most **six crabs** go out at a time, most urgent first
-  (waiting, stuck, cut off, failed, then the rest). Raise it with `view.strollMax` in
-  `settings.json` if you want more
+- Crowded machines stay readable: **six crabs** go out at a time by default, most urgent first
+  (waiting, stuck, cut off, failed, then the rest)
+- **Settings > General > Desktop stroll** sets how many go out, how big they are, and how fast
+  they walk. The three modes are exclusive, so what you pick applies the next time you switch to
+  the stroll
 
 The three modes are exclusive — the window, the corner, and the desktop. Switch between them from
 the top bar, the tray menu, or the shortcuts.

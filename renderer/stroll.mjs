@@ -8,9 +8,11 @@
 // 그래서 이 파일은 캔버스를 모르고 `now`와 `dt`를 인자로 받는다 — main/notify.mjs가
 // Electron을 모르는 것과 같은 이유이고, 그래서 test/stroll.test.mjs가 돈다.
 import { miniRoster } from './render.mjs';
+import { STROLL_DEFAULTS } from '../shared/stroll-choices.mjs';
 
-// 한 화면에 세울 수 있는 최대 인원. 세션이 스물이어도 바탕화면이 게로 덮이면 안 된다.
-export const STROLL_MAX = 6;
+// 한 화면에 세울 수 있는 인원의 기본값. 세션이 스물이어도 바탕화면이 게로 덮이면 안 된다.
+// 실제로 쓰는 값은 설정에서 온다(설정 > 일반 > 바탕화면 산책).
+export const STROLL_MAX = STROLL_DEFAULTS.strollMax;
 
 // 걷는 속도(논리 px/ms). 큰 창의 산책과 같은 느긋함이다 — 데스크톱에서 빠르게 지나다니면
 // 곁눈질이 아니라 방해가 된다.
@@ -84,40 +86,50 @@ export function createWorld() {
   return { pets: new Map(), w: 0, h: 0 };
 }
 
-function spawn(entry, { w, h, now, rng }) {
+// 게 하나를 만든다.
+//
+// `inside`는 **모드를 켜는 순간 이미 있던 세션**이다. 이들은 걸어 들어오지 않고 제자리에서
+// 시작한다 — 산책으로 갈아타는 것은 "지금 사무실을 바탕화면에 내놓는" 일이라, 일하던
+// 세션이 노트북 대신 걸어다니고 있으면 그건 지금 상태가 아니다. 넓은 화면에서는 걸어
+// 들어오는 데만 10초가 넘게 걸려서, 그동안 화면이 거짓말을 한다.
+function spawn(entry, { w, h, now, rng, inside = false }) {
   const area = strollArea(w, h);
   const fromLeft = rng() < 0.5;
-  // 들어오는 높이는 매번 다르다 — 늘 같은 줄로 들어오면 여럿이 한 줄에 겹친다
+  // 서는 높이는 매번 다르다 — 늘 같은 줄이면 여럿이 겹친다
   const y = area.y0 + rng() * (area.y1 - area.y0);
+  const x = inside ? area.x0 + rng() * (area.x1 - area.x0) : fromLeft ? -OFFSCREEN : w + OFFSCREEN;
   return {
     key: entry.worker.key,
     entry,
-    x: fromLeft ? -OFFSCREEN : w + OFFSCREEN,
+    x,
     y,
     // **들어온 쪽 가까이에 선다.** 반대편을 목표로 주면 넓은 화면에서는 걸어 들어오는 데만
     // 수십 초가 걸려, 켜자마자 아무도 없는 바탕화면을 한참 보게 된다.
-    gx: Math.round(fromLeft ? w * (0.05 + rng() * 0.15) : w * (0.8 + rng() * 0.15)),
+    gx: inside ? x : Math.round(fromLeft ? w * (0.05 + rng() * 0.15) : w * (0.8 + rng() * 0.15)),
     gy: y,
     dir: fromLeft ? 1 : -1,
-    act: 'in',
+    act: inside ? 'walk' : 'in',
     until: 0,
     lap: 0, // 노트북을 편 정도 0..1
-    moving: true,
+    moving: false,
     born: now,
     seed: Math.floor(rng() * 1e6),
   };
 }
 
 // 한 프레임. `drag`는 지금 손에 잡힌 게({ key, x, y })이고 없으면 null이다.
-export function stepStroll(world, cast, { w, h, now, dt, drag = null, rng = Math.random } = {}) {
+export function stepStroll(world, cast, { w, h, now, dt, drag = null, rng = Math.random, speed = 1 } = {}) {
   world.w = w;
   world.h = h;
   const area = strollArea(w, h);
   const live = new Map(cast.map((e) => [e.worker.key, e]));
 
-  // 새로 온 게
+  // 새로 온 게. **첫 프레임에 있던 것들은 이미 그 자리에 있던 것으로 친다**(inside) —
+  // 걸어 들어오는 연출은 산책 중에 새로 생긴 세션의 몫이다.
+  const first = !world.begun;
+  world.begun = true;
   for (const [key, entry] of live) {
-    if (!world.pets.has(key)) world.pets.set(key, spawn(entry, { w, h, now, rng }));
+    if (!world.pets.has(key)) world.pets.set(key, spawn(entry, { w, h, now, rng, inside: first }));
     else world.pets.get(key).entry = entry;
   }
 
@@ -161,8 +173,17 @@ export function stepStroll(world, cast, { w, h, now, dt, drag = null, rng = Math
       continue;
     }
 
+    // 걸어 들어오는 중에 일을 받으면 **거기서 멈춘다.** 화면 안에 발을 들였으면 그 자리가
+    // 곧 일할 자리다 — 등장을 끝까지 마치게 두면 노트북을 펴기까지 몇 초가 더 걸린다.
+    if (pet.act === 'in' && !gone && wantAct(pet.entry.worker) !== 'walk' && pet.x > area.x0 && pet.x < area.x1) {
+      pet.act = 'walk';
+      pet.gx = pet.x;
+      pet.gy = pet.y;
+      pet.until = 0;
+    }
+
     if (pet.act === 'in' || pet.act === 'out') {
-      if (advance(pet, step, pet.act === 'out' ? 0 : NEAR)) {
+      if (advance(pet, step, pet.act === 'out' ? 0 : NEAR, speed)) {
         if (pet.act === 'out') world.pets.delete(pet.key);
         else {
           pet.act = 'walk';
@@ -207,7 +228,7 @@ export function stepStroll(world, cast, { w, h, now, dt, drag = null, rng = Math
       pet.moving = false;
       continue;
     }
-    if (advance(pet, step, NEAR)) {
+    if (advance(pet, step, NEAR, speed)) {
       pet.moving = false;
       pet.until = now + REST_MIN + rng() * REST_SPAN;
       aim(pet, area, rng);
@@ -223,7 +244,7 @@ export function stepStroll(world, cast, { w, h, now, dt, drag = null, rng = Math
 // 축마다 속도가 다르므로 **방향은 거리로 정하고 속도는 축이 정한다.** x가 먼저 닿으면 남는
 // 것은 세로 성분뿐이라 그 뒤로는 위아래로만 걷는다 — 대각선이 한 번 꺾이지만, 세로로도
 // 가로 속도로 내달리는 것보다 걸음으로 읽힌다.
-function advance(pet, step, near) {
+function advance(pet, step, near, speed = 1) {
   const dx = pet.gx - pet.x;
   const dy = pet.gy - pet.y;
   const dist = Math.hypot(dx, dy);
@@ -236,8 +257,8 @@ function advance(pet, step, near) {
   }
   // 좌우 자세가 없는 캐릭터지만(정면 그림) 방향은 들고 있는다 — 나가는 쪽을 정할 때 쓴다
   if (Math.abs(dx) > 0.01) pet.dir = dx > 0 ? 1 : -1;
-  const mx = (dx / dist) * SPEED_X * step;
-  const my = (dy / dist) * SPEED_Y * step;
+  const mx = (dx / dist) * SPEED_X * speed * step;
+  const my = (dy / dist) * SPEED_Y * speed * step;
   // 한 걸음이 남은 거리보다 크면 목적지에 딱 맞춘다 — 넘어갔다 돌아오면 그 자리에서 떤다
   pet.x += Math.abs(mx) > Math.abs(dx) ? dx : mx;
   pet.y += Math.abs(my) > Math.abs(dy) ? dy : my;

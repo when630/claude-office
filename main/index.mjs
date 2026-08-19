@@ -46,6 +46,13 @@ import {
 import { openTerminal, reasonText as terminalReason } from './terminal.mjs';
 import { t, fmtDur, fmtWhen, setLang, resolveLang, LANGS, LANG_NAMES } from '../shared/i18n.mjs';
 import {
+  STROLL_MAXES,
+  STROLL_SCALES,
+  STROLL_SPEEDS,
+  STROLL_DEFAULTS,
+  pickStroll,
+} from '../shared/stroll-choices.mjs';
+import {
   diffEvents,
   bootEvent,
   appendEvents,
@@ -123,7 +130,9 @@ const defaults = {
   // 값이 없는 옛 설정 파일이 그대로 열린 채로 뜬다.
   view: {
     names: 'show',
-    strollMax: 6,
+    // 산책 모드의 셋 — 한 번에 내보낼 인원 · 게를 몇 배로 그릴지 · 걷는 속도(배수).
+    // 화면 크기와 취향이 사람마다 달라 상수로 박아 둘 수 없는 값들이다(설정 창 > 일반).
+    ...STROLL_DEFAULTS,
     roomThemes: {},
     pinned: [],
     collapsed: [],
@@ -348,16 +357,14 @@ function sanitizeView(v) {
     panelOpen: v?.panelOpen !== false,
     // 산책 모드에 한 번에 내보낼 인원. 세션이 스물이어도 바탕화면이 게로 덮이면 안 되므로
     // 급한 순으로 이만큼만 나간다(renderer/stroll.mjs의 strollCast).
-    strollMax: strollMax(v?.strollMax),
+    strollMax: pickStroll(v?.strollMax, STROLL_MAXES, defaults.view.strollMax),
+    // 게를 몇 배로 그릴까. **정수배만 받는다** — 픽셀 아트라 반 칸에서 획이 뭉갠다
+    strollScale: pickStroll(v?.strollScale, STROLL_SCALES, defaults.view.strollScale),
+    // 걷는 속도(배수)
+    strollSpeed: pickStroll(v?.strollSpeed, STROLL_SPEEDS, defaults.view.strollSpeed),
   };
 }
 
-// 산책 인원. 손으로 고친 settings.json이 화면을 게로 덮지 못하게 위아래를 막는다.
-function strollMax(v) {
-  const n = Number(v);
-  if (!Number.isFinite(n)) return defaults.view.strollMax;
-  return Math.min(24, Math.max(1, Math.round(n)));
-}
 
 // 방 → 칸(`[열, 행]`). 손으로 고친 settings.json도 이 문을 지나므로 모양이 깨진 항목만
 // 버리고 나머지는 살린다 — 하나가 이상해서 배치를 통째로 날리면 짜 둔 사무실이 사라진다.

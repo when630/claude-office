@@ -80,6 +80,18 @@ export default {
     auto: '자동',
   },
 
+  strollSize: {
+    x2: '보통',
+    x3: '크게',
+    x4: '아주 크게',
+  },
+
+  strollSpeed: {
+    slow: '느긋하게',
+    normal: '보통',
+    fast: '부지런히',
+  },
+
   names: {
     show: '이름 그대로',
     mask: '가리기 (클로드 1…)',
@@ -227,6 +239,13 @@ export default {
     names: '이름표',
     namesHint:
       '가리면 <code>클로드 1, 2…</code>로 부릅니다. 화면을 남에게 보일 때 쓰세요 — 작업 디렉터리 경로는 패널에 그대로 남습니다.',
+    strollSection: '바탕화면 산책',
+    strollHint:
+      '창을 접고 게만 바탕화면에 내보내는 모습입니다. 여기서 정한 값은 <b>다음에 산책으로 갈아탈 때</b> 적용됩니다 — 세 모습은 배타적이라 산책 중에는 이 창이 떠 있지 않습니다.',
+    strollMax: '한 번에 내보낼 인원',
+    strollMaxValue: '{n}마리',
+    strollScale: '게 크기',
+    strollSpeed: '걷는 속도',
     roomTheme: '방 종류',
     roomNotify: '알림 세기',
     roomPin: '맨 앞에 고정',

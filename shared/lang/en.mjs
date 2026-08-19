@@ -82,6 +82,18 @@ export default {
     auto: 'Auto',
   },
 
+  strollSize: {
+    x2: 'Normal',
+    x3: 'Large',
+    x4: 'Extra large',
+  },
+
+  strollSpeed: {
+    slow: 'Ambling',
+    normal: 'Normal',
+    fast: 'Brisk',
+  },
+
   names: {
     show: 'Real names',
     mask: 'Masked (Clawd 1…)',
@@ -225,6 +237,13 @@ export default {
     names: 'Name tags',
     namesHint:
       'Masking calls them <code>Clawd 1, 2…</code>. Use it when showing your screen to someone — the working directory path still shows in the panel.',
+    strollSection: 'Desktop stroll',
+    strollHint:
+      'The mode that puts the window away and leaves only the crabs on your desktop. What you pick here applies <b>the next time you switch to the stroll</b> — the three modes are exclusive, so this window is not up while they are out there.',
+    strollMax: 'How many go out',
+    strollMaxValue: '{n} crabs',
+    strollScale: 'Crab size',
+    strollSpeed: 'Walking speed',
     roomTheme: 'Room type',
     roomNotify: 'Alert level',
     roomPin: 'Pin to the front',
