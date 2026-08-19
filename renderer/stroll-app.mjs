@@ -61,7 +61,24 @@ let frozen = false; // 헤드리스로 굽을 때만 켠다 (__stroll.freeze)
 let command = false; // 지금 지휘 모드인가
 let box = null; // 그리는 중인 선택 상자 (창 좌표)
 const selected = new Set(); // 고른 게의 key
+// 상자를 안 끄는 동안에는 이 하나를 돌려 쓴다 — 30fps로 빈 Set을 새로 만들 이유가 없다
+const NO_KEYS = new Set();
+let inBox = NO_KEYS; // 지금 상자 안에 들어와 있는 게의 key (아직 고른 것은 아니다)
+const picks = new Map(); // 고른 직후 이펙트를 돌릴 게 — key → 시작 시각(performance.now)
 let marks = []; // 누른 자리에 찍히는 표식 (논리 좌표)
+
+// 고른 게마다 이펙트를 켤 시각. **한꺼번에 켜면 화면이 한 번 번쩍이고 만다** —
+// 시차를 주면 하나씩 호명되는 것으로 읽힌다.
+//
+// 기준점은 **상자를 누르기 시작한 자리**다. 그래서 끈 방향대로 켜진다 — 오른쪽 아래에서
+// 왼쪽 위로 끌었으면 오른쪽 아래 게부터 물린다. 가운데를 기준으로 삼아 봤더니 어느 쪽으로
+// 끌든 같은 순서로 켜져서, 방금 내가 그은 획과 화면이 따로 놀았다.
+function armPicks(list, from, now) {
+  for (const pet of list) {
+    const away = Math.hypot(pet.x - from.x, pet.y - from.y);
+    picks.set(pet.key, now + Math.min(200, away * 1.4));
+  }
+}
 
 // 표식 하나. 오래된 것은 그릴 때 걸러지므로 여기서는 개수만 막는다.
 function mark(m) {
@@ -69,20 +86,14 @@ function mark(m) {
   if (marks.length > 8) marks = marks.slice(-8);
 }
 
-// 고른 게들을 감싸는 자리 — 그룹핑 표식이 여기로 조여든다
-function boundsOf(list) {
-  if (!list.length) return null;
-  let x0 = Infinity;
-  let y0 = Infinity;
-  let x1 = -Infinity;
-  let y1 = -Infinity;
-  for (const p of list) {
-    x0 = Math.min(x0, p.x - 9);
-    x1 = Math.max(x1, p.x + 9);
-    y0 = Math.min(y0, p.y - 15);
-    y1 = Math.max(y1, p.y + 2);
-  }
-  return { x0, y0, x1, y1 };
+// 상자를 실제로 끌었는가. 톡 누른 것과 갈라야 하는 자리가 둘이라 여기 모아 둔다.
+function drawnBox(b) {
+  return Math.abs(b.x1 - b.x0) > 3 || Math.abs(b.y1 - b.y0) > 3;
+}
+
+// 상자를 게가 사는 좌표계로. 창 좌표로 그려 놓고 논리 좌표로 재는 자리가 셋이다.
+function boxLogical(b) {
+  return { x0: b.x0 / scale, y0: b.y0 / scale, x1: b.x1 / scale, y1: b.y1 / scale };
 }
 
 function logical() {
@@ -152,6 +163,15 @@ function tick(now) {
     for (const key of selected) if (!world.pets.has(key)) selected.delete(key);
   }
 
+  // **상자 안은 매 프레임 다시 센다.** 상자를 안 움직여도 게가 걸어서 들고 난다 —
+  // mousemove에서만 세면 가만 든 게가 표시 없이 잡히거나, 빠져나간 게가 표시를 달고 있다.
+  // 아직 톡 누르기만 한 참이면 비워 둔다 — 상자에 크기가 없어도 판정에 여유(petsInBox)가
+  // 있어서 옆에 선 게가 곧장 켜지는데, 그 상태로 떼면 선택은 오히려 풀린다
+  inBox =
+    box && drawnBox(box)
+      ? new Set(petsInBox(pets, boxLogical(box)).map((p) => p.key))
+      : NO_KEYS;
+
   renderStroll(ctx, pets, {
     scale,
     dpr,
@@ -160,8 +180,10 @@ function tick(now) {
     font: `${OFFICE_FONT_PX}px ${OFFICE_FONT_FAMILY}, monospace`,
     tracks: strollTracks(world, Date.now()),
     selected,
+    inBox,
+    picks,
     // 상자는 창 좌표로 그렸으므로 논리 좌표로 바꿔 넘긴다
-    box: box && { x0: box.x0 / scale, y0: box.y0 / scale, x1: box.x1 / scale, y1: box.y1 / scale },
+    box: box && boxLogical(box),
     command,
     cursor: command && pointer ? { x: pointer.x / scale, y: pointer.y / scale, ready: selected.size > 0 } : null,
     marks,
@@ -179,7 +201,10 @@ tick.last = 0;
 function setCommand(on) {
   if (on === command) return;
   command = on;
-  if (!on) box = null;
+  if (!on) {
+    box = null;
+    inBox = NO_KEYS;
+  }
   setPassThrough(!on);
   // 지휘 중에는 **OS 커서를 감추고 캔버스에 직접 그린다**(stroll-view의 drawCursor) —
   // 화살표 그대로면 지금 지휘 중인지가 화면에 드러나지 않는다
@@ -242,23 +267,21 @@ window.addEventListener('mousedown', (e) => {
 
 window.addEventListener('mouseup', () => {
   if (box) {
-    const drawn = Math.abs(box.x1 - box.x0) > 3 || Math.abs(box.y1 - box.y0) > 3;
+    const drawn = drawnBox(box);
     selected.clear();
-    const from = { x0: box.x0 / scale, y0: box.y0 / scale, x1: box.x1 / scale, y1: box.y1 / scale };
+    picks.clear();
+    const from = boxLogical(box);
     // 상자를 그렸으면 그 안을 고르고, 톡 누르기만 했으면 선택을 푼다
     let picked = [];
     if (drawn) {
       picked = petsInBox(pets, from);
       for (const p of picked) selected.add(p.key);
     }
-    // 상자가 고른 것들을 감싸며 조여든다. 아무것도 못 골랐으면 그 자리로 오므라들어 사라진다.
-    const mid = { x: (from.x0 + from.x1) / 2, y: (from.y0 + from.y1) / 2 };
-    mark({
-      group: true,
-      from,
-      to: boundsOf(picked) ?? { x0: mid.x - 1, y0: mid.y - 1, x1: mid.x + 1, y1: mid.y + 1 },
-    });
+    // 그린 상자는 여기서 사라지고, 대신 **게마다 제 네모가 하나씩 물린다**(stroll-view의
+    // drawPickBox). 전체를 감싸는 네모는 "저 무리"까지만 말하고 누구누구인지는 말하지 않는다.
+    if (picked.length) armPicks(picked, { x: from.x0, y: from.y0 }, performance.now());
     box = null;
+    inBox = NO_KEYS;
     return;
   }
   if (!grab) return;
@@ -319,6 +342,7 @@ window.__stroll = {
   tuning: () => ({ scale, speed, limit }),
   world: () => world,
   selected: () => [...selected],
+  inBox: () => [...inBox],
   cmd: () => ({ command, box: !!box, passThrough }),
   marks: (list) => {
     marks = list;
