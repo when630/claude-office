@@ -34,10 +34,10 @@ const SHUT_MS = 300;
 const LAND_MS = 420;
 // 포탈에서 떨어지는 높이와 가속도(px/ms²). 45px이면 반 초쯤 떨어진다 —
 // 더 높이면 화면 위쪽에서 포탈이 잘리고, 더 낮으면 떨어진 것이 아니라 튀어나온 것이 된다.
-// 구멍은 **게 머리보다 위에** 뜬다. 발 높이에 맞춰 놓았더니 몸통 한가운데에 겹쳐, 양옆으로
-// 삐져나온 조각만 보였다(굽어서 확인했다) — 게 키(14px)에 틈을 더한 만큼 올린다.
+// 구멍은 **게가 나오기 시작하는 평면**이다. 처음엔 머리 위로 한참 띄웠는데, 그러면 게가
+// 이미 다 나온 채로 구멍 아래에 떠 있어 "거기서 나왔다"가 아니라 "구멍 밑에 있다"가 됐다.
+// 이제 게는 이 높이에서 시작해 아래로 나온다 — 구멍 너머의 몸은 그리는 쪽이 잘라 낸다.
 const DROP_H = 45;
-const PORTAL_GAP = 18;
 const GRAVITY = 0.0004;
 // 포탈이 열리고 · 게가 떨어지는 동안 열린 채 있다가 · 닫히는 시간
 const PORTAL_OPEN_MS = 220;
@@ -114,7 +114,7 @@ function spawn(entry, { w, h, now, rng }) {
   const x = area.x0 + rng() * (area.x1 - area.x0);
   // **내려앉는 자리는 화면 위쪽을 비운다** — 구멍이 그만큼 더 위에 떠야 하는데, 맨 위에
   // 내려앉으면 그 구멍이 화면 밖으로 잘린다. 착지한 뒤에는 위로도 자유롭게 걸어간다.
-  const top = Math.min(area.y0 + DROP_H + PORTAL_GAP, (area.y0 + area.y1) / 2);
+  const top = Math.min(area.y0 + DROP_H, (area.y0 + area.y1) / 2);
   const y = top + rng() * Math.max(0, area.y1 - top);
   return {
     key: entry.worker.key,
@@ -129,7 +129,7 @@ function spawn(entry, { w, h, now, rng }) {
     portal: 0, // 포탈이 열린 정도 0..1 — 그리는 쪽이 이 값만 본다
     // 구멍이 뜨는 자리. **여기서 셈해 넘긴다** — 떨어지는 높이를 그리는 쪽에도 적어 두면
     // 한쪽만 고쳤을 때 게가 구멍이 아닌 허공에서 나온다
-    portalY: y - DROP_H - PORTAL_GAP,
+    portalY: y - DROP_H,
     vy: 0,
     until: 0,
     lap: 0, // 노트북을 편 정도 0..1

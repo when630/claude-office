@@ -106,8 +106,10 @@ test('등장은 화면 밖에서 걸어오는 것이 아니라 포탈에서 떨�
   // 좌우 화면 밖이 아니라 **설 자리 위**에서 시작한다
   assert.ok(first.x > 0 && first.x < W, `화면 밖에서 나타났다: ${first.x}`);
   assert.ok(first.y < first.gy, `떨어질 높이가 없다: ${first.y} → ${first.gy}`);
-  // 구멍은 게보다 위에 뜬다
-  assert.ok(first.portalY < first.y, `포탈이 게 아래에 있다: ${first.portalY}`);
+  // 구멍은 **게가 나오기 시작하는 평면**이다 — 그 위의 몸은 그리는 쪽이 잘라 내므로,
+  // 여기가 어긋나면 게가 구멍 밑에 떠 있는 그림이 된다
+  assert.equal(Math.round(first.portalY), Math.round(first.y));
+  assert.ok(first.portalY < first.gy, `구멍이 설 자리보다 아래다: ${first.portalY}`);
 
   // 포탈이 다 열릴 때까지는 떨어지지 않는다 — 구멍도 없는데 게가 먼저 나오면 안 된다
   const opening = find(run(world, cast, { frames: 6, t0: 10_016 }), 'a');

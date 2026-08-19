@@ -106,16 +106,24 @@ const PORTAL_H = 8;
 // 비슷해 뚫린 곳이 아니라 얹어 놓은 판으로 보였다(굽어서 확인했다).
 const PORTAL = { rim: '#8fd6b4', hole: '#0a0418' };
 
-function drawPortal(ctx, cx, cy, k, t) {
+// `part`는 타원의 어느 절반인가 — **게를 그 사이에 끼우려고 나눈다.**
+//
+// 통째로 그리면 게가 구멍을 지나가는 것이 아니라 **타원 뒤로 숨거나 앞을 스치는** 것이 된다.
+// 뒤쪽(위) 절반을 먼저, 게를 그 위에, 앞쪽(아래) 절반을 마지막에 얹으면 그제야 게가 구멍
+// **안에** 있는 것으로 읽힌다 — 캐릭터가 구멍을 통과하는 그림의 관례다.
+function drawPortal(ctx, cx, cy, k, t, part = 'all') {
   if (k <= 0) return;
   const w = Math.max(2, PORTAL_W * k);
   const h = Math.max(1, PORTAL_H * k);
   const rows = Math.max(1, Math.round(h));
+  const half = rows / 2;
   // 열리는 동안 테두리가 옅게 뛴다 — 가만히 있는 고리는 그려 둔 무늬로 보인다.
   // **맥동은 테두리에만 준다**: 속까지 반투명하게 칠했더니 테두리 색이 비쳐 구멍이
   // 청록으로 빛났다(어두운 배경에서 굽어 확인했다). 구멍은 늘 불투명한 검정이다.
   const pulse = Math.min(1, 0.65 + 0.35 * Math.abs(Math.sin(t / 140)));
   for (let i = 0; i < rows; i++) {
+    if (part === 'back' && i >= half) continue;
+    if (part === 'front' && i < half) continue;
     // 타원 한 줄의 반지름. 위아래로 갈수록 좁아진다.
     const ny = ((i + 0.5) / rows) * 2 - 1;
     const rw = (w / 2) * Math.sqrt(Math.max(0, 1 - ny * ny));
@@ -156,9 +164,10 @@ function drawPet(ctx, pet, t, opts) {
   const falling = pet.act === 'warp';
   const sinking = pet.act === 'sink';
 
-  // 나올 때 구멍은 **게보다 먼저** 그린다 — 게가 거기서 나오는 것이지 구멍이 게 위에 얹히는
-  // 것이 아니다. 들어갈 때는 반대다(아래 참고). 자리는 어느 쪽이든 제자리에 남는다.
-  if (pet.portal > 0 && !sinking) drawPortal(ctx, x, Math.round(pet.portalY), pet.portal, t);
+  // 구멍의 **뒤쪽 절반**이 먼저다. 게는 그 위에 그리고, 앞쪽 절반은 게 위에 얹는다(아래).
+  const portalY = Math.round(pet.portalY ?? 0);
+  const inPortal = pet.portal > 0 && (falling || sinking);
+  if (inPortal) drawPortal(ctx, x, portalY, pet.portal, t, 'back');
 
   // 그림자는 **설 자리에** 진다 — 떨어지는 동안에도 어디에 내려앉을지 미리 보인다.
   // 구멍으로 잠기는 동안에는 없다: 발밑이 구멍인데 그림자가 지면 바닥이 있는 것이 된다.
@@ -169,8 +178,7 @@ function drawPet(ctx, pet, t, opts) {
     ctx.globalAlpha = 1;
   }
 
-  // 포탈이 다 열리기 전에는 아직 나오지 않았다
-  if (falling && pet.portal < 1) return { x, top: y };
+
 
   // 마우스가 올라간 게의 발밑을 밝힌다. **들고 있는 동안은 안 그린다** — 이미 손에 있는데
   // 노란 띠까지 따라다니면 그게 놓을 자리 표시처럼 읽힌다.
@@ -182,28 +190,28 @@ function drawPet(ctx, pet, t, opts) {
 
   const dim = worker.mood === 'stopped';
   if (dim) ctx.globalAlpha = 0.45;
-  // 가라앉는 동안에는 **구멍 아래로 내려간 몸을 자른다** — 안 자르면 구멍 위를 지나쳐
-  // 그대로 흘러내리는 것이 되어, 들어가는 것이 아니라 떨어뜨린 것으로 보인다
-  if (sinking) {
+  // 구멍을 오가는 동안에는 **구멍 너머에 있는 몸을 자른다.** 자르지 않으면 통과하는 것이
+  // 아니라 구멍을 스쳐 지나가는 것이 된다. 자르는 쪽은 반대다 — 나올 때는 아직 구멍
+  // **위**에 있는 부분이 안 보이고, 들어갈 때는 이미 구멍 **아래**로 내려간 부분이 안 보인다.
+  if (inPortal) {
     ctx.save();
     ctx.beginPath();
-    ctx.rect(x - 16, pet.portalY - 60, 32, 60);
+    if (sinking) ctx.rect(x - 16, portalY - 60, 32, 60);
+    else ctx.rect(x - 16, portalY, 32, 80);
     ctx.clip();
   }
   drawSprite(ctx, body, x - body.w / 2, y - body.h);
-  if (sinking) ctx.restore();
+  if (inPortal) ctx.restore();
   if (dim) ctx.globalAlpha = 1;
 
   // 노트북은 몸보다 나중에 — 상판이 하반신을 덮어야 "뒤에 앉았다"가 된다
   const lap = laptopOf(pet.lap, t);
   if (lap) drawSprite(ctx, lap, x - lap.w / 2, y - lap.h + LAP_DY);
 
-  // 들어갈 때 구멍은 **게보다 나중에** — 테두리가 몸 위에 얹혀야 빠진 것으로 보인다.
-  // 그 뒤로는 아무것도 안 그린다: 기호도 이름표도 없이 조용히 잠긴다.
-  if (sinking) {
-    if (pet.portal > 0) drawPortal(ctx, x, Math.round(pet.portalY), pet.portal, t);
-    return { x, top: y - body.h };
-  }
+  // 구멍의 앞쪽 절반은 게 위에 얹는다 — 이 한 겹이 "구멍 안에 있다"를 만든다
+  if (inPortal) drawPortal(ctx, x, portalY, pet.portal, t, 'front');
+  // 잠기는 동안에는 그 뒤로 아무것도 안 그린다: 기호도 이름표도 없이 조용히 사라진다
+  if (sinking) return { x, top: y - body.h };
 
   let top = y - body.h;
   const glyphKey = glyphKeyFor(worker);

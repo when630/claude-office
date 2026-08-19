@@ -41,6 +41,7 @@ let hover = null; // 지금 커서 밑의 게 key
 let grab = null; // 잡고 있는 게 { key, dx, dy, at, moved }
 let drag = null; // stepStroll에 넘길 { key, x, y }
 let passThrough = true; // 지금 창이 클릭을 통과시키고 있는가
+let frozen = false; // 헤드리스로 굽을 때만 켠다 (__stroll.freeze)
 
 function logical() {
   return { w: canvas.clientWidth / scale, h: canvas.clientHeight / scale };
@@ -70,7 +71,9 @@ function tick(now) {
   const { w, h } = logical();
   if (!w || !h) return;
 
-  pets = stepStroll(world, strollCast(state.rooms, limit), { w, h, now: Date.now(), dt, drag, speed });
+  // 얼려 두면 그리기만 한다 — 헤드리스로 굽을 때 특정 순간(구멍을 반쯤 통과한 참 같은)을
+  // 잡으려면 시간이 멈춰 있어야 한다. 켜는 곳은 `__stroll.freeze` 하나뿐이다.
+  if (!frozen) pets = stepStroll(world, strollCast(state.rooms, limit), { w, h, now: Date.now(), dt, drag, speed });
 
   // **커서 밑을 매 프레임 다시 본다.** 마우스가 가만히 있어도 게가 걸어와 커서 밑으로
   // 들어올 수 있는데, 그때 mousemove는 오지 않는다.
@@ -177,4 +180,7 @@ window.__stroll = {
   push: (next) => applyState(next),
   pets: () => pets,
   tuning: () => ({ scale, speed, limit }),
+  freeze: (on) => {
+    frozen = on !== false;
+  },
 };

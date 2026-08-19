@@ -288,6 +288,11 @@ DevTools 콘솔에서 `__office.push(state)` / `__office.select(key)`로 임의 
 캡처를 방에 딱 맞게 자르려면 방이 화면 어디인지 알아야 하고, 캔버스라 DOM으로는 물어볼 수 없다.
 화면 좌표는 `방 좌표 * scale + pan`이다(캔버스는 보이는 창만큼이고 사무실이 그 안에서 움직인다).
 
+산책 창(`stroll.html`)은 입구가 따로다 — `__stroll.push(state)`·`__stroll.pets()`·
+`__stroll.tuning()`, 그리고 **`__stroll.freeze(true)`**. 마지막 것은 시간을 멈춰 그리기만
+남기는 스위치다: 구멍을 반쯤 통과한 참처럼 **0.2초짜리 순간**은 캡처가 그보다 느려서
+멈추지 않으면 잡히지 않는다(`pets()`가 돌려주는 것은 실제 객체라 자리를 직접 세워 둘 수 있다).
+
 README의 캡처(`docs/images/en`·`docs/images/ko`)도 그렇게 구운 것이다 — 가짜 preload로
 `window.office`를 세워 스냅샷을 밀어 넣고, 화면 밖에 **보이게** 띄운 창을 `capturePage`로 찍는다.
 숨긴 창은 컴포지터가 프레임을 제시하지 않아 애니메이션 순간이 잡히지 않는다.
