@@ -367,7 +367,7 @@ function drawCursor(ctx, at, ready) {
   const y = Math.round(at.y);
   drawSprite(ctx, SPR.cursor, x, y);
   // 고른 게가 있으면 화살표 옆에 점을 하나 찍어 "보낼 수 있다"를 알린다
-  if (ready) rect(ctx, x + 13, y + 3, 2, 2, MARK_MOVE);
+  if (ready) rect(ctx, x + 11, y + 2, 2, 2, MARK_MOVE);
 }
 
 // 누른 자리에 남는 표식. **밖에서 안으로 모여 콕 찍힌다** — 퍼지는 파문으로 그렸더니
