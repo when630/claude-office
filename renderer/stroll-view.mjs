@@ -46,8 +46,10 @@ function bodyOf(pet, t) {
   switch (pet.act) {
     case 'held':
       return Math.floor(t / 190) % 2 ? SPR.heldA : SPR.heldB;
+    case 'warp':
+      return SPR.heldA; // 떨어지는 동안 다리는 늘어져 있다 (집혔을 때와 같은 자세)
     case 'land':
-      return SPR.armsUp; // 내려놓인 직후 — 팔이 한 줄 올라간 채 잠깐 멈칫한다
+      return SPR.armsUp; // 딛고 선 직후 — 팔이 한 줄 올라간 채 잠깐 멈칫한다
     case 'work':
       return Math.floor(t / 150) % 2 ? SPR.sitUp : SPR.sit;
     case 'in':
@@ -91,6 +93,42 @@ function drawGlyphBubble(ctx, cx, bottom, glyph) {
   drawSprite(ctx, glyph, left + (w - glyph.w) / 2, top + (h - 1 - glyph.h) / 2);
 }
 
+// 게가 떨어져 나오는 포탈. **위에서 내려다본 납작한 구멍**이라 가로로 넓다 — 정면에서 본
+// 고리로 그리면 게가 그 앞을 지나가는 것인지 통과하는 것인지 알 수 없다.
+//
+// 색은 **상태 신호와 겹치지 않는 것**으로 골랐다. 이 화면에서 노랑은 대기, 빨강은 실패,
+// 초록은 완료, 파랑은 작업 중, 연보라는 서버 장애가 이미 쓰고 있다(sprites.mjs의 긴 주석).
+// 포탈은 상태가 아니라 연출이므로 그 체계 밖에 있어야 한다 — 민트 테두리에 짙은 남보라 구멍이다.
+const PORTAL_W = 24;
+const PORTAL_H = 8;
+// 속은 **거의 검정이어야 구멍이 된다.** 남보라로 두었더니 어두운 배경(#1b2230)과 명도가
+// 비슷해 뚫린 곳이 아니라 얹어 놓은 판으로 보였다(굽어서 확인했다).
+const PORTAL = { rim: '#8fd6b4', hole: '#0a0418' };
+
+function drawPortal(ctx, cx, cy, k, t) {
+  if (k <= 0) return;
+  const w = Math.max(2, PORTAL_W * k);
+  const h = Math.max(1, PORTAL_H * k);
+  const rows = Math.max(1, Math.round(h));
+  // 열리는 동안 테두리가 옅게 뛴다 — 가만히 있는 고리는 그려 둔 무늬로 보인다.
+  // **맥동은 테두리에만 준다**: 속까지 반투명하게 칠했더니 테두리 색이 비쳐 구멍이
+  // 청록으로 빛났다(어두운 배경에서 굽어 확인했다). 구멍은 늘 불투명한 검정이다.
+  const pulse = Math.min(1, 0.65 + 0.35 * Math.abs(Math.sin(t / 140)));
+  for (let i = 0; i < rows; i++) {
+    // 타원 한 줄의 반지름. 위아래로 갈수록 좁아진다.
+    const ny = ((i + 0.5) / rows) * 2 - 1;
+    const rw = (w / 2) * Math.sqrt(Math.max(0, 1 - ny * ny));
+    if (rw < 0.5) continue;
+    const y = Math.round(cy - h / 2 + i);
+    ctx.globalAlpha = pulse;
+    rect(ctx, cx - rw, y, rw * 2, 1, PORTAL.rim);
+    ctx.globalAlpha = 1;
+    // 속은 판다. **테두리를 2px 남긴다** — 1px만 남기면 이 크기에서 고리가 실선 한 줄로
+    // 보여 구멍이 아니라 그어 놓은 타원이 된다.
+    if (rw > 3 && i > 0 && i < rows - 1) rect(ctx, cx - rw + 2, y, rw * 2 - 4, 1, PORTAL.hole);
+  }
+}
+
 function drawDizzy(ctx, cx, top, t) {
   const a = ((t % DIZZY_CYCLE) / DIZZY_CYCLE) * Math.PI * 2;
   const angles = [];
@@ -114,16 +152,26 @@ function drawPet(ctx, pet, t, opts) {
   const x = Math.round(pet.x);
   const y = Math.round(pet.y);
   const lifted = pet.act === 'held';
+  const falling = pet.act === 'warp';
 
-  ctx.globalAlpha = lifted ? 0.14 : 0.3;
-  rect(ctx, x - 6, y - 1, 12, 2, COLORS.shadow);
+  // 포탈은 **게보다 먼저** 그린다 — 게가 구멍에서 나오는 것이지 구멍이 게 위에 얹히는 것이 아니다.
+  // 자리는 설 자리 위다: 떨어지는 동안 게가 아래로 내려가도 구멍은 제자리에 남는다.
+  if (pet.portal > 0) drawPortal(ctx, x, Math.round(pet.portalY), pet.portal, t);
+
+  // 그림자는 **설 자리에** 진다 — 떨어지는 동안에도 어디에 내려앉을지 미리 보인다
+  const shadowY = falling ? Math.round(pet.gy) : y;
+  ctx.globalAlpha = lifted ? 0.14 : falling ? 0.18 : 0.3;
+  rect(ctx, x - 6, shadowY - 1, 12, 2, COLORS.shadow);
   ctx.globalAlpha = 1;
+
+  // 포탈이 다 열리기 전에는 아직 나오지 않았다
+  if (falling && pet.portal < 1) return { x, top: y };
 
   // 마우스가 올라간 게의 발밑을 밝힌다. **들고 있는 동안은 안 그린다** — 이미 손에 있는데
   // 노란 띠까지 따라다니면 그게 놓을 자리 표시처럼 읽힌다.
   if (hover === worker.key && !lifted) {
     ctx.globalAlpha = 0.35;
-    rect(ctx, x - 9, y - 2, 18, 3, COLORS.sel);
+    rect(ctx, x - 9, shadowY - 2, 18, 3, COLORS.sel);
     ctx.globalAlpha = 1;
   }
 

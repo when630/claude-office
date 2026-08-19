@@ -30,13 +30,24 @@ const EDGE_BOTTOM = 7;
 // 노트북을 펴고 접는 데 걸리는 시간. 펴는 쪽이 느린 것은 "꺼내는 동작"이 보여야 하기 때문이다.
 const OPEN_MS = 520;
 const SHUT_MS = 300;
-// 내려놓은 뒤 잠깐 멈칫하는 시간 — 놓자마자 걸어가 버리면 놓아 준 자리가 안 보인다
+// 내려놓거나 떨어져 선 뒤 잠깐 멈칫하는 시간 — 놓자마자 걸어가 버리면 놓아 준 자리가 안 보인다
 const LAND_MS = 420;
+// 포탈에서 떨어지는 높이와 가속도(px/ms²). 45px이면 반 초쯤 떨어진다 —
+// 더 높이면 화면 위쪽에서 포탈이 잘리고, 더 낮으면 떨어진 것이 아니라 튀어나온 것이 된다.
+// 구멍은 **게 머리보다 위에** 뜬다. 발 높이에 맞춰 놓았더니 몸통 한가운데에 겹쳐, 양옆으로
+// 삐져나온 조각만 보였다(굽어서 확인했다) — 게 키(14px)에 틈을 더한 만큼 올린다.
+const DROP_H = 45;
+const PORTAL_GAP = 18;
+const GRAVITY = 0.0004;
+// 포탈이 열리고 · 게가 떨어지는 동안 열린 채 있다가 · 닫히는 시간
+const PORTAL_OPEN_MS = 220;
+const PORTAL_HOLD_MS = 520;
+const PORTAL_CLOSE_MS = 260;
 // 목적지에 닿았다고 볼 거리, 그리고 다음 목적지까지 쉬는 시간
 const NEAR = 1.2;
 const REST_MIN = 900;
 const REST_SPAN = 2600;
-// 화면 밖 여백 — 등장·퇴장은 이만큼 밖에서 시작하고 끝난다
+// 화면 밖 여백 — 퇴장은 이만큼 밖까지 걸어 나가고 사라진다(등장은 포탈이라 안 쓴다)
 const OFFSCREEN = 22;
 
 // 화면에 내보낼 게를 급한 순으로. **미니 창의 줄 세우기를 그대로 쓴다** — "무엇이 급한가"의
@@ -86,35 +97,50 @@ export function createWorld() {
   return { pets: new Map(), w: 0, h: 0 };
 }
 
-// 게 하나를 만든다.
+// 게 하나를 만든다 — **설 자리 위에 포탈이 열리고 거기서 떨어진다.**
 //
-// `inside`는 **모드를 켜는 순간 이미 있던 세션**이다. 이들은 걸어 들어오지 않고 제자리에서
-// 시작한다 — 산책으로 갈아타는 것은 "지금 사무실을 바탕화면에 내놓는" 일이라, 일하던
-// 세션이 노트북 대신 걸어다니고 있으면 그건 지금 상태가 아니다. 넓은 화면에서는 걸어
-// 들어오는 데만 10초가 넘게 걸려서, 그동안 화면이 거짓말을 한다.
-function spawn(entry, { w, h, now, rng, inside = false }) {
+// 처음엔 화면 좌우 밖에서 걸어 들어오게 했다. 두 가지가 어긋났다:
+//   - 넓은 화면에서는 걸어 들어오는 데만 10초가 넘게 걸린다. 산책으로 막 갈아탄 참이면
+//     그동안 **일하던 게가 노트북 대신 걸어다니는** 그림이 되어 화면이 거짓말을 한다
+//   - 산책은 좌우가 아니라 **화면 전체**를 쓰는데, 등장만 좌우 끝에서 시작하니 세로로
+//     자유롭게 다니는 나머지 연출과 결이 맞지 않았다
+//
+// 떨어지는 자리가 곧 설 자리다(`gy`). 그래서 어디로 떨어질지 그림자가 미리 알려 준다.
+function spawn(entry, { w, h, now, rng }) {
   const area = strollArea(w, h);
-  const fromLeft = rng() < 0.5;
-  // 서는 높이는 매번 다르다 — 늘 같은 줄이면 여럿이 겹친다
-  const y = area.y0 + rng() * (area.y1 - area.y0);
-  const x = inside ? area.x0 + rng() * (area.x1 - area.x0) : fromLeft ? -OFFSCREEN : w + OFFSCREEN;
+  const x = area.x0 + rng() * (area.x1 - area.x0);
+  // **내려앉는 자리는 화면 위쪽을 비운다** — 구멍이 그만큼 더 위에 떠야 하는데, 맨 위에
+  // 내려앉으면 그 구멍이 화면 밖으로 잘린다. 착지한 뒤에는 위로도 자유롭게 걸어간다.
+  const top = Math.min(area.y0 + DROP_H + PORTAL_GAP, (area.y0 + area.y1) / 2);
+  const y = top + rng() * Math.max(0, area.y1 - top);
   return {
     key: entry.worker.key,
     entry,
     x,
-    y,
-    // **들어온 쪽 가까이에 선다.** 반대편을 목표로 주면 넓은 화면에서는 걸어 들어오는 데만
-    // 수십 초가 걸려, 켜자마자 아무도 없는 바탕화면을 한참 보게 된다.
-    gx: inside ? x : Math.round(fromLeft ? w * (0.05 + rng() * 0.15) : w * (0.8 + rng() * 0.15)),
+    y: y - DROP_H, // 포탈 바로 아래에서 시작해 떨어진다
+    gx: x,
     gy: y,
-    dir: fromLeft ? 1 : -1,
-    act: inside ? 'walk' : 'in',
+    dir: rng() < 0.5 ? 1 : -1,
+    act: 'warp',
+    warpAt: now,
+    portal: 0, // 포탈이 열린 정도 0..1 — 그리는 쪽이 이 값만 본다
+    // 구멍이 뜨는 자리. **여기서 셈해 넘긴다** — 떨어지는 높이를 그리는 쪽에도 적어 두면
+    // 한쪽만 고쳤을 때 게가 구멍이 아닌 허공에서 나온다
+    portalY: y - DROP_H - PORTAL_GAP,
+    vy: 0,
     until: 0,
     lap: 0, // 노트북을 편 정도 0..1
     moving: false,
     born: now,
     seed: Math.floor(rng() * 1e6),
   };
+}
+
+// 포탈이 얼마나 열려 있나. 열리고(OPEN) → 게가 떨어지는 동안 열린 채로 있다가(HOLD) → 닫힌다.
+function portalOpen(age) {
+  if (age < PORTAL_OPEN_MS) return age / PORTAL_OPEN_MS;
+  if (age < PORTAL_OPEN_MS + PORTAL_HOLD_MS) return 1;
+  return Math.max(0, 1 - (age - PORTAL_OPEN_MS - PORTAL_HOLD_MS) / PORTAL_CLOSE_MS);
 }
 
 // 한 프레임. `drag`는 지금 손에 잡힌 게({ key, x, y })이고 없으면 null이다.
@@ -124,18 +150,22 @@ export function stepStroll(world, cast, { w, h, now, dt, drag = null, rng = Math
   const area = strollArea(w, h);
   const live = new Map(cast.map((e) => [e.worker.key, e]));
 
-  // 새로 온 게. **첫 프레임에 있던 것들은 이미 그 자리에 있던 것으로 친다**(inside) —
-  // 걸어 들어오는 연출은 산책 중에 새로 생긴 세션의 몫이다.
-  const first = !world.begun;
-  world.begun = true;
+  // 새로 온 게 — 모드를 막 켰든 산책 중에 세션이 생겼든 **같은 포탈로 떨어진다**
   for (const [key, entry] of live) {
-    if (!world.pets.has(key)) world.pets.set(key, spawn(entry, { w, h, now, rng, inside: first }));
+    if (!world.pets.has(key)) world.pets.set(key, spawn(entry, { w, h, now, rng }));
     else world.pets.get(key).entry = entry;
   }
 
   const step = Math.min(dt, 64); // 창이 가려졌다 돌아왔을 때 한 프레임에 순간이동하지 않게
 
   for (const pet of [...world.pets.values()]) {
+    // 포탈은 **어느 상태에 있든 제 시간표대로 닫힌다.** 떨어지는 동안만 갱신했더니 착지 뒤
+    // 멈칫하는 사이(land) 시간이 멈춰, 게가 다시 걸을 때까지 구멍이 열린 채로 남았다.
+    if (pet.warpAt != null) {
+      pet.portal = portalOpen(now - pet.warpAt);
+      if (pet.portal <= 0 && pet.act !== 'warp') pet.warpAt = null;
+    }
+
     const gone = !live.has(pet.key);
     // 목록에서 빠진 게는 화면 밖으로 걸어 나간다 — 그 자리에서 사라지면 눈이 그것을 놓친다
     if (gone && pet.act !== 'out' && pet.act !== 'held') {
@@ -173,24 +203,22 @@ export function stepStroll(world, cast, { w, h, now, dt, drag = null, rng = Math
       continue;
     }
 
-    // 걸어 들어오는 중에 일을 받으면 **거기서 멈춘다.** 화면 안에 발을 들였으면 그 자리가
-    // 곧 일할 자리다 — 등장을 끝까지 마치게 두면 노트북을 펴기까지 몇 초가 더 걸린다.
-    if (pet.act === 'in' && !gone && wantAct(pet.entry.worker) !== 'walk' && pet.x > area.x0 && pet.x < area.x1) {
-      pet.act = 'walk';
-      pet.gx = pet.x;
-      pet.gy = pet.y;
-      pet.until = 0;
-    }
-
-    if (pet.act === 'in' || pet.act === 'out') {
-      if (advance(pet, step, pet.act === 'out' ? 0 : NEAR, speed)) {
-        if (pet.act === 'out') world.pets.delete(pet.key);
-        else {
-          pet.act = 'walk';
-          pet.until = now + REST_MIN;
-          aim(pet, area, rng);
-        }
+    // 포탈에서 떨어지는 중. 포탈이 다 열릴 때까지는 아직 나오지 않는다.
+    if (pet.act === 'warp') {
+      pet.moving = false;
+      if (now - pet.warpAt < PORTAL_OPEN_MS) continue;
+      pet.vy += GRAVITY * step;
+      pet.y += pet.vy * step;
+      if (pet.y >= pet.gy) {
+        pet.y = pet.gy;
+        pet.vy = 0;
+        pet.act = 'land';
+        pet.until = now + LAND_MS;
       }
+      continue;
+    }
+    if (pet.act === 'out') {
+      if (advance(pet, step, 0, speed)) world.pets.delete(pet.key);
       continue;
     }
 

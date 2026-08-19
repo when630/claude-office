@@ -97,51 +97,57 @@ test('무엇을 하고 있어야 하는가 — 일을 받으면 앉고 나머지
   assert.equal(wantAct(worker('a', 'stopped')), 'halt');
 });
 
-test('모드를 켜는 순간 있던 세션은 걸어 들어오지 않는다', () => {
+test('등장은 화면 밖에서 걸어오는 것이 아니라 포탈에서 떨어지는 것이다', () => {
   const world = createWorld();
-  // 산책으로 갈아타는 것은 "지금 사무실을 내놓는" 일이다 — 일하던 게가 화면 밖에서
-  // 걸어 들어오는 동안 노트북을 안 펴고 있으면 그건 지금 상태가 아니다
-  const cast = strollCast(rooms(['proj', worker('a', 'typing'), worker('b', 'idle')]));
-  const pets = stepStroll(world, cast, { w: W, h: H, now: 10_000, dt: 16, rng: () => 0.4 });
-  for (const p of pets) {
-    assert.notEqual(p.act, 'in', `${p.key}가 밖에서 걸어 들어온다`);
-    assert.ok(p.x > 0 && p.x < W, `${p.key}가 화면 밖에 있다: ${p.x}`);
-  }
-  // 그리고 일하던 것은 곧장 노트북을 편다
-  const busy = find(run(world, cast, { frames: 60, t0: 10_100 }), 'a');
-  assert.equal(busy.act, 'work');
-  assert.ok(busy.lap > 0.9, `노트북이 안 펴졌다: ${busy.lap}`);
-});
-
-test('나중에 합류한 세션은 화면 밖에서 걸어 들어온다', () => {
-  const world = createWorld();
-  const none = [];
-  stepStroll(world, none, { w: W, h: H, now: 10_000, dt: 16 });
-
   const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
-  const first = find(stepStroll(world, cast, { w: W, h: H, now: 10_016, dt: 16, rng: () => 0.1 }), 'a');
-  assert.equal(first.act, 'in');
-  assert.ok(first.x < 0 || first.x > W, `화면 안에서 나타났다: ${first.x}`);
+  const first = find(stepStroll(world, cast, { w: W, h: H, now: 10_000, dt: 16, rng: () => 0.4 }), 'a');
 
-  const pet = find(run(world, cast, { frames: 700, t0: 10_100, rng: () => 0.1 }), 'a');
-  assert.ok(pet.x > 0 && pet.x < W, `화면 안으로 못 들어왔다: ${pet.x}`);
-  assert.notEqual(pet.act, 'in');
+  assert.equal(first.act, 'warp');
+  // 좌우 화면 밖이 아니라 **설 자리 위**에서 시작한다
+  assert.ok(first.x > 0 && first.x < W, `화면 밖에서 나타났다: ${first.x}`);
+  assert.ok(first.y < first.gy, `떨어질 높이가 없다: ${first.y} → ${first.gy}`);
+  // 구멍은 게보다 위에 뜬다
+  assert.ok(first.portalY < first.y, `포탈이 게 아래에 있다: ${first.portalY}`);
+
+  // 포탈이 다 열릴 때까지는 떨어지지 않는다 — 구멍도 없는데 게가 먼저 나오면 안 된다
+  const opening = find(run(world, cast, { frames: 6, t0: 10_016 }), 'a');
+  assert.equal(Math.round(opening.y), Math.round(first.y), '포탈이 열리기 전에 떨어졌다');
+  assert.ok(opening.portal > 0 && opening.portal < 1, `포탈이 안 열리는 중이다: ${opening.portal}`);
+
+  // 떨어져서 제자리에 선다. **여기서 프레임을 더 돌리면 안 된다** — 착지 뒤 멈칫이 끝나면
+  // 새 목적지로 걷기 시작해서, 그때의 y는 내려앉은 자리가 아니다.
+  const landed = find(run(world, cast, { frames: 45, t0: 10_200 }), 'a');
+  assert.equal(Math.round(landed.y), Math.round(landed.gy), `안 내려앉았다: ${landed.y}`);
+  assert.equal(landed.act, 'land', `아직 떨어지는 중이다: ${landed.act}`);
 });
 
-test('걸어 들어오는 중에 일을 받으면 그 자리에서 노트북을 편다', () => {
+test('포탈은 게가 선 뒤에 닫힌다', () => {
   const world = createWorld();
-  stepStroll(world, [], { w: W, h: H, now: 20_000, dt: 16 });
+  const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
+  stepStroll(world, cast, { w: W, h: H, now: 30_000, dt: 16, rng: () => 0.4 });
+
+  // 착지 직후(멈칫하는 동안)에도 구멍은 아직 남아 있다 — 서자마자 사라지면 튀어나온 것이
+  // 아니라 원래 거기 있던 것으로 보인다
+  const justLanded = find(run(world, cast, { frames: 45, t0: 30_016 }), 'a');
+  assert.equal(justLanded.act, 'land');
+  assert.ok(justLanded.portal > 0, '서자마자 구멍이 사라졌다');
+
+  // 시간이 더 지나면 닫힌다
+  const later = find(run(world, cast, { frames: 60, t0: 31_100 }), 'a');
+  assert.equal(later.portal, 0, `구멍이 안 닫힌다: ${later.portal}`);
+});
+
+test('떨어지는 중에 일을 받아도 착지한 자리에서 노트북을 편다', () => {
+  const world = createWorld();
   const idle = strollCast(rooms(['proj', worker('a', 'idle')]));
-  // 화면 안으로 발을 들일 만큼만 걷게 둔다
-  const walking = find(run(world, idle, { frames: 120, t0: 20_016, rng: () => 0.1 }), 'a');
-  assert.equal(walking.act, 'in');
-  assert.ok(walking.x > 0, `아직 화면 밖이다: ${walking.x}`);
-  const at = walking.x;
+  const born = find(stepStroll(world, idle, { w: W, h: H, now: 20_000, dt: 16, rng: () => 0.4 }), 'a');
+  const spot = born.gy;
 
   const busy = strollCast(rooms(['proj', worker('a', 'typing')]));
-  const pet = find(run(world, busy, { frames: 60, t0: 22_000 }), 'a');
-  assert.equal(pet.act, 'work', '등장을 끝까지 마치느라 일을 못 받았다');
-  assert.ok(Math.abs(pet.x - at) < 2, `일을 받고도 더 걸어갔다: ${at} → ${pet.x}`);
+  const pet = find(run(world, busy, { frames: 160, t0: 20_016 }), 'a');
+  assert.equal(pet.act, 'work');
+  assert.equal(Math.round(pet.y), Math.round(spot), `떨어지다 말고 공중에 앉았다: ${pet.y}`);
+  assert.ok(pet.lap > 0.9, `노트북이 안 펴졌다: ${pet.lap}`);
 });
 
 test('일이 들어오면 걷다 말고 그 자리에서 노트북을 편다', () => {
