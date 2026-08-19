@@ -68,11 +68,15 @@ const picks = new Map(); // 고른 직후 이펙트를 돌릴 게 — key → �
 let marks = []; // 누른 자리에 찍히는 표식 (논리 좌표)
 
 // 고른 게마다 이펙트를 켤 시각. **한꺼번에 켜면 화면이 한 번 번쩍이고 만다** —
-// 가운데에서 바깥으로 시차를 주면 하나씩 호명되는 것으로 읽힌다.
-function armPicks(list, mid, now) {
+// 시차를 주면 하나씩 호명되는 것으로 읽힌다.
+//
+// 기준점은 **상자를 누르기 시작한 자리**다. 그래서 끈 방향대로 켜진다 — 오른쪽 아래에서
+// 왼쪽 위로 끌었으면 오른쪽 아래 게부터 물린다. 가운데를 기준으로 삼아 봤더니 어느 쪽으로
+// 끌든 같은 순서로 켜져서, 방금 내가 그은 획과 화면이 따로 놀았다.
+function armPicks(list, from, now) {
   for (const pet of list) {
-    const away = Math.hypot(pet.x - mid.x, pet.y - mid.y);
-    picks.set(pet.key, now + Math.min(200, away * 1.6));
+    const away = Math.hypot(pet.x - from.x, pet.y - from.y);
+    picks.set(pet.key, now + Math.min(200, away * 1.4));
   }
 }
 
@@ -90,22 +94,6 @@ function drawnBox(b) {
 // 상자를 게가 사는 좌표계로. 창 좌표로 그려 놓고 논리 좌표로 재는 자리가 셋이다.
 function boxLogical(b) {
   return { x0: b.x0 / scale, y0: b.y0 / scale, x1: b.x1 / scale, y1: b.y1 / scale };
-}
-
-// 고른 게들을 감싸는 자리 — 그룹핑 표식이 여기로 조여든다
-function boundsOf(list) {
-  if (!list.length) return null;
-  let x0 = Infinity;
-  let y0 = Infinity;
-  let x1 = -Infinity;
-  let y1 = -Infinity;
-  for (const p of list) {
-    x0 = Math.min(x0, p.x - 9);
-    x1 = Math.max(x1, p.x + 9);
-    y0 = Math.min(y0, p.y - 15);
-    y1 = Math.max(y1, p.y + 2);
-  }
-  return { x0, y0, x1, y1 };
 }
 
 function logical() {
@@ -289,16 +277,9 @@ window.addEventListener('mouseup', () => {
       picked = petsInBox(pets, from);
       for (const p of picked) selected.add(p.key);
     }
-    // 상자가 고른 것들을 감싸며 조여든다. 아무것도 못 골랐으면 그 자리로 오므라들어 사라진다.
-    const mid = { x: (from.x0 + from.x1) / 2, y: (from.y0 + from.y1) / 2 };
-    mark({
-      group: true,
-      from,
-      to: boundsOf(picked) ?? { x0: mid.x - 1, y0: mid.y - 1, x1: mid.x + 1, y1: mid.y + 1 },
-    });
-    // 상자가 조여드는 동안 게마다 고리가 하나씩 앉는다 — 상자는 "여기까지 묶었다"를,
-    // 게의 고리는 "너와 너와 너다"를 말한다
-    if (picked.length) armPicks(picked, mid, performance.now());
+    // 그린 상자는 여기서 사라지고, 대신 **게마다 제 네모가 하나씩 물린다**(stroll-view의
+    // drawPickBox). 전체를 감싸는 네모는 "저 무리"까지만 말하고 누구누구인지는 말하지 않는다.
+    if (picked.length) armPicks(picked, { x: from.x0, y: from.y0 }, performance.now());
     box = null;
     inBox = NO_KEYS;
     return;
