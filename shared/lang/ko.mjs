@@ -29,6 +29,7 @@ export default {
   // ── 상단바
   topbar: {
     mini: '작게 띄우기',
+    stroll: '바탕화면으로 내보내기',
     filter: '방 이름',
     hidden: '{n}개 숨김',
     hiddenTitle: '거르기와 접기를 모두 푼다',
@@ -77,6 +78,18 @@ export default {
     acceptEdits: '편집 자동승인',
     bypassPermissions: '권한 우회',
     auto: '자동',
+  },
+
+  strollSize: {
+    x2: '보통',
+    x3: '크게',
+    x4: '아주 크게',
+  },
+
+  strollSpeed: {
+    slow: '느긋하게',
+    normal: '보통',
+    fast: '부지런히',
   },
 
   names: {
@@ -209,6 +222,7 @@ export default {
     hotkeyToggle: '창 열고 닫기',
     hotkeyJump: '가장 오래 기다린 세션 열기',
     hotkeyMini: '작게 띄우기 켜고 끄기',
+    hotkeyStroll: '바탕화면 산책 켜고 끄기',
     hotkeyNone: '없음',
     hotkeyPress: '조합을 누르세요…',
     hotkeyTaken: '다른 앱이 쓰고 있습니다',
@@ -225,6 +239,13 @@ export default {
     names: '이름표',
     namesHint:
       '가리면 <code>클로드 1, 2…</code>로 부릅니다. 화면을 남에게 보일 때 쓰세요 — 작업 디렉터리 경로는 패널에 그대로 남습니다.',
+    strollSection: '바탕화면 산책',
+    strollHint:
+      '창을 접고 게만 바탕화면에 내보내는 모습입니다. 여기서 정한 값은 <b>다음에 산책으로 갈아탈 때</b> 적용됩니다 — 세 모습은 배타적이라 산책 중에는 이 창이 떠 있지 않습니다.',
+    strollMax: '한 번에 내보낼 인원',
+    strollMaxValue: '{n}마리',
+    strollScale: '게 크기',
+    strollSpeed: '걷는 속도',
     roomTheme: '방 종류',
     roomNotify: '알림 세기',
     roomPin: '맨 앞에 고정',
@@ -310,6 +331,7 @@ export default {
     update: '업데이트 설치하고 재시작 (v{v})',
     open: '사무실 열기',
     mini: '작게 띄우기 (항상 위)',
+    stroll: '바탕화면으로 내보내기 (산책)',
     waitingList: '기다리는 세션',
     waitingNone: '기다리는 세션이 없습니다',
     notify: '알림',

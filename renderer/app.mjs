@@ -31,6 +31,13 @@ import {
 } from '../shared/i18n.mjs';
 import { accelLabel, modHint } from '../shared/accel.mjs';
 import { showsBroken } from '../shared/status.mjs';
+import {
+  STROLL_MAXES,
+  STROLL_SCALES,
+  STROLL_SPEEDS,
+  STROLL_DEFAULTS,
+  pickStroll,
+} from '../shared/stroll-choices.mjs';
 
 const canvas = document.getElementById('office');
 const ctx = canvas.getContext('2d');
@@ -730,7 +737,7 @@ canvas.addEventListener('click', (e) => {
   const seat = seatAt(e.clientX, e.clientY);
   // 미니에는 패널이 없다 — 자리를 누르면 큰 창으로 올라가며 그 자리가 펼쳐진다
   if (MINI) {
-    if (seat) window.office?.miniSelect?.(seat.worker.key);
+    if (seat) window.office?.selectSession?.(seat.worker.key);
     return;
   }
   selectKey(seat?.worker.key ?? null);
@@ -1583,6 +1590,7 @@ function roomSig() {
 }
 
 // main도 같은 값을 걸러내지만(sanitizeView), 렌더러는 IPC 없이도 돌아야 하므로 여기서도 본다.
+
 function normalizeView(v) {
   const list = (x) => (Array.isArray(x) ? x.filter((k) => typeof k === 'string' && k) : []);
   // 방을 앉힌 칸 — `{ 방 이름: [열, 행] }`. 모양이 깨진 항목만 버리고 나머지는 살린다
@@ -1608,6 +1616,11 @@ function normalizeView(v) {
     // 양쪽 열이 열려 있는지. 기본이 열림이라 옛 설정에도 값이 없어도 된다.
     railOpen: v?.railOpen !== false,
     panelOpen: v?.panelOpen !== false,
+    // 산책 모드의 셋. 이 창은 산책을 그리지 않지만 **설정 창이 여기 있다** — 값을 들고
+    // 있어야 select가 지금 값에 맞춰 서고, 실제로 쓰는 것은 산책 창이다(stroll-app.mjs).
+    strollMax: pickStroll(v?.strollMax, STROLL_MAXES, STROLL_DEFAULTS.strollMax),
+    strollScale: pickStroll(v?.strollScale, STROLL_SCALES, STROLL_DEFAULTS.strollScale),
+    strollSpeed: pickStroll(v?.strollSpeed, STROLL_SPEEDS, STROLL_DEFAULTS.strollSpeed),
   };
 }
 
@@ -1626,7 +1639,12 @@ let capturing = null; // 지금 조합을 받고 있는 자리 (toggle | jump)
 
 // 자리 목록은 main이 들고 있다(`hotkeys`의 키) — 여기서는 라벨만 붙인다.
 // 목록을 양쪽에 두면 하나를 늘릴 때마다 두 군데를 고쳐야 한다.
-const HOTKEY_LABEL = { toggle: 'cfg.hotkeyToggle', jump: 'cfg.hotkeyJump', mini: 'cfg.hotkeyMini' };
+const HOTKEY_LABEL = {
+  toggle: 'cfg.hotkeyToggle',
+  jump: 'cfg.hotkeyJump',
+  mini: 'cfg.hotkeyMini',
+  stroll: 'cfg.hotkeyStroll',
+};
 
 // 눌린 키를 Electron Accelerator로. 수식키만 눌린 동안에는 아직 조합이 아니다.
 function accelOf(e) {
@@ -1805,6 +1823,35 @@ function generalPane() {
         )}</select>
       </div>
     </section>
+
+    <section class="block">
+      <h3>${t('cfg.strollSection')}${hintBtn('cfg.strollHint')}</h3>
+      <div class="cfg-row">
+        <label for="cfg-stroll-max"><b>${t('cfg.strollMax')}</b></label>
+        <select id="cfg-stroll-max">${options(
+          STROLL_MAXES.map((n) => [n, t('cfg.strollMaxValue', { n })]),
+          cfg.strollMax,
+        )}</select>
+      </div>
+      <div class="cfg-row">
+        <label for="cfg-stroll-scale"><b>${t('cfg.strollScale')}</b></label>
+        <select id="cfg-stroll-scale">${options(
+          STROLL_SCALES.map((n) => [n, t(`strollSize.x${n}`)]),
+          cfg.strollScale,
+        )}</select>
+      </div>
+      <div class="cfg-row">
+        <label for="cfg-stroll-speed"><b>${t('cfg.strollSpeed')}</b></label>
+        <select id="cfg-stroll-speed">${options(
+          [
+            [0.6, t('strollSpeed.slow')],
+            [1, t('strollSpeed.normal')],
+            [1.6, t('strollSpeed.fast')],
+          ],
+          cfg.strollSpeed,
+        )}</select>
+      </div>
+    </section>
   `;
 }
 
@@ -1969,6 +2016,13 @@ cfgBody.addEventListener('change', (e) => {
   }
   if (el.id === 'cfg-names') {
     saveView({ names: el.value });
+    return;
+  }
+  // 산책 셋. 이 창은 산책을 그리지 않으므로 화면에 곧장 반영될 것은 없다 —
+  // 모드가 배타적이라 다음에 산책으로 갈아탈 때 새 창이 저장된 값을 읽어 간다.
+  const stroll = { 'cfg-stroll-max': 'strollMax', 'cfg-stroll-scale': 'strollScale', 'cfg-stroll-speed': 'strollSpeed' };
+  if (stroll[el.id]) {
+    saveView({ [stroll[el.id]]: Number(el.value) });
     return;
   }
   if (el.dataset?.notify) {
@@ -2353,8 +2407,9 @@ shownBtn.addEventListener('click', () => {
 });
 
 // ── 미니 모드 여닫기. 창을 갈아 끼우는 일이라 main이 한다(별도 창이다).
-document.getElementById('mini-open').addEventListener('click', () => window.office?.setMini?.(true));
-document.getElementById('mini-grow').addEventListener('click', () => window.office?.setMini?.(false));
+document.getElementById('mini-open').addEventListener('click', () => window.office?.setMode?.('mini'));
+document.getElementById('stroll-open')?.addEventListener('click', () => window.office?.setMode?.('stroll'));
+document.getElementById('mini-grow').addEventListener('click', () => window.office?.setMode?.('normal'));
 
 // 캡션은 눌린 버튼 자리에 고정돼 있으므로, 그 자리가 움직이면 닫는다 —
 // 판이 스크롤될 때, 창 크기가 바뀔 때. (탭을 옮길 때는 setPanelTab이 닫는다.)
@@ -2438,6 +2493,12 @@ const ICONS = {
   foldOn: '<rect x="1.5" y="4.5" width="9" height="3" rx="1" fill="currentColor" stroke="none"/>',
   // 부모로 묶기
   group: '<rect x="1.5" y="1.5" width="9" height="9" rx="1"/><path d="M6 3.6v4.8M3.6 6h4.8"/>',
+  // 바탕화면 산책 — **창에서 밖으로 나간다.**
+  //
+  // 처음엔 바닥선 위에 선 게를 그렸다. 12px에서 몸통·팔·다리·바닥이 전부 붙어 게가 아니라
+  // 버섯이 됐다(굽어서 확인했다) — 이 크기에 담을 수 있는 획은 그만큼 적다.
+  // 그래서 무엇으로 보이는지가 아니라 **무슨 일이 일어나는지**를 그린다.
+  stroll: '<rect x="1.5" y="3.5" width="5.5" height="6" rx="1"/><path d="M6 6.5h4.5M8.5 4.5l2 2-2 2"/>',
   // 나를 기다린다
   bang: '<circle cx="6" cy="6" r="4.5"/><path d="M6 3.7v2.9"/><circle cx="6" cy="8.6" r="0.7" fill="currentColor" stroke="none"/>',
 };

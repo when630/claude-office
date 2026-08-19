@@ -32,6 +32,7 @@ export default {
   // ── Top bar
   topbar: {
     mini: 'Shrink to a corner',
+    stroll: 'Out onto the desktop',
     filter: 'Room name',
     hidden: '{n} hidden',
     hiddenTitle: 'Clear the filter and unfold every room',
@@ -79,6 +80,18 @@ export default {
     acceptEdits: 'Auto-accept edits',
     bypassPermissions: 'Bypass permissions',
     auto: 'Auto',
+  },
+
+  strollSize: {
+    x2: 'Normal',
+    x3: 'Large',
+    x4: 'Extra large',
+  },
+
+  strollSpeed: {
+    slow: 'Ambling',
+    normal: 'Normal',
+    fast: 'Brisk',
   },
 
   names: {
@@ -207,6 +220,7 @@ export default {
     hotkeyToggle: 'Show or hide the window',
     hotkeyJump: 'Open the longest wait',
     hotkeyMini: 'Toggle the mini window',
+    hotkeyStroll: 'Toggle the desktop stroll',
     hotkeyNone: 'None',
     hotkeyPress: 'Press a combination…',
     hotkeyTaken: 'Another app has it',
@@ -223,6 +237,13 @@ export default {
     names: 'Name tags',
     namesHint:
       'Masking calls them <code>Clawd 1, 2…</code>. Use it when showing your screen to someone — the working directory path still shows in the panel.',
+    strollSection: 'Desktop stroll',
+    strollHint:
+      'The mode that puts the window away and leaves only the crabs on your desktop. What you pick here applies <b>the next time you switch to the stroll</b> — the three modes are exclusive, so this window is not up while they are out there.',
+    strollMax: 'How many go out',
+    strollMaxValue: '{n} crabs',
+    strollScale: 'Crab size',
+    strollSpeed: 'Walking speed',
     roomTheme: 'Room type',
     roomNotify: 'Alert level',
     roomPin: 'Pin to the front',
@@ -308,6 +329,7 @@ export default {
     update: 'Install update and restart (v{v})',
     open: 'Open the office',
     mini: 'Mini window (always on top)',
+    stroll: 'Out onto the desktop (stroll)',
     waitingList: 'Waiting on you',
     waitingNone: 'Nothing waiting on you',
     notify: 'Notifications',

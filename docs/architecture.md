@@ -49,6 +49,16 @@ renderer/           픽셀 렌더러 (app · render · sprites · themes · talk
                     유무는 창을 만들 때 정해지고 나중에 못 바꾸기 때문이다.
                     캔버스는 큰 창과 **다른 함수**를 탄다(`layoutMini`·`renderMini`) —
                     방을 안 그리고 게만 두 줄로 모아 세운다
+renderer/stroll.html      산책 창의 뼈대 — 캔버스 하나뿐이라 style.css를 안 끌고 온다
+renderer/stroll-app.mjs   산책 창의 껍데기 — 스냅샷·프레임·마우스(집어 들기·클릭 통과 판정).
+                          큰 창의 app.mjs를 안 태운다 — 쓸 것이 없는 2천 줄이 창마다 한 벌 돈다
+renderer/stroll.mjs       산책의 **움직임** — 걷기·앉기·집어 옮기기·포탈로 나오고 들어가기.
+                          화면 전체를 2차원으로
+                          다니고 바닥이 없다(세로는 앞뒤로 읽혀 가로보다 느리다).
+                          캔버스를 모르고 `now`·`dt`를
+                          받으므로 node로 돈다(test/stroll.test.mjs). 큰 창은 자리를 시각에서
+                          유도했지만(walkPos) 여기서는 사람이 게를 옮기므로 상태가 남아야 한다
+renderer/stroll-view.mjs  산책 **그리기** — 배경이 없어 스프라이트·말풍선·이름표뿐이다
 renderer/fonts/     번들 폰트 둘 — 사무실 픽셀 폰트(Mona S 12px)와 껍데기 본문
                     (Pretendard Variable). 둘 다 OFL 1.1. **선언만 두고 설치를 기대하지
                     않는다** — 그 전에는 설치한 사람만 Pretendard를 봤다 (renderer/fonts/README.md)
@@ -57,6 +67,9 @@ shared/i18n.mjs     화면에 나가는 문구 — t()·언어 정하기, 기간
 shared/lang/*.mjs   언어별 사전 (순수 데이터 — UI 문구 · 방 이름 · 캐릭터 대사)
 shared/accel.mjs    단축키를 보여주는 꼴 — 맥은 키캡 기호(⌥⌘O), 윈도는 글자(Ctrl+Alt+O).
                     설정 창과 등록 실패 알림이 같은 표기를 써야 해서 shared에 있다
+shared/stroll-choices.mjs  산책 모드에서 고를 수 있는 값(인원·크기·속도). 설정 창·저장하는 문·
+                    산책 창 **셋이 같은 목록을 봐야 해서** shared에 있다 — 한쪽만 늘리면 고른
+                    값이 조용히 되돌아온다
 shared/status.mjs   세션 하나를 **무엇이라고 부를지**. mood 위에 얹히는 표시(서버 장애)가
                     생기면서 "그래서 어느 칸에 세는가"의 답이 한 곳에 있어야 했다 —
                     상단바·세션 목록·트레이·패널·캔버스가 전부 이것을 본다
@@ -70,6 +83,22 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
 
 ## 손댈 만한 곳
 
+- **산책 모드는 "없는 척하는 창"이다**(`main/index.mjs`의 `createStroll`). 작업 영역을 통째로
+  덮으므로 잘못 만들면 **화면 전체가 클릭을 먹는다** — 그래서 기본은
+  `setIgnoreMouseEvents(true, { forward: true })`이고, 커서가 게 위에 왔을 때만 렌더러가
+  알려 와서 잠깐 끈다(`office:stroll-pass`). forward를 켜야 통과 중에도 mousemove가 와서
+  "게 위에 왔다"를 알 수 있다(Electron에서 통과 중 전달되는 것은 mousemove뿐이다).
+  **`backgroundThrottling: false`가 빠지면 게가 얼어붙는다** — 아무것도 안 그린 투명 창은
+  Chromium의 occlusion 판정에 걸려 `visibilityState: hidden`이 되고 rAF가 멈춘다(실제 앱을
+  띄워 확인했다. 창은 떠 있는데 게만 멈춘 그림이 된다). 투명 창은 크기를 못 바꾸므로
+  `resizable: false`이고 자리는 `fitStroll`이 작업 영역에 맞춰 다시 잡는다.
+  Windows만 `focusable: false`다 — 게를 끌어도 작업 중인 창의 초점을 뺏지 않아야 하는데,
+  맥에서는 초점을 못 받는 창이 마우스 눌림을 받는 보장이 없어 집어 드는 것 자체를 잃는다
+- **모습은 셋 중 하나다**(`settings.mode` — `normal` · `mini` · `stroll`). 배타라는 약속은
+  `setMode` 한 곳에만 있다. 옛 설정의 `mini: true`는 `sanitizeMode`가 읽어 준다 —
+  트레이 상주 앱이라 남의 설정을 잃는 것이 곧 회귀다
+- **산책에 누구를 내보낼지는 미니와 같은 판단을 쓴다**(`strollCast` → `miniRoster`). 급한 순으로
+  `view.strollMax`(기본 6)마리까지다. 여기서 순서를 따로 매기면 같은 앱이 창마다 다른 말을 한다
 - `renderer/style.css` — **껍데기의 값은 다 `:root`에 있다.** 리터럴 hex는 그 정의부 밖에
   하나도 없어야 한다(모서리·글자 크기도 단으로 접혀 있고, 예외는 모양이 값을 정하는 곳뿐 —
   주석에 이유가 적혀 있다). 버튼 생김새는 셋(`.btn`·`.btn-go`·`.btn-toggle`)이고 그 위에
@@ -258,6 +287,11 @@ DevTools 콘솔에서 `__office.push(state)` / `__office.select(key)`로 임의 
 `__office.layout`은 지금 그려진 방 사각형(논리 좌표)·배율·놓인 자리(`pan`)를 돌려준다 —
 캡처를 방에 딱 맞게 자르려면 방이 화면 어디인지 알아야 하고, 캔버스라 DOM으로는 물어볼 수 없다.
 화면 좌표는 `방 좌표 * scale + pan`이다(캔버스는 보이는 창만큼이고 사무실이 그 안에서 움직인다).
+
+산책 창(`stroll.html`)은 입구가 따로다 — `__stroll.push(state)`·`__stroll.pets()`·
+`__stroll.tuning()`, 그리고 **`__stroll.freeze(true)`**. 마지막 것은 시간을 멈춰 그리기만
+남기는 스위치다: 구멍을 반쯤 통과한 참처럼 **0.2초짜리 순간**은 캡처가 그보다 느려서
+멈추지 않으면 잡히지 않는다(`pets()`가 돌려주는 것은 실제 객체라 자리를 직접 세워 둘 수 있다).
 
 README의 캡처(`docs/images/en`·`docs/images/ko`)도 그렇게 구운 것이다 — 가짜 preload로
 `window.office`를 세워 스냅샷을 밀어 넣고, 화면 밖에 **보이게** 띄운 창을 `capturePage`로 찍는다.

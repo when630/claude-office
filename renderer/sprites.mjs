@@ -45,6 +45,11 @@ export const SPR = {
   aideUp: sprite(PX.CLAWD_AIDE_UP),
   tiltL: sprite(PX.CLAWD_TILT_L),
   tiltR: sprite(PX.CLAWD_TILT_R),
+  // 산책 모드에서만 서는 자세 — 바닥에 앉기(노트북)와 집어 들렸을 때
+  sit: sprite(PX.CLAWD_SIT),
+  sitUp: sprite(PX.CLAWD_SIT_UP),
+  heldA: sprite(PX.CLAWD_HELD_A),
+  heldB: sprite(PX.CLAWD_HELD_B),
 
   // 바닥 소품
   plant: sprite(PX.PLANT),
@@ -90,6 +95,11 @@ export const SPR = {
   // 방 종류별 작업 도구
   flask: sprite(PX.FLASK),
   laptop: sprite(PX.LAPTOP),
+  // 바닥에서 펴는 노트북(산책 모드) — 접힘 → 반쯤 → 열림, 그리고 코드가 흐르는 프레임
+  laptopShut: sprite(PX.LAPTOP_SHUT),
+  laptopHalf: sprite(PX.LAPTOP_HALF),
+  laptopOpen: sprite(PX.LAPTOP_OPEN),
+  laptopCode: sprite(PX.LAPTOP_OPEN_CODE),
   book: sprite(PX.BOOK),
   pencup: sprite(PX.PENCUP),
   docs: sprite(PX.DOCS),

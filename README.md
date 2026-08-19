@@ -238,6 +238,36 @@ that stays **always on top**. No rooms here — just the crabs, **gathered in on
 
 <br clear="right" />
 
+### Or send them out onto the desktop
+
+The other button (or the tray menu) does away with the window altogether. The office becomes a
+transparent sheet over your desktop and **only the crabs are left**, wandering wherever they like
+across it.
+
+- Crabs arrive through a **portal**: it opens over the spot they are about to take and they drop
+  out of it. Switching to the stroll brings everyone out at once, right where they are — a session
+  that is working is already at its laptop, not walking in from off-screen
+- They leave the same way. When a session is gone a portal opens **under its feet** and the crab
+  sinks into it, right where it stood
+- Give a session work and its crab stops where it stands, **pulls out a laptop and gets to work**.
+  When the work ends it folds the laptop away and carries on walking
+- Whoever is waiting on you stands still with both claws up and a `❗` — same as everywhere else.
+  Stuck, cut off, failed and stopped all keep the faces they have in the office
+- **Pick one up and drop it wherever you like.** It dangles from your cursor with its legs hanging,
+  and stays exactly where you put it — there is no floor to fall back to
+- **Hover** for the room and session name; **click** and the full window comes back with that
+  session selected
+- Anywhere that is not a crab **clicks straight through** to whatever is underneath — the sheet is
+  not there as far as your mouse is concerned
+- Crowded machines stay readable: **six crabs** go out at a time by default, most urgent first
+  (waiting, stuck, cut off, failed, then the rest)
+- **Settings > General > Desktop stroll** sets how many go out, how big they are, and how fast
+  they walk. The three modes are exclusive, so what you pick applies the next time you switch to
+  the stroll
+
+The three modes are exclusive — the window, the corner, and the desktop. Switch between them from
+the top bar, the tray menu, or the shortcuts.
+
 ### Moving the office around
 
 | | |
@@ -290,6 +320,7 @@ restarts.
 | Show and hide the window | `Ctrl+Alt+O` | `⌥⌘O` |
 | Open the terminal of the longest wait | `Ctrl+Alt+W` | `⌥⌘W` |
 | Toggle the mini window | `Ctrl+Alt+M` | `⌥⌘M` |
+| Toggle the desktop stroll | `Ctrl+Alt+S` | `⌥⌘S` |
 
 Rebind them in Settings. A combination another app already holds is **marked in red** there,
 rather than leaving you with a shortcut that quietly does nothing.
@@ -312,7 +343,10 @@ rather than leaving you with a shortcut that quietly does nothing.
   Korean only
 - When the window is covered or on another virtual desktop the animation stops and picks up where
   it left off once the window is visible again — that is the browser engine saving your battery,
-  not a hang
+  not a hang. **The desktop stroll is the exception and keeps running** — a mascot that freezes
+  the moment something covers it is no use at the corner of your eye
+- The stroll only covers the **work area of your primary display**. With several monitors the crabs
+  stay on the main one, and they do not climb over fullscreen apps
 - Builds are not code signed — on Windows that means the SmartScreen warning, and on macOS one
   `xattr -cr` before first launch plus manual updates
 - The `~/.claude` layout is Claude Code's internal arrangement and can change between versions
