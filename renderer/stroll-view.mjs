@@ -187,7 +187,8 @@ function drawPet(ctx, pet, t, opts) {
   const falling = pet.act === 'warp';
   const sinking = pet.act === 'sink';
   // 폴짝 뛴 높이. 몸만 이만큼 뜨고 그림자는 바닥에 남는다.
-  const hop = (pet.hop ?? 0) * HOP_H;
+  // 고른 직후의 들썩(perkOf)도 같은 값에 얹는다 — 그래야 그림자도 같이 줄어 "떴다"가 된다.
+  const hop = (pet.hop ?? 0) * HOP_H + (opts.perks?.get(pet.key) ?? 0);
 
   // 구멍의 **뒤쪽 절반**이 먼저다. 게는 그 위에 그리고, 앞쪽 절반은 게 위에 얹는다(아래).
   const portalY = Math.round(pet.portalY ?? 0);
@@ -211,7 +212,9 @@ function drawPet(ctx, pet, t, opts) {
 
   // 마우스가 올라간 게의 발밑을 밝힌다. **들고 있는 동안은 안 그린다** — 이미 손에 있는데
   // 노란 띠까지 따라다니면 그게 놓을 자리 표시처럼 읽힌다.
-  if (hover === worker.key && !lifted) {
+  // **지휘 중에도 안 그린다**: 그때 발밑은 고른 표시가 쓰는 자리라 노란 띠가 흰 고리를 덮고,
+  // 무엇보다 지휘 중에는 가리키는 것만으로는 아무 일도 안 일어나 알릴 것이 없다.
+  if (hover === worker.key && !lifted && !opts.command) {
     ctx.globalAlpha = 0.35;
     rect(ctx, x - 9, shadowY - 2, 18, 3, COLORS.sel);
     ctx.globalAlpha = 1;
@@ -346,17 +349,62 @@ const PICK = '#f4f6fb';
 // 상태 팔레트(노랑=대기·초록=완료·빨강=실패·파랑=작업)와 겹치지 않는 민트를 쓴다.
 const MARK_MOVE = '#8fd6b4';
 const MARK_MS = 620;
+// 흰 고리 하나만 두면 밝은 벽지에서 사라진다 — 한 픽셀 아래에 어두운 고리를 깔아 테두리를 만든다.
+// 남의 배경화면 위에 놓이는 그림이라 이 한 겹이 "어디서나 읽힌다"의 전부다.
+const PICK_EDGE = '#0d1016';
+const PICK_R = 9;
+// 후보 고리는 한 뼘 작다 — 몸이 뒤쪽 호를 가리는 탓에 크기까지 같으면 닫힌 고리와 구분이 안 된다.
+// 큰 고리가 몸 밖으로 나와야 "둘렀다"가 보이고, 작은 반달은 발밑에 붙어 "얹혔다"로 읽힌다.
+const IN_BOX_R = 7;
+// 발밑에 눕는 만큼 — 보내기 표식(0.62)보다 더 눌렀다. 게 발치에 딱 붙어야 신발처럼 읽힌다.
+const PICK_SQUASH = 0.42;
+// 고른 직후 게마다 한 번 도는 이펙트의 길이
+const PICK_FX_MS = 380;
 
-function drawPicked(ctx, pet) {
+// 고른 게의 발밑 고리. **바닥에 놓인 타원이다** — 예전에는 네 귀퉁이 괄호였는데,
+// 같은 모양을 그룹핑 표식(drawGroupMark)도 쓰고 있어서 조여든 상자가 그대로 멈춰 선 것처럼
+// 보였다. 발밑 원은 RTS의 관례이기도 하고, 이 화면이 이미 쓰는 눌린 원(포탈·보내기)과 결이 맞는다.
+function drawPicked(ctx, pet, t) {
   const x = Math.round(pet.x);
   const y = Math.round(pet.y);
-  ctx.globalAlpha = 0.85;
-  // 발밑을 감싸는 낮은 괄호 — 몸을 두르면 게가 상자에 갇힌 것으로 보인다
-  rect(ctx, x - 9, y, 3, 1, PICK);
-  rect(ctx, x + 6, y, 3, 1, PICK);
-  rect(ctx, x - 9, y - 2, 1, 3, PICK);
-  rect(ctx, x + 8, y - 2, 1, 3, PICK);
+  // 아주 느리게 숨 쉰다 — 멈춘 고리는 발밑에 그려 둔 무늬로 보인다
+  const breath = 0.5 + 0.5 * Math.sin(t / 520);
+  const r = PICK_R + breath * 0.7;
+  ctx.globalAlpha = 0.5;
+  ring(ctx, x, y + 1, r, PICK_EDGE, PICK_SQUASH);
+  ctx.globalAlpha = 0.7 + breath * 0.3;
+  ring(ctx, x, y, r, PICK, PICK_SQUASH);
   ctx.globalAlpha = 1;
+}
+
+// 상자가 지나가는 중에 그 안에 든 게. **아직 고른 것이 아니라 고리가 안 닫혔다** —
+// 발밑에 앞쪽 반달만 걸친다. 다 닫아 두면 놓기 전에 이미 골라진 것으로 보여, 상자를 넓혔다
+// 좁히며 조준하는 동안 무엇이 바뀌는지가 안 보인다.
+function drawInBox(ctx, pet) {
+  const x = Math.round(pet.x);
+  const y = Math.round(pet.y);
+  ctx.globalAlpha = 0.4;
+  ring(ctx, x, y + 1, IN_BOX_R, PICK_EDGE, PICK_SQUASH, true);
+  ctx.globalAlpha = 0.75;
+  ring(ctx, x, y, IN_BOX_R, PICK, PICK_SQUASH, true);
+  ctx.globalAlpha = 1;
+}
+
+// 놓는 순간 게마다 한 번 도는 이펙트 — **고리가 밖에서 조여들어 발밑에 앉는다.**
+// 여럿을 시차를 두고 켜면(stroll-app의 stagger) 하나씩 호명되는 것으로 읽힌다.
+function drawPickFx(ctx, pet, k) {
+  const x = Math.round(pet.x);
+  const y = Math.round(pet.y);
+  const e = 1 - (1 - k) * (1 - k) * (1 - k); // 끝에서 부드럽게 멎는다
+  ctx.globalAlpha = 0.9 * (1 - k * k);
+  ring(ctx, x, y, PICK_R + (1 - e) * 10, PICK, PICK_SQUASH);
+  ctx.globalAlpha = 1;
+}
+
+// 고리가 앉을 때 게가 살짝 들썩인다 — 고리만 돌면 게는 가만있는데 바닥에만 무언가 생긴 것이
+// 되어, 누가 골렸는지가 아니라 어디가 골렸는지로 읽힌다. 앞의 절반에서만 뜬다.
+function perkOf(k) {
+  return k < 0.5 ? Math.sin((k / 0.5) * Math.PI) * 2 : 0;
 }
 
 // 지휘 중의 커서. **OS 커서를 감추고 이것을 그린다**(stroll-app의 setCommand) —
@@ -383,13 +431,18 @@ function drawMarks(ctx, marks, now) {
 
 // 바닥에 놓인 원. **세로로 눌러 그린다** — 위에서 비스듬히 내려다본 화면이라 정원으로 그리면
 // 바닥이 아니라 허공에 뜬 고리가 된다(포탈과 같은 사정이다).
-function ring(ctx, cx, cy, r, color, squash = 0.62) {
+// `front`는 앞쪽(아래) 절반만 그린다 — 발밑에 걸친 초승달이 된다. **점선으로 끊어 보려다
+// 접었다**: 이 크기(반지름 7~9px)에서 각도로 자르면 좌우 끝에 점이 몰려, 고리가 아니라 양옆에
+// 붙은 괄호로 보였다(굽어서 확인했다). 열린 고리와 닫힌 고리로 가르는 편이 확실하다.
+function ring(ctx, cx, cy, r, color, squash = 0.62, front = false) {
   if (r < 1) return;
   // 촘촘히 돌아야 각이 안 진다 — 성글게 찍으면 원이 아니라 팔각형이 된다
   const steps = Math.max(16, Math.round(r * 12));
   for (let i = 0; i < steps; i++) {
     const a = (i / steps) * Math.PI * 2;
-    rect(ctx, cx + Math.cos(a) * r, cy + Math.sin(a) * r * squash, 1, 1, color);
+    const sin = Math.sin(a);
+    if (front && sin < -0.25) continue;
+    rect(ctx, cx + Math.cos(a) * r, cy + sin * r * squash, 1, 1, color);
   }
 }
 
@@ -471,19 +524,38 @@ function drawBox(ctx, box) {
 
 // 한 프레임. `pets`는 stepStroll이 돌려준 그리기 순서 그대로다.
 export function renderStroll(ctx, pets, opts) {
-  const { scale, dpr, t, hover, tracks = [], selected = null, box = null, cursor = null, marks = [] } = opts;
+  const { scale, dpr, t, hover, tracks = [], box = null, cursor = null, marks = [] } = opts;
+  const { selected = null, inBox = null, picks = null } = opts;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
   ctx.imageSmoothingEnabled = false;
 
   drawTracks(ctx, tracks);
-  // 선택 표시는 **게보다 먼저** — 발밑 표시가 몸 위에 얹히면 다리가 잘려 보인다
-  if (selected?.size) for (const pet of pets) if (selected.has(pet.key)) drawPicked(ctx, pet);
+  // 선택 표시는 **게보다 먼저** — 발밑 표시가 몸 위에 얹히면 다리가 잘려 보인다.
+  // 고른 것이 후보보다 세다: 상자를 다시 끌 때 이미 고른 게의 고리가 도로 열리면 안 된다.
+  for (const pet of pets) {
+    if (selected?.has(pet.key)) drawPicked(ctx, pet, t);
+    else if (inBox?.has(pet.key)) drawInBox(ctx, pet);
+  }
 
+  // 놓는 순간의 이펙트. 게가 걸어 다니므로 자리를 저장하지 않고 **매 프레임 게에서 읽는다**.
+  const perks = new Map();
+  if (picks?.size) {
+    for (const pet of pets) {
+      const t0 = picks.get(pet.key);
+      if (t0 == null) continue;
+      const k = (t - t0) / PICK_FX_MS;
+      if (k < 0 || k > 1) continue; // 아직 제 차례가 아니거나(시차) 이미 끝났다
+      drawPickFx(ctx, pet, k);
+      perks.set(pet.key, perkOf(k));
+    }
+  }
+
+  const petOpts = perks.size ? { ...opts, perks } : opts;
   const tags = [];
   for (const pet of pets) {
-    const at = drawPet(ctx, pet, t, opts);
+    const at = drawPet(ctx, pet, t, petOpts);
     if (hover === pet.key && !opts.command) tags.push({ pet, at });
   }
   if (marks.length) drawMarks(ctx, marks, t);
