@@ -334,21 +334,60 @@ function drawTracks(ctx, tracks) {
   }
 }
 
+// 고른 게의 발밑 표시와 선택 상자.
+//
+// 색은 **흰색이다.** 게임 관례는 초록이지만 이 화면에서 초록은 "완료"가 쓰고 있고,
+// 노랑은 대기, 빨강은 실패다(sprites.mjs의 긴 주석). 고르는 것은 상태가 아니라 내가 지금
+// 하고 있는 조작이므로, 상태 팔레트 바깥의 색이라야 서로 헷갈리지 않는다.
+const PICK = '#f4f6fb';
+
+function drawPicked(ctx, pet) {
+  const x = Math.round(pet.x);
+  const y = Math.round(pet.y);
+  ctx.globalAlpha = 0.85;
+  // 발밑을 감싸는 낮은 괄호 — 몸을 두르면 게가 상자에 갇힌 것으로 보인다
+  rect(ctx, x - 9, y, 3, 1, PICK);
+  rect(ctx, x + 6, y, 3, 1, PICK);
+  rect(ctx, x - 9, y - 2, 1, 3, PICK);
+  rect(ctx, x + 8, y - 2, 1, 3, PICK);
+  ctx.globalAlpha = 1;
+}
+
+function drawBox(ctx, box) {
+  const x0 = Math.round(Math.min(box.x0, box.x1));
+  const x1 = Math.round(Math.max(box.x0, box.x1));
+  const y0 = Math.round(Math.min(box.y0, box.y1));
+  const y1 = Math.round(Math.max(box.y0, box.y1));
+  const w = Math.max(1, x1 - x0);
+  const h = Math.max(1, y1 - y0);
+  ctx.globalAlpha = 0.12;
+  rect(ctx, x0, y0, w, h, PICK);
+  ctx.globalAlpha = 0.8;
+  rect(ctx, x0, y0, w, 1, PICK);
+  rect(ctx, x0, y1, w, 1, PICK);
+  rect(ctx, x0, y0, 1, h, PICK);
+  rect(ctx, x1, y0, 1, h + 1, PICK);
+  ctx.globalAlpha = 1;
+}
+
 // 한 프레임. `pets`는 stepStroll이 돌려준 그리기 순서 그대로다.
 export function renderStroll(ctx, pets, opts) {
-  const { scale, dpr, t, hover, tracks = [] } = opts;
+  const { scale, dpr, t, hover, tracks = [], selected = null, box = null } = opts;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
   ctx.imageSmoothingEnabled = false;
 
   drawTracks(ctx, tracks);
+  // 선택 표시는 **게보다 먼저** — 발밑 표시가 몸 위에 얹히면 다리가 잘려 보인다
+  if (selected?.size) for (const pet of pets) if (selected.has(pet.key)) drawPicked(ctx, pet);
 
   const tags = [];
   for (const pet of pets) {
     const at = drawPet(ctx, pet, t, opts);
     if (hover === pet.key) tags.push({ pet, at });
   }
+  if (box) drawBox(ctx, box);
   // 이름표는 게를 다 그린 뒤에 — 옆 게가 남의 이름표를 덮으면 안 된다
   for (const tag of tags) drawTag(ctx, tag.pet, tag.at, opts);
   ctx.setTransform(1, 0, 0, 1, 0, 0);

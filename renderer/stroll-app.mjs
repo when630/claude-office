@@ -4,7 +4,16 @@
 // 갈라 쓰는 값이 있었지만, 산책에는 **DOM이 캔버스 하나뿐**이다. 같은 app.mjs를 태우면
 // 쓰지도 않을 2천 줄이 창마다 한 벌씩 돌게 된다.
 import { OFFICE_FONT_PX, OFFICE_FONT_FAMILY } from './render.mjs';
-import { createWorld, stepStroll, strollCast, strollTracks, saying, petAt } from './stroll.mjs';
+import {
+  createWorld,
+  stepStroll,
+  strollCast,
+  strollTracks,
+  saying,
+  petAt,
+  petsInBox,
+  orderMove,
+} from './stroll.mjs';
 import { renderStroll } from './stroll-view.mjs';
 import {
   STROLL_MAXES,
@@ -42,6 +51,15 @@ let grab = null; // 잡고 있는 게 { key, dx, dy, at, moved }
 let drag = null; // stepStroll에 넘길 { key, x, y }
 let passThrough = true; // 지금 창이 클릭을 통과시키고 있는가
 let frozen = false; // 헤드리스로 굽을 때만 켠다 (__stroll.freeze)
+
+// ── 지휘 (Ctrl+Shift)
+//
+// 이 창은 평소 클릭을 통과시키므로 키를 받을 자리가 없다. 그런데 **통과 중에 전달되는
+// mousemove에는 수식키 상태가 실려 온다** — 실제 마우스 입력으로 확인했다. 그래서 별도 창도
+// 전역 단축키도 없이 `ctrlKey && shiftKey`만 보면 된다.
+let command = false; // 지금 지휘 모드인가
+let box = null; // 그리는 중인 선택 상자 (창 좌표)
+const selected = new Set(); // 고른 게의 key
 
 function logical() {
   return { w: canvas.clientWidth / scale, h: canvas.clientHeight / scale };
@@ -90,7 +108,10 @@ function tick(now) {
 
   // **커서 밑을 매 프레임 다시 본다.** 마우스가 가만히 있어도 게가 걸어와 커서 밑으로
   // 들어올 수 있는데, 그때 mousemove는 오지 않는다.
-  if (grab) {
+  if (command) {
+    // 지휘 중에는 커서가 게 위에 있든 없든 창이 클릭을 먹는다
+    hover = pointer ? (petAt(pets, pointer.x, pointer.y, scale)?.key ?? null) : null;
+  } else if (grab) {
     hover = grab.key;
   } else if (pointer) {
     const hit = petAt(pets, pointer.x, pointer.y, scale);
@@ -101,6 +122,11 @@ function tick(now) {
     setPassThrough(true);
   }
 
+  // 사라진 게는 선택에서도 빠진다
+  if (selected.size) {
+    for (const key of selected) if (!world.pets.has(key)) selected.delete(key);
+  }
+
   renderStroll(ctx, pets, {
     scale,
     dpr,
@@ -108,6 +134,9 @@ function tick(now) {
     hover,
     font: `${OFFICE_FONT_PX}px ${OFFICE_FONT_FAMILY}, monospace`,
     tracks: strollTracks(world, Date.now()),
+    selected,
+    // 상자는 창 좌표로 그렸으므로 논리 좌표로 바꿔 넘긴다
+    box: box && { x0: box.x0 / scale, y0: box.y0 / scale, x1: box.x1 / scale, y1: box.y1 / scale },
   });
 }
 tick.last = 0;
@@ -117,8 +146,24 @@ tick.last = 0;
 // 창은 기본적으로 클릭을 통과시키므로(main의 setIgnoreMouseEvents(true, { forward: true }))
 // 여기 오는 mousemove는 **통과 중에도** 전달되는 것이다. 그래서 커서가 게 위에 닿는 순간
 // 통과를 끄고, 벗어나면 다시 켠다.
+// 수식키가 눌린 동안에는 창이 클릭을 먹는다. **떼면 곧장 통과로 돌아간다** —
+// 화면을 덮는 창이 마우스를 계속 먹으면 그건 고장이다.
+function setCommand(on) {
+  if (on === command) return;
+  command = on;
+  if (!on) box = null;
+  setPassThrough(!on);
+  document.body.style.cursor = on ? 'crosshair' : passThrough ? 'default' : 'grab';
+}
+
 window.addEventListener('mousemove', (e) => {
   pointer = { x: e.clientX, y: e.clientY };
+  setCommand(e.ctrlKey && e.shiftKey);
+  if (box) {
+    box.x1 = e.clientX;
+    box.y1 = e.clientY;
+    return;
+  }
   if (!grab) return;
   if (Math.abs(e.clientX - grab.at.x) > DRAG_SLOP || Math.abs(e.clientY - grab.at.y) > DRAG_SLOP) grab.moved = true;
   drag = { key: grab.key, x: (e.clientX + grab.dx) / scale, y: (e.clientY + grab.dy) / scale };
@@ -128,7 +173,24 @@ window.addEventListener('mouseleave', () => {
   pointer = null;
 });
 
+// 지휘 중에는 우클릭이 "저리로 가라"다 — 창 메뉴가 뜨면 그 명령이 먹히지 않는다
+window.addEventListener('contextmenu', (e) => {
+  if (command) e.preventDefault();
+});
+
 window.addEventListener('mousedown', (e) => {
+  if (command) {
+    e.preventDefault();
+    // 우클릭 — 고른 게들을 그 자리로 보낸다
+    if (e.button === 2) {
+      if (selected.size) orderMove(world, selected, e.clientX / scale, e.clientY / scale, logical().w, logical().h);
+      return;
+    }
+    if (e.button !== 0) return;
+    // 좌클릭 — 여기서부터 상자를 그린다
+    box = { x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY };
+    return;
+  }
   if (e.button !== 0) return;
   const hit = petAt(pets, e.clientX, e.clientY, scale);
   if (!hit) return;
@@ -146,6 +208,22 @@ window.addEventListener('mousedown', (e) => {
 });
 
 window.addEventListener('mouseup', () => {
+  if (box) {
+    const drawn = Math.abs(box.x1 - box.x0) > 3 || Math.abs(box.y1 - box.y0) > 3;
+    selected.clear();
+    // 상자를 그렸으면 그 안을 고르고, 톡 누르기만 했으면 선택을 푼다
+    if (drawn) {
+      const inBox = petsInBox(pets, {
+        x0: box.x0 / scale,
+        y0: box.y0 / scale,
+        x1: box.x1 / scale,
+        y1: box.y1 / scale,
+      });
+      for (const p of inBox) selected.add(p.key);
+    }
+    box = null;
+    return;
+  }
   if (!grab) return;
   const held = grab;
   grab = null;
@@ -195,6 +273,8 @@ window.__stroll = {
   pets: () => pets,
   tuning: () => ({ scale, speed, limit }),
   world: () => world,
+  selected: () => [...selected],
+  cmd: () => ({ command, box: !!box, passThrough }),
   freeze: (on) => {
     frozen = on !== false;
   },
