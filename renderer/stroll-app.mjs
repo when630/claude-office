@@ -4,7 +4,7 @@
 // 갈라 쓰는 값이 있었지만, 산책에는 **DOM이 캔버스 하나뿐**이다. 같은 app.mjs를 태우면
 // 쓰지도 않을 2천 줄이 창마다 한 벌씩 돌게 된다.
 import { OFFICE_FONT_PX, OFFICE_FONT_FAMILY } from './render.mjs';
-import { createWorld, stepStroll, strollCast, petAt, petFloor, STROLL_MAX } from './stroll.mjs';
+import { createWorld, stepStroll, strollCast, petAt, STROLL_MAX } from './stroll.mjs';
 import { renderStroll } from './stroll-view.mjs';
 
 const canvas = document.getElementById('stroll');
@@ -80,8 +80,6 @@ function tick(now) {
     t: now,
     hover,
     font: `${OFFICE_FONT_PX}px ${OFFICE_FONT_FAMILY}, monospace`,
-    // 들려 있는 게의 그림자가 남을 바닥
-    floorY: (pet) => petFloor(pet, h),
   });
 }
 tick.last = 0;

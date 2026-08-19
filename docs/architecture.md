@@ -52,7 +52,9 @@ renderer/           픽셀 렌더러 (app · render · sprites · themes · talk
 renderer/stroll.html      산책 창의 뼈대 — 캔버스 하나뿐이라 style.css를 안 끌고 온다
 renderer/stroll-app.mjs   산책 창의 껍데기 — 스냅샷·프레임·마우스(집어 들기·클릭 통과 판정).
                           큰 창의 app.mjs를 안 태운다 — 쓸 것이 없는 2천 줄이 창마다 한 벌 돈다
-renderer/stroll.mjs       산책의 **움직임** — 걷기·앉기·낙하·등퇴장. 캔버스를 모르고 `now`·`dt`를
+renderer/stroll.mjs       산책의 **움직임** — 걷기·앉기·집어 옮기기·등퇴장. 화면 전체를 2차원으로
+                          다니고 바닥이 없다(세로는 앞뒤로 읽혀 가로보다 느리다).
+                          캔버스를 모르고 `now`·`dt`를
                           받으므로 node로 돈다(test/stroll.test.mjs). 큰 창은 자리를 시각에서
                           유도했지만(walkPos) 여기서는 사람이 게를 옮기므로 상태가 남아야 한다
 renderer/stroll-view.mjs  산책 **그리기** — 배경이 없어 스프라이트·말풍선·이름표뿐이다

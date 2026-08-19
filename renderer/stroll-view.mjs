@@ -46,10 +46,8 @@ function bodyOf(pet, t) {
   switch (pet.act) {
     case 'held':
       return Math.floor(t / 190) % 2 ? SPR.heldA : SPR.heldB;
-    case 'fall':
-      return SPR.heldA; // 떨어지는 동안 다리는 늘어져 있다
     case 'land':
-      return SPR.armsUp; // 착지 반동 — 팔이 한 줄 올라간다
+      return SPR.armsUp; // 내려놓인 직후 — 팔이 한 줄 올라간 채 잠깐 멈칫한다
     case 'work':
       return Math.floor(t / 150) % 2 ? SPR.sitUp : SPR.sit;
     case 'in':
@@ -105,29 +103,27 @@ function drawDizzy(ctx, cx, top, t) {
   }
 }
 
-// 게 하나. 그림자는 **몸이 아니라 바닥에 남는다** — 집어 든 게가 그림자를 달고 올라가면
-// 떠 있는 것이 아니라 화면 전체가 확대된 것처럼 보인다.
+// 게 하나.
+//
+// **바닥이 없는 화면이다** — 게가 위아래로도 다니므로 "떨어질 곳"이 없고, 그림자는 늘 발밑에
+// 같은 크기로 붙는다. 집혀 있는 동안만 흐려진다: 발을 딛고 있지 않다는 표시가 그것뿐이다.
 function drawPet(ctx, pet, t, opts) {
-  const { hover, scale } = opts;
+  const { hover } = opts;
   const worker = pet.entry?.worker ?? {};
   const body = bodyOf(pet, t);
   const x = Math.round(pet.x);
   const y = Math.round(pet.y);
-  const lifted = pet.act === 'held' || pet.act === 'fall';
-  const floor = lifted ? Math.round(opts.floorY(pet)) : y;
+  const lifted = pet.act === 'held';
 
-  // 바닥 그림자. 들려 있을수록 작고 흐려진다 — 높이를 그림자가 말한다.
-  const lift = Math.max(0, floor - y);
-  const k = Math.max(0.25, 1 - lift / 90);
-  ctx.globalAlpha = 0.3 * k;
-  rect(ctx, x - 6 * k, floor - 1, 12 * k, 2, COLORS.shadow);
+  ctx.globalAlpha = lifted ? 0.14 : 0.3;
+  rect(ctx, x - 6, y - 1, 12, 2, COLORS.shadow);
   ctx.globalAlpha = 1;
 
   // 마우스가 올라간 게의 발밑을 밝힌다. **들고 있는 동안은 안 그린다** — 이미 손에 있는데
-  // 원래 있던 바닥에 노란 띠가 남으면 그게 놓을 자리 표시처럼 읽힌다(굽어서 확인했다).
+  // 노란 띠까지 따라다니면 그게 놓을 자리 표시처럼 읽힌다.
   if (hover === worker.key && !lifted) {
     ctx.globalAlpha = 0.35;
-    rect(ctx, x - 9, floor - 2, 18, 3, COLORS.sel);
+    rect(ctx, x - 9, y - 2, 18, 3, COLORS.sel);
     ctx.globalAlpha = 1;
   }
 

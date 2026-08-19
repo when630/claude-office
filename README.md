@@ -241,15 +241,15 @@ that stays **always on top**. No rooms here — just the crabs, **gathered in on
 ### Or send them out onto the desktop
 
 The other button (or the tray menu) does away with the window altogether. The office becomes a
-transparent sheet over your desktop and **only the crabs are left**, walking along the bottom of
-the screen.
+transparent sheet over your desktop and **only the crabs are left**, wandering wherever they like
+across it.
 
 - Give a session work and its crab stops where it stands, **pulls out a laptop and gets to work**.
   When the work ends it folds the laptop away and carries on walking
 - Whoever is waiting on you stands still with both claws up and a `❗` — same as everywhere else.
   Stuck, cut off, failed and stopped all keep the faces they have in the office
-- **Pick one up and drop it wherever you like.** It dangles from your cursor, legs hanging, and
-  falls back to the floor when you let go
+- **Pick one up and drop it wherever you like.** It dangles from your cursor with its legs hanging,
+  and stays exactly where you put it — there is no floor to fall back to
 - **Hover** for the room and session name; **click** and the full window comes back with that
   session selected
 - Anywhere that is not a crab **clicks straight through** to whatever is underneath — the sheet is

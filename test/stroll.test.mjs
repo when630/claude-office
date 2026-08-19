@@ -25,7 +25,7 @@ globalThis.document = {
   }),
 };
 
-const { createWorld, stepStroll, strollCast, wantAct, petAt, petHitBox, STROLL_MAX } = await import(
+const { createWorld, stepStroll, strollCast, wantAct, petAt, petHitBox, strollArea, STROLL_MAX } = await import(
   '../renderer/stroll.mjs'
 );
 
@@ -154,28 +154,63 @@ test('입력 대기는 멈춰 선다', () => {
   assert.equal(pet.moving, false);
 });
 
-test('집어 들면 커서를 따라오고, 놓으면 떨어져 바닥에 선다', () => {
+test('집어 들면 커서를 따라오고, 놓으면 그 자리에 선다', () => {
   const world = createWorld();
   const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
   run(world, cast, { frames: 700, rng: () => 0.1 });
 
   // 잡고 화면 위쪽으로 끌어올린다
-  const held = run(world, cast, { frames: 20, t0: 40_000, drag: () => ({ key: 'a', x: 120, y: 30 }) });
+  const held = run(world, cast, { frames: 20, t0: 40_000, drag: () => ({ key: 'a', x: 120, y: 40 }) });
   const up = find(held, 'a');
   assert.equal(up.act, 'held');
   assert.equal(up.x, 120);
-  assert.equal(up.y, 30);
+  assert.equal(up.y, 40);
 
-  // 놓는다 — 다음 프레임부터 떨어지기 시작한다
-  const falling = find(run(world, cast, { frames: 2, t0: 40_400 }), 'a');
-  assert.equal(falling.act, 'fall');
-  assert.ok(falling.y > 30, '놓았는데 안 떨어진다');
+  // 놓는다 — **떨어지지 않는다.** 위아래로 자유롭게 다니는 화면에는 바닥이 없다
+  const dropped = find(run(world, cast, { frames: 2, t0: 40_400 }), 'a');
+  assert.equal(dropped.act, 'land');
+  assert.equal(Math.round(dropped.y), 40, `놓았는데 자리가 움직였다: ${dropped.y}`);
+  assert.equal(Math.round(dropped.x), 120);
 
-  const landed = find(run(world, cast, { frames: 90, t0: 40_500 }), 'a');
-  assert.ok(landed.y > H - 40, `바닥까지 안 내려왔다: ${landed.y}`);
-  assert.ok(landed.act !== 'fall' && landed.act !== 'held', `계속 떠 있다: ${landed.act}`);
-  // 놓아 준 x는 지킨다 — 손으로 옮긴 결과가 착지하면서 되돌려지면 옮긴 뜻이 없다
-  assert.ok(Math.abs(landed.x - 120) < 40, `놓은 자리에서 너무 멀다: ${landed.x}`);
+  // 멈칫하는 동안에도 그 자리다
+  const still = find(run(world, cast, { frames: 10, t0: 40_500 }), 'a');
+  assert.equal(Math.round(still.y), 40);
+
+  // 멈칫이 끝나면 거기서부터 다시 걷는다 — 원래 있던 곳으로 되돌아가지 않는다
+  const after = find(run(world, cast, { frames: 30, t0: 41_000 }), 'a');
+  assert.equal(after.act, 'walk');
+  assert.ok(Math.abs(after.y - 40) < 12, `놓은 높이를 버렸다: ${after.y}`);
+});
+
+test('위아래로도 다닌다 — 아래쪽 띠에 붙어 있지 않는다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
+  run(world, cast, { frames: 700, rng: () => 0.1 });
+
+  const seen = new Set();
+  let pets = [];
+  for (let i = 0; i < 6000; i++) {
+    pets = stepStroll(world, cast, { w: W, h: H, now: 80_000 + i * 16, dt: 16 });
+    const pet = find(pets, 'a');
+    if (pet) seen.add(Math.round(pet.y / 10));
+  }
+  // 높이가 한 자리에 묶여 있지 않아야 한다
+  assert.ok(seen.size >= 4, `높이가 ${seen.size}가지뿐이다 — 아래쪽에 붙어 있다`);
+  const ys = [...seen].map((k) => k * 10);
+  assert.ok(Math.max(...ys) - Math.min(...ys) > H / 4, `오르내린 폭이 좁다: ${Math.min(...ys)}~${Math.max(...ys)}`);
+});
+
+test('세로가 가로보다 빠르지 않다 — 위아래로 미끄러지면 걸음이 아니다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
+  run(world, cast, { frames: 700, rng: () => 0.1 });
+  let prev = find(stepStroll(world, cast, { w: W, h: H, now: 90_000, dt: 16 }), 'a');
+  let lastY = prev.y;
+  for (let i = 1; i < 1500; i++) {
+    const pet = find(stepStroll(world, cast, { w: W, h: H, now: 90_000 + i * 16, dt: 16 }), 'a');
+    assert.ok(Math.abs(pet.y - lastY) <= 0.75, `세로로 튀었다: ${lastY} → ${pet.y}`);
+    lastY = pet.y;
+  }
 });
 
 test('목록에서 빠지면 화면 밖으로 걸어 나간 뒤에 사라진다', () => {
@@ -209,6 +244,7 @@ test('프레임 사이에 튀지 않는다 — 창이 가려졌다 돌아와도'
 });
 
 test('화면 안에서만 걷는다', () => {
+  const area = strollArea(W, H);
   const world = createWorld();
   const cast = strollCast(rooms(['proj', worker('a', 'idle'), worker('b', 'idle'), worker('c', 'idle')]));
   let pets = run(world, cast, { frames: 600 });
@@ -217,16 +253,20 @@ test('화면 안에서만 걷는다', () => {
     for (const p of pets) {
       if (p.act === 'in' || p.act === 'out') continue;
       assert.ok(p.x >= 0 && p.x <= W, `${p.key}가 화면을 벗어났다: ${p.x}`);
-      assert.ok(p.y > 0 && p.y <= H, `${p.key}의 발이 화면 밖이다: ${p.y}`);
+      // 위는 말풍선 몫, 아래는 노트북 몫을 남긴다 — 잘리면 무슨 상태인지가 안 보인다
+      assert.ok(p.y >= area.y0 && p.y <= area.y1, `${p.key}의 발이 다닐 자리 밖이다: ${p.y}`);
     }
   }
 });
 
-test('여럿이면 줄을 나눠 선다', () => {
+test('여럿이면 서로 다른 높이로 들어온다', () => {
   const world = createWorld();
   const cast = strollCast(rooms(['proj', worker('a'), worker('b'), worker('c'), worker('d')]));
-  const pets = run(world, cast, { frames: 600 });
-  assert.equal(new Set(pets.map((p) => p.lane)).size, 4, '넷이 한 줄에 몰렸다');
+  // 들어오는 높이는 난수로 갈린다 — 고정 rng를 주면 넷이 한 줄에 겹친다
+  let seed = 0;
+  const rng = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+  const pets = run(world, cast, { frames: 5, rng });
+  assert.equal(new Set(pets.map((p) => Math.round(p.y))).size, 4, '넷이 같은 높이로 들어왔다');
 });
 
 test('클릭은 앞에 있는 게가 먼저 잡힌다', () => {
