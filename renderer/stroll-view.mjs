@@ -160,7 +160,8 @@ function drawPet(ctx, pet, t, opts) {
 function drawTag(ctx, pet, at, opts) {
   const { scale, dpr, font } = opts;
   const worker = pet.entry?.worker ?? {};
-  const room = pet.entry?.room?.name ?? '';
+  // 방 이름은 `label`이다 — `key`는 작업 디렉터리 이름이고, 별칭·묶기가 반영된 것이 이쪽이다
+  const room = pet.entry?.room?.label ?? '';
   const name = worker.name ?? '';
   const line = [room, name].filter(Boolean).join(' · ');
   if (!line) return;

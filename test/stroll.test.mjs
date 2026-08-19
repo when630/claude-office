@@ -37,7 +37,8 @@ function worker(key, mood = 'idle', over = {}) {
 }
 
 function rooms(...specs) {
-  return specs.map(([name, ...workers]) => ({ key: name, name, workers }));
+  // 실제 스냅샷의 방 모양 그대로 — 화면에 적히는 이름은 label이다(main/collect.mjs)
+  return specs.map(([name, ...workers]) => ({ key: name, label: name, cwd: name, workers }));
 }
 
 // 프레임을 돌린다. 시각은 16ms 단위로 흐르고, 실제 rAF처럼 dt를 그대로 넘긴다.
