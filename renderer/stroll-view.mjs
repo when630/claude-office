@@ -14,6 +14,7 @@ const COLORS = {
   label: '#f4f6fb',
   labelDim: '#c3ccdb',
   labelBack: '#171a1fdd',
+  speech: '#1d2026',
   sel: '#d8a33a',
 };
 
@@ -48,7 +49,25 @@ function bodyOf(pet, t) {
       return Math.floor(t / 190) % 2 ? SPR.heldA : SPR.heldB;
     case 'warp':
     case 'sink':
-      return SPR.heldA; // 구멍을 오갈 때는 다리가 늘어져 있다 (집혔을 때와 같은 자세)
+    case 'drop':
+      return SPR.heldA; // 구멍을 오가거나 손에서 떨어지는 동안은 다리가 늘어져 있다
+    case 'look':
+      // 커서를 올려다본다 — 팔을 살짝 들었다 내리는 것이 "쳐다보는 중"으로 읽힌다
+      return Math.floor(t / 420) % 2 ? SPR.armsUp : SPR.stand;
+    case 'chat':
+      // 웃는 눈으로 떠든다 — 큰 창의 잡담과 같은 얼굴이다
+      return Math.floor(t / 220) % 2 ? SPR.chat : SPR.stand;
+    case 'stretch':
+      return SPR.armsHigh; // 두 팔을 쭉 편다
+    case 'nap':
+      return SPR.asleep;
+    case 'dizzy':
+      // 흔들린 뒤 — **몸은 그대로 두고 머리 위 별만 돌린다.** 큰 창처럼 갸우뚱 프레임을
+      // 끼웠더니 줄마다 어긋난 머리가 이 크기에서 "기울었다"가 아니라 "찌그러졌다"로 보였다.
+      // 어지러움은 별이 말한다.
+      return SPR.stand;
+    case 'hop':
+      return SPR.armsUp; // 뛰는 동안 팔이 올라간다
     case 'land':
       return SPR.armsUp; // 딛고 선 직후 — 팔이 한 줄 올라간 채 잠깐 멈칫한다
     case 'work':
@@ -59,7 +78,8 @@ function bodyOf(pet, t) {
     default:
       break;
   }
-  if (pet.moving) return Math.floor(t / 160) % 2 ? SPR.stepA : SPR.stepB;
+  // 뛰는 동안은 걸음이 빨라진다 — 자리만 빨리 흐르고 다리가 그대로면 미끄러지는 것으로 보인다
+  if (pet.moving) return Math.floor(t / (pet.dash ? 95 : 160)) % 2 ? SPR.stepA : SPR.stepB;
   if (worker.mood === 'waiting') return SPR.armsHigh;
   if (showsDizzy(worker)) return Math.sin(((t % DIZZY_CYCLE) / DIZZY_CYCLE) * Math.PI * 2) >= 0 ? SPR.tiltR : SPR.tiltL;
   // 헤매는 중 — 아주 느리게 팔을 들었다 내린다(머리 긁적). 타이핑 150ms와 확연히 달라야 한다
@@ -78,6 +98,9 @@ function laptopOf(lap, t) {
   return Math.floor(t / 220) % 2 ? SPR.laptopCode : SPR.laptopOpen;
 }
 
+// 폴짝 뛸 때 몸이 뜨는 높이. `pet.hop`(0..1)에 곱한다 — 얼마나 뛰었나는 움직임이 정하고,
+// 그것이 몇 px인가는 그리는 쪽이 정한다.
+const HOP_H = 7;
 const BUBBLE_H = 11;
 
 function drawGlyphBubble(ctx, cx, bottom, glyph) {
@@ -163,6 +186,8 @@ function drawPet(ctx, pet, t, opts) {
   const lifted = pet.act === 'held';
   const falling = pet.act === 'warp';
   const sinking = pet.act === 'sink';
+  // 폴짝 뛴 높이. 몸만 이만큼 뜨고 그림자는 바닥에 남는다.
+  const hop = (pet.hop ?? 0) * HOP_H;
 
   // 구멍의 **뒤쪽 절반**이 먼저다. 게는 그 위에 그리고, 앞쪽 절반은 게 위에 얹는다(아래).
   const portalY = Math.round(pet.portalY ?? 0);
@@ -171,10 +196,14 @@ function drawPet(ctx, pet, t, opts) {
 
   // 그림자는 **설 자리에** 진다 — 떨어지는 동안에도 어디에 내려앉을지 미리 보인다.
   // 구멍으로 잠기는 동안에는 없다: 발밑이 구멍인데 그림자가 지면 바닥이 있는 것이 된다.
+  //
+  // **뜬 만큼 작고 옅어진다.** 폴짝 뛸 때 몸만 올려 봤더니 뛴 것이 아니라 화면이 흔들린
+  // 것으로 보였다 — 발밑에 남아 줄어드는 그림자가 "떴다"를 만드는 전부다.
   const shadowY = falling ? Math.round(pet.gy) : y;
   if (!sinking) {
-    ctx.globalAlpha = lifted ? 0.14 : falling ? 0.18 : 0.3;
-    rect(ctx, x - 6, shadowY - 1, 12, 2, COLORS.shadow);
+    const k = hop > 0 ? 1 - (hop / HOP_H) * 0.45 : 1;
+    ctx.globalAlpha = (lifted ? 0.14 : falling ? 0.18 : 0.3) * k;
+    rect(ctx, x - 6 * k, shadowY - 1, 12 * k, 2, COLORS.shadow);
     ctx.globalAlpha = 1;
   }
 
@@ -200,7 +229,7 @@ function drawPet(ctx, pet, t, opts) {
     else ctx.rect(x - 16, portalY, 32, 80);
     ctx.clip();
   }
-  drawSprite(ctx, body, x - body.w / 2, y - body.h);
+  drawSprite(ctx, body, x - body.w / 2, y - hop - body.h);
   if (inPortal) ctx.restore();
   if (dim) ctx.globalAlpha = 1;
 
@@ -214,7 +243,14 @@ function drawPet(ctx, pet, t, opts) {
   if (sinking) return { x, top: y - body.h };
 
   let top = y - body.h;
-  const glyphKey = glyphKeyFor(worker);
+  // 잡담 중이면 말풍선이 기호 자리를 쓴다 — 둘을 같이 띄우면 머리 위가 두 겹이 된다
+  if (pet.say) {
+    drawSpeech(ctx, x, y - body.h - GLYPH_GAP, pet.say, opts);
+    return { x, top: y - body.h - GLYPH_GAP - 9 };
+  }
+  // 마우스를 게 위에 얹고 있으면 하트를 띄운다 — 쓰다듬는 것에 대한 대답이다.
+  // **상태 기호보다 뒤다**: 나를 기다리는 게가 하트를 띄우고 있으면 그건 오작동이다.
+  const glyphKey = glyphKeyFor(worker) ?? (hover === worker.key && pet.act !== 'work' ? 'gHeart' : null);
   const glyph = glyphKey ? SPR[glyphKey] : null;
   if (glyph) {
     const float = worker.mood === 'waiting' ? Math.round(Math.sin(t / 260) * 1.5) : Math.round(Math.sin(t / 900) * 1);
@@ -223,9 +259,36 @@ function drawPet(ctx, pet, t, opts) {
     // 이름표는 말풍선 **위**에 선다 — 아래에 두면 무슨 상태인지가 이름에 가린다
     top = bottom - BUBBLE_H;
   }
-  if (showsDizzy(worker)) drawDizzy(ctx, x, y - body.h, t);
+  // 서버 장애의 별과 **같은 별을 쓴다** — 흔들려서 어지러운 것도 어지러운 것이다.
+  // 둘이 겹칠 일은 없다: 흔들림은 idle일 때만 걸리고 서버 장애는 그 자리에서 멈춰 선다.
+  if (showsDizzy(worker) || pet.act === 'dizzy') drawDizzy(ctx, x, y - body.h, t);
 
   return { x, top };
+}
+
+// 잡담 말풍선. 기호 말풍선(drawGlyphBubble)과 달리 글자가 들어가므로 폭을 재서 그린다.
+// **글자는 확대 변환 밖에서 그린다** — 픽셀 폰트를 배율로 늘리면 획이 뭉갠다(큰 창과 같은 규칙).
+function drawSpeech(ctx, cx, bottom, text, opts) {
+  const { scale, dpr, font } = opts;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.font = font;
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left';
+  const tw = ctx.measureText(text).width;
+  const w = tw + 10;
+  const h = 17;
+  const wide = ctx.canvas.width / dpr;
+  const left = Math.min(Math.max(Math.round(cx * scale - w / 2), 4), Math.max(4, wide - w - 4));
+  const top = Math.max(2, Math.round(bottom * scale) - h);
+  ctx.fillStyle = COLORS.bubble;
+  ctx.fillRect(left, top, w, h - 3);
+  ctx.fillRect(left + 2, top + h - 3, w - 4, 3);
+  // 꼬리는 풍선이 아니라 **게 머리 위**에 붙는다 — 가장자리에서 풍선이 안으로 밀려도
+  // 누가 말하고 있는지는 그대로 남아야 한다
+  ctx.fillRect(Math.round(cx * scale) - 2, top + h - 4, 5, 5);
+  ctx.fillStyle = COLORS.speech;
+  ctx.fillText(text, left + 5, top + 12);
+  ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
 }
 
 // 이름표는 **마우스를 올렸을 때만** 뜬다. 바탕화면에 늘 글자가 떠 있으면 장식이 아니라 잡음이고,
@@ -254,13 +317,32 @@ function drawTag(ctx, pet, at, opts) {
   ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
 }
 
+// 발자국. **게보다 먼저, 전부 한꺼번에** 그린다 — 게마다 제 자국을 그리게 하면 뒤에 오는
+// 게가 앞선 게의 자국을 덮어 발자국이 끊긴다.
+//
+// 색은 게 몸통(#cc785c)을 어둡게 한 것이다. 그림자처럼 검게 두면 어두운 배경화면에서
+// 아예 안 보인다 — 자국은 "지나간 흔적"이라 밟은 것의 색을 띠는 편이 어느 벽지에서나 읽힌다.
+const TRACK_COLOR = '#8a4f39';
+
+function drawTracks(ctx, tracks) {
+  for (const k of tracks) {
+    if (k.fade <= 0) continue;
+    ctx.globalAlpha = 0.5 * k.fade;
+    // 뛴 자국은 조금 길다 — 걸음과 달리 발을 끌고 나간 것으로 읽힌다
+    rect(ctx, k.x - 1, k.y - 1, k.run ? 3 : 2, 1, TRACK_COLOR);
+    ctx.globalAlpha = 1;
+  }
+}
+
 // 한 프레임. `pets`는 stepStroll이 돌려준 그리기 순서 그대로다.
 export function renderStroll(ctx, pets, opts) {
-  const { scale, dpr, t, hover } = opts;
+  const { scale, dpr, t, hover, tracks = [] } = opts;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
   ctx.imageSmoothingEnabled = false;
+
+  drawTracks(ctx, tracks);
 
   const tags = [];
   for (const pet of pets) {

@@ -4,7 +4,7 @@
 // 갈라 쓰는 값이 있었지만, 산책에는 **DOM이 캔버스 하나뿐**이다. 같은 app.mjs를 태우면
 // 쓰지도 않을 2천 줄이 창마다 한 벌씩 돌게 된다.
 import { OFFICE_FONT_PX, OFFICE_FONT_FAMILY } from './render.mjs';
-import { createWorld, stepStroll, strollCast, petAt } from './stroll.mjs';
+import { createWorld, stepStroll, strollCast, strollTracks, saying, petAt } from './stroll.mjs';
 import { renderStroll } from './stroll-view.mjs';
 import {
   STROLL_MAXES,
@@ -73,7 +73,20 @@ function tick(now) {
 
   // 얼려 두면 그리기만 한다 — 헤드리스로 굽을 때 특정 순간(구멍을 반쯤 통과한 참 같은)을
   // 잡으려면 시간이 멈춰 있어야 한다. 켜는 곳은 `__stroll.freeze` 하나뿐이다.
-  if (!frozen) pets = stepStroll(world, strollCast(state.rooms, limit), { w, h, now: Date.now(), dt, drag, speed });
+  if (!frozen)
+    pets = stepStroll(world, strollCast(state.rooms, limit), {
+      w,
+      h,
+      now: Date.now(),
+      dt,
+      drag,
+      speed,
+      // 커서는 논리 좌표로 넘긴다 — 게가 사는 좌표계가 그것이다
+      pointer: pointer && !grab ? { x: pointer.x / scale, y: pointer.y / scale } : null,
+    });
+
+  // 지금 하는 말. 그리는 쪽이 문자열만 보게 여기서 붙여 둔다.
+  for (const pet of pets) pet.say = saying(pet, Date.now());
 
   // **커서 밑을 매 프레임 다시 본다.** 마우스가 가만히 있어도 게가 걸어와 커서 밑으로
   // 들어올 수 있는데, 그때 mousemove는 오지 않는다.
@@ -94,6 +107,7 @@ function tick(now) {
     t: now,
     hover,
     font: `${OFFICE_FONT_PX}px ${OFFICE_FONT_FAMILY}, monospace`,
+    tracks: strollTracks(world, Date.now()),
   });
 }
 tick.last = 0;
@@ -180,6 +194,7 @@ window.__stroll = {
   push: (next) => applyState(next),
   pets: () => pets,
   tuning: () => ({ scale, speed, limit }),
+  world: () => world,
   freeze: (on) => {
     frozen = on !== false;
   },

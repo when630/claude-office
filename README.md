@@ -254,7 +254,14 @@ across it.
 - Whoever is waiting on you stands still with both claws up and a `❗` — same as everywhere else.
   Stuck, cut off, failed and stopped all keep the faces they have in the office
 - **Pick one up and drop it wherever you like.** It dangles from your cursor with its legs hanging,
-  and stays exactly where you put it — there is no floor to fall back to
+  dips a little as you let go, and stays where you put it. **Shake one while carrying it** and it
+  comes down dizzy, stars and all
+- **Footprints** fade behind them, and now and then one breaks into a run
+- Two that end up next to each other **stop and chat** — the same lines the office uses. Once in a
+  while one starts **chasing** the other
+- Bring your cursor close and a crab **stops to look at it**; rest it on one and you get a heart
+- With nothing to do for a long while they **stretch or doze off**. Work wakes them straight up —
+  no play ever covers what a session is actually doing
 - **Hover** for the room and session name; **click** and the full window comes back with that
   session selected
 - Anywhere that is not a crab **clicks straight through** to whatever is underneath — the sheet is
