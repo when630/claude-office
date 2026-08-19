@@ -64,9 +64,25 @@ const selected = new Set(); // 고른 게의 key
 let marks = []; // 누른 자리에 찍히는 표식 (논리 좌표)
 
 // 표식 하나. 오래된 것은 그릴 때 걸러지므로 여기서는 개수만 막는다.
-function mark(x, y, move) {
-  marks.push({ x: x / scale, y: y / scale, t0: performance.now(), move });
+function mark(m) {
+  marks.push({ ...m, t0: performance.now() });
   if (marks.length > 8) marks = marks.slice(-8);
+}
+
+// 고른 게들을 감싸는 자리 — 그룹핑 표식이 여기로 조여든다
+function boundsOf(list) {
+  if (!list.length) return null;
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const p of list) {
+    x0 = Math.min(x0, p.x - 9);
+    x1 = Math.max(x1, p.x + 9);
+    y0 = Math.min(y0, p.y - 15);
+    y1 = Math.max(y1, p.y + 2);
+  }
+  return { x0, y0, x1, y1 };
 }
 
 function logical() {
@@ -199,7 +215,7 @@ window.addEventListener('mousedown', (e) => {
     if (e.button === 2) {
       if (selected.size) {
         orderMove(world, selected, e.clientX / scale, e.clientY / scale, logical().w, logical().h);
-        mark(e.clientX, e.clientY, true);
+        mark({ x: e.clientX / scale, y: e.clientY / scale });
       }
       return;
     }
@@ -228,17 +244,20 @@ window.addEventListener('mouseup', () => {
   if (box) {
     const drawn = Math.abs(box.x1 - box.x0) > 3 || Math.abs(box.y1 - box.y0) > 3;
     selected.clear();
+    const from = { x0: box.x0 / scale, y0: box.y0 / scale, x1: box.x1 / scale, y1: box.y1 / scale };
     // 상자를 그렸으면 그 안을 고르고, 톡 누르기만 했으면 선택을 푼다
+    let picked = [];
     if (drawn) {
-      const inBox = petsInBox(pets, {
-        x0: box.x0 / scale,
-        y0: box.y0 / scale,
-        x1: box.x1 / scale,
-        y1: box.y1 / scale,
-      });
-      for (const p of inBox) selected.add(p.key);
+      picked = petsInBox(pets, from);
+      for (const p of picked) selected.add(p.key);
     }
-    mark(box.x1, box.y1, false);
+    // 상자가 고른 것들을 감싸며 조여든다. 아무것도 못 골랐으면 그 자리로 오므라들어 사라진다.
+    const mid = { x: (from.x0 + from.x1) / 2, y: (from.y0 + from.y1) / 2 };
+    mark({
+      group: true,
+      from,
+      to: boundsOf(picked) ?? { x0: mid.x - 1, y0: mid.y - 1, x1: mid.x + 1, y1: mid.y + 1 },
+    });
     box = null;
     return;
   }

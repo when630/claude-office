@@ -267,10 +267,11 @@ across it.
 - Anywhere that is not a crab **clicks straight through** to whatever is underneath — the sheet is
   not there as far as your mouse is concerned
 - Hold **`Ctrl+Shift`** and you can order them about — the pointer picks up a mint outline while
-  you do. **Drag a box** to pick crabs, **right-click** to send the picked ones there (brackets
-  close on the spot you clicked, and they spread out rather than pile on one), click empty space to
-  clear. Let go of the keys and the sheet goes back to letting your clicks through. One that is
-  working folds its laptop, walks over, and **opens it again on arrival**
+  you do. **Drag a box** to pick crabs and it snaps shut around whatever you caught;
+  **right-click** to send them somewhere and an arrow drops onto that spot, with the crabs
+  spreading out rather than piling on one. Click empty space to clear. Let go of the keys and the
+  sheet goes back to letting your clicks through. One that is working folds its laptop, walks over,
+  and **opens it again on arrival**
 - Crowded machines stay readable: **six crabs** go out at a time by default, most urgent first
   (waiting, stuck, cut off, failed, then the rest)
 - **Settings > General > Desktop stroll** sets how many go out, how big they are, and how fast

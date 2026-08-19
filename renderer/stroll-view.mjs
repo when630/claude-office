@@ -370,39 +370,63 @@ function drawCursor(ctx, at, ready) {
   if (ready) rect(ctx, x + 11, y + 2, 2, 2, MARK_MOVE);
 }
 
-// 누른 자리에 남는 표식. **밖에서 안으로 모여 콕 찍힌다** — 퍼지는 파문으로 그렸더니
-// 명령이 그 지점에 꽂히는 것이 아니라 거기서 무언가 번지는 것으로 보였다.
-// 다 모이면 가운데에 점이 남고, 그 상태로 잠깐 있다가 사라진다.
+// 누른 자리에 남는 표식. **보내는 것과 고르는 것은 다른 그림이다** — 같은 모양을 색만 바꿔
+// 썼더니 무슨 명령을 내렸는지가 색 하나에 달려 있었다.
 function drawMarks(ctx, marks, now) {
   for (const m of marks) {
     const age = (now - m.t0) / MARK_MS;
     if (age < 0 || age > 1) continue;
-    const color = m.move ? MARK_MOVE : PICK;
-    // 앞의 절반 동안 모여들고, 남은 절반에 옅어진다
-    const k = Math.min(1, age / 0.5);
-    const d = 9 - k * 5;
-    ctx.globalAlpha = age > 0.5 ? 1 - (age - 0.5) / 0.5 : 1;
-
-    // **찍힌 지점은 처음부터 있다.** 다 모인 뒤에야 점을 찍어 봤더니 어디를 눌렀는지가
-    // 마지막 순간에만 보여서, 모여드는 동안은 무엇을 하는 표시인지 알 수 없었다.
-    rect(ctx, m.x - 1, m.y, 3, 1, color);
-    rect(ctx, m.x, m.y - 1, 1, 3, color);
-
-    // 네 귀퉁이에서 모여드는 ㄱ자 — 세로는 조금 눌러 찍는다(위에서 내려다본 화면이다)
-    for (const [sx, sy] of [
-      [-1, -1],
-      [1, -1],
-      [-1, 1],
-      [1, 1],
-    ]) {
-      const cx = Math.round(m.x + sx * d);
-      const cy = Math.round(m.y + sy * d * 0.7);
-      rect(ctx, cx, cy, 1, 1, color);
-      rect(ctx, cx - (sx < 0 ? 0 : 1), cy, 2, 1, color);
-      rect(ctx, cx, cy - (sy < 0 ? 0 : 1), 1, 2, color);
-    }
-    ctx.globalAlpha = 1;
+    if (m.group) drawGroupMark(ctx, m, age);
+    else drawMoveMark(ctx, m, age);
   }
+}
+
+// 보내기 — **화살표가 위에서 내려와 바닥을 친다.** 지점에 무언가 나타났다 사라지는 것만으로는
+// "여기"까지밖에 못 말한다. 내려오는 방향이 있어야 "저기로 가라"가 된다.
+function drawMoveMark(ctx, m, age) {
+  const x = Math.round(m.x);
+  const floor = Math.round(m.y);
+  // 앞의 절반 동안 떨어지고, 닿은 뒤로는 그 자리에서 옅어진다
+  const drop = age < 0.5 ? (1 - age / 0.5) * 9 : 0;
+  const y = Math.round(floor - 7 - drop);
+  ctx.globalAlpha = age < 0.5 ? 1 : 1 - (age - 0.5) / 0.5;
+  rect(ctx, x - 2, y, 5, 1, MARK_MOVE);
+  rect(ctx, x - 1, y + 1, 3, 1, MARK_MOVE);
+  rect(ctx, x, y + 2, 1, 1, MARK_MOVE);
+  // 닿고 나서야 바닥 자국이 생긴다 — 닿기 전에 그리면 화살표가 제자리에 떠 있는 것으로 보인다
+  if (age >= 0.5) {
+    rect(ctx, x - 3, floor, 7, 1, MARK_MOVE);
+    rect(ctx, x, floor - 1, 1, 1, MARK_MOVE);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// 고르기 — **그린 상자가 고른 게들을 감싸며 조여든다.** 고르는 것은 한 점을 찍는 일이 아니라
+// 여럿을 하나로 묶는 일이라, 상자가 대상에 달라붙는 것이 그 동작 자체다.
+function drawGroupMark(ctx, m, age) {
+  const k = Math.min(1, age / 0.45);
+  const e = 1 - (1 - k) * (1 - k); // 끝에서 부드럽게 멎는다
+  const at = (a, b) => a + (b - a) * e;
+  const x0 = at(m.from.x0, m.to.x0);
+  const y0 = at(m.from.y0, m.to.y0);
+  const x1 = at(m.from.x1, m.to.x1);
+  const y1 = at(m.from.y1, m.to.y1);
+  ctx.globalAlpha = age > 0.45 ? 1 - (age - 0.45) / 0.55 : 0.9;
+  // 네 귀퉁이만 — 네 변을 다 그리면 아직 끌고 있는 선택 상자와 구분이 안 된다
+  const arm = Math.max(2, Math.min(5, (x1 - x0) / 4));
+  for (const [px, sx] of [
+    [x0, 1],
+    [x1, -1],
+  ]) {
+    for (const [py, sy] of [
+      [y0, 1],
+      [y1, -1],
+    ]) {
+      rect(ctx, sx > 0 ? px : px - arm, py, arm, 1, PICK);
+      rect(ctx, px, sy > 0 ? py : py - arm, 1, arm, PICK);
+    }
+  }
+  ctx.globalAlpha = 1;
 }
 
 function drawBox(ctx, box) {
