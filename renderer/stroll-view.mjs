@@ -381,24 +381,47 @@ function drawMarks(ctx, marks, now) {
   }
 }
 
-// 보내기 — **화살표가 위에서 내려와 바닥을 친다.** 지점에 무언가 나타났다 사라지는 것만으로는
-// "여기"까지밖에 못 말한다. 내려오는 방향이 있어야 "저기로 가라"가 된다.
+// 바닥에 놓인 원. **세로로 눌러 그린다** — 위에서 비스듬히 내려다본 화면이라 정원으로 그리면
+// 바닥이 아니라 허공에 뜬 고리가 된다(포탈과 같은 사정이다).
+function ring(ctx, cx, cy, r, color, squash = 0.62) {
+  if (r < 1) return;
+  // 촘촘히 돌아야 각이 안 진다 — 성글게 찍으면 원이 아니라 팔각형이 된다
+  const steps = Math.max(16, Math.round(r * 12));
+  for (let i = 0; i < steps; i++) {
+    const a = (i / steps) * Math.PI * 2;
+    rect(ctx, cx + Math.cos(a) * r, cy + Math.sin(a) * r * squash, 1, 1, color);
+  }
+}
+
+// 보내기 — **화살표가 내리꽂히고, 그 자리에서 원이 조여든다.**
+//
+// 처음엔 천천히 내려와 바닥에 `ㅗ` 자국을 남겼는데, 찍는 것이 아니라 조심스레 놓는 것으로
+// 보였고 자국도 지저분했다. 빠르게 떨어뜨려 튕기게 하고, 닿은 자리에는 줄어드는 원만 남긴다.
 function drawMoveMark(ctx, m, age) {
   const x = Math.round(m.x);
-  const floor = Math.round(m.y);
-  // 앞의 절반 동안 떨어지고, 닿은 뒤로는 그 자리에서 옅어진다
-  const drop = age < 0.5 ? (1 - age / 0.5) * 9 : 0;
-  const y = Math.round(floor - 7 - drop);
-  ctx.globalAlpha = age < 0.5 ? 1 : 1 - (age - 0.5) / 0.5;
-  rect(ctx, x - 2, y, 5, 1, MARK_MOVE);
-  rect(ctx, x - 1, y + 1, 3, 1, MARK_MOVE);
-  rect(ctx, x, y + 2, 1, 1, MARK_MOVE);
-  // 닿고 나서야 바닥 자국이 생긴다 — 닿기 전에 그리면 화살표가 제자리에 떠 있는 것으로 보인다
-  if (age >= 0.5) {
-    rect(ctx, x - 3, floor, 7, 1, MARK_MOVE);
-    rect(ctx, x, floor - 1, 1, 1, MARK_MOVE);
+  const y = Math.round(m.y);
+  const HIT = 0.22; // 이때 바닥에 닿는다
+
+  // 화살표 — 내려오고, 닿는 순간 한 번 튕겼다 사라진다
+  if (age < HIT + 0.28) {
+    const k = Math.min(1, age / HIT);
+    const drop = (1 - k) * (1 - k) * 12; // 끝에서 빨라진다
+    const bounce = age > HIT ? Math.sin(((age - HIT) / 0.28) * Math.PI) * 2.5 : 0;
+    const ay = Math.round(y - 6 - drop - bounce);
+    ctx.globalAlpha = age > HIT ? 1 - (age - HIT) / 0.28 : 1;
+    rect(ctx, x - 2, ay, 5, 1, MARK_MOVE);
+    rect(ctx, x - 1, ay + 1, 3, 1, MARK_MOVE);
+    rect(ctx, x, ay + 2, 1, 1, MARK_MOVE);
+    ctx.globalAlpha = 1;
   }
-  ctx.globalAlpha = 1;
+
+  // 닿은 자리 — 원이 조여들며 옅어진다. 다 조여들면 점 하나가 남는다.
+  if (age >= HIT) {
+    const k = (age - HIT) / (1 - HIT);
+    ctx.globalAlpha = 1 - k * k;
+    ring(ctx, x, y, 7 - k * 5, MARK_MOVE);
+    ctx.globalAlpha = 1;
+  }
 }
 
 // 고르기 — **그린 상자가 고른 게들을 감싸며 조여든다.** 고르는 것은 한 점을 찍는 일이 아니라
