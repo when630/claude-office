@@ -973,17 +973,17 @@ function stepVillain(world, live, { now, step, area, rng, drag }) {
     return;
   }
   if (now - vil.born > RAGE_MS) armFighters(world, live, vil, now, rng);
-  // 망치가 나온 뒤에는 얼어붙어 부들부들 떨기만 한다 — 이 크기에서 도망치는 표적을 쫓아가
-  // 때리는 그림은 안 나온다. 겁먹고 굳은 것을 마주 보고 내리치는 것이 피니셔다.
+  // 망치가 나온 뒤에는 겁먹고 얼어붙는다 — 이 크기에서 도망치는 표적을 쫓아가 때리는
+  // 그림은 안 나온다. 굳은 것을 마주 보고 내리치는 것이 피니셔다. **떨지는 않는다**:
+  // 좌우 지터는 맞은 순간(flinch)과 돌진 조준의 것이라, 몇 초씩 이어지는 이 국면에
+  // 얹으면 악당이 내내 좌우로 덜덜거린다.
   const swinger = vil.hammerKey ? world.pets.get(vil.hammerKey) : null;
   if (swinger) {
     vil.mode = null;
-    vil.shake = 1;
+    vil.shake = 0; // 조준 도중 망치가 배정되면 mode만 걷혀 떨림이 켜진 채 남는다
     vil.dir = swinger.x > vil.x ? 1 : -1;
     return;
   }
-  // 망치잡이가 자격을 잃어 물러났으면 떨림도 걷는다 — 조준 떨림은 runAttack이 제 손으로 켠다
-  if (vil.shake && vil.mode?.kind !== 'charge') vil.shake = 0;
   // 다 나가떨어져 있으면 공격을 안 고르고 떠서 기다린다 — 곧 누군가 일어난다
   const targets = [...world.pets.values()].filter((p) => canPlay(world, live, p.key));
   if (!vil.mode && now >= vil.nextAt && targets.length) pickAttack(vil, targets, now, rng, area);

@@ -1146,8 +1146,10 @@ test('망치는 꽂히는 순간에 눕힌다 — 도착 즉시 눕히면 시체
   let drift = 0;
   let at = { x: 0, y: 0 };
   let koAt = 0;
+  let shook = false;
   for (let i = 0; i < 2500 && world.villain && !koAt; i++, t += 16) {
     stepStroll(world, cast, { w: W, h: H, now: t, dt: 16, rng: () => 0.5 });
+    if (world.villain.hammerKey && world.villain.shake) shook = true;
     const sw = [...world.pets.values()].find((p) => p.swingAt);
     if (sw && !swingStart) {
       swingStart = t;
@@ -1168,6 +1170,8 @@ test('망치는 꽂히는 순간에 눕힌다 — 도착 즉시 눕히면 시체
   // 타격은 내리침 국면(스윙 중반 이후)이다 — 시작 즉시도, 끝나고 나서도 아니다
   const delay = koAt - swingStart;
   assert.ok(delay > 300 && delay < 640, `눕는 시점이 내리침과 어긋난다 (${delay}ms)`);
+  // 좌우 지터는 맞은 순간의 것 — 망치 국면 몇 초 동안 내내 떨면 안 된다
+  assert.ok(!shook, '망치 국면에서 악당이 계속 떤다');
 });
 
 test('악당을 잡아 휙 던지면 즉시 격퇴된다 — 살살 놓으면 다시 일어난다', () => {
