@@ -52,6 +52,10 @@ function bodyOf(pet, t) {
     case 'sink':
     case 'drop':
       return SPR.heldA; // 구멍을 오가거나 손에서 떨어지는 동안은 다리가 늘어져 있다
+    case 'throw':
+      // 날아가는 동안 허우적 — 빙글 도는 그림은 이 크기에서 못 그리고, 팔다리를 빠르게
+      // 젓는 것이 "던져졌다"로 읽힌다(집힌 발버둥 190ms보다 급하다)
+      return Math.floor(t / 110) % 2 ? SPR.heldA : SPR.heldB;
     case 'look':
       // 커서를 올려다본다 — 팔을 살짝 들었다 내리는 것이 "쳐다보는 중"으로 읽힌다
       return Math.floor(t / 420) % 2 ? SPR.armsUp : SPR.stand;
