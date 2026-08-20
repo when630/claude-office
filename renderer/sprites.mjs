@@ -106,6 +106,10 @@ export const SPR = {
   villainB: sprite(PX.VILLAIN_B),
   villainFlat: sprite(PX.VILLAIN_FLAT),
   hammer: sprite(PX.HAMMER),
+  hammerSide: sprite(PX.HAMMER_SIDE),
+  // 왼쪽 볼 때의 수평 망치 — drawSprite에 뒤집기가 없어 거울상을 따로 굽는다
+  hammerSideL: sprite(PX.HAMMER_SIDE.map((row) => [...row].reverse().join(''))),
+  hammerDown: sprite(PX.HAMMER_DOWN),
   book: sprite(PX.BOOK),
   pencup: sprite(PX.PENCUP),
   docs: sprite(PX.DOCS),

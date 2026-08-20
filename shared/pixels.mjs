@@ -891,6 +891,26 @@ export const HAMMER = [
   '...m...',
 ];
 
+// 내리치는 찰나의 망치 — 대가리가 앞(오른쪽)으로 넘어간 수평 자세. 왼쪽 볼 때는 그리는 쪽이
+// 뒤집은 판(sprites.mjs)을 쓴다. 세로 판을 90° 돌린 모양이라 대가리 5×2가 2×5로 선다.
+export const HAMMER_SIDE = [
+  '....ss',
+  '....ss',
+  'mmmmss',
+  '....ss',
+  '....SS',
+];
+
+// 꽂힌 망치 — 대가리가 바닥, 자루가 위. 세로 판을 뒤집은 것으로, 이 자세로 타격 뒤 멈춘다.
+export const HAMMER_DOWN = [
+  '...m...',
+  '...m...',
+  '...m...',
+  '...m...',
+  '.sssSS.',
+  '.sssss.',
+];
+
 // 자료실 열람석에 펼쳐진 책
 export const BOOK = ['..z...z..', '.zwz.zwz.', 'zwwwzwwwz', 'zwwwzwwwz', 'mmmmmmmmm'];
 

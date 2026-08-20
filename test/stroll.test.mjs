@@ -1130,6 +1130,46 @@ test('반격 — 미니 포탈로 무기를 받고 망치 피니셔로 끝낸다
   assert.ok(world.playCool > t - 16, '쿨다운이 안 걸렸다');
 });
 
+test('망치는 꽂히는 순간에 눕힌다 — 도착 즉시 눕히면 시체 위로 내리치는 그림이 된다 (#196)', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle'), worker('b', 'idle'), worker('c', 'idle')]));
+  run(world, cast, { frames: 700, rng: () => 0.5 });
+  triggerVillain(world, cast, 4_400_000);
+  let t = villainLive(world, cast, 4_400_016);
+  const vil = world.villain;
+  vil.hp = 1;
+  vil.born = t - 7000;
+
+  let swingStart = 0;
+  let stateAtSwing = null;
+  let distAtSwing = 0;
+  let drift = 0;
+  let at = { x: 0, y: 0 };
+  let koAt = 0;
+  for (let i = 0; i < 2500 && world.villain && !koAt; i++, t += 16) {
+    stepStroll(world, cast, { w: W, h: H, now: t, dt: 16, rng: () => 0.5 });
+    const sw = [...world.pets.values()].find((p) => p.swingAt);
+    if (sw && !swingStart) {
+      swingStart = t;
+      stateAtSwing = world.villain.state;
+      distAtSwing = Math.hypot(sw.x - world.villain.x, sw.y - world.villain.y);
+      at = { x: world.villain.x, y: world.villain.y };
+    }
+    if (swingStart && world.villain.state === 'live')
+      drift = Math.max(drift, Math.hypot(world.villain.x - at.x, world.villain.y - at.y));
+    if (world.villain.state === 'ko') koAt = t;
+  }
+  assert.ok(swingStart, '스윙이 시작되지 않는다');
+  assert.equal(stateAtSwing, 'live', '들어올리기도 전에 이미 납작하다');
+  // 옆자리(SMASH_GAP)에 선다 — 겹쳐 서면 제 머리를 때리는 그림이 된다
+  assert.ok(distAtSwing > 12, `너무 붙어 선다 (${distAtSwing.toFixed(1)}px)`);
+  // 들어올리는 동안 악당은 얼어붙는다 — 움직이면 내리침이 헛돈다
+  assert.ok(drift < 0.5, `스윙 중에 악당이 돌아다닌다 (${drift.toFixed(1)}px)`);
+  // 타격은 내리침 국면(스윙 중반 이후)이다 — 시작 즉시도, 끝나고 나서도 아니다
+  const delay = koAt - swingStart;
+  assert.ok(delay > 300 && delay < 640, `눕는 시점이 내리침과 어긋난다 (${delay}ms)`);
+});
+
 test('악당을 잡아 휙 던지면 즉시 격퇴된다 — 살살 놓으면 다시 일어난다', () => {
   const world = createWorld();
   const cast = strollCast(rooms(['proj', worker('a', 'idle'), worker('b', 'idle')]));
