@@ -14,6 +14,7 @@ import {
   petAt,
   petsInBox,
   orderMove,
+  throwPet,
 } from './stroll.mjs';
 import { renderStroll } from './stroll-view.mjs';
 import {
@@ -222,6 +223,9 @@ window.addEventListener('mousemove', (e) => {
   if (!grab) return;
   if (Math.abs(e.clientX - grab.at.x) > DRAG_SLOP || Math.abs(e.clientY - grab.at.y) > DRAG_SLOP) grab.moved = true;
   drag = { key: grab.key, x: (e.clientX + grab.dx) / scale, y: (e.clientY + grab.dy) / scale };
+  // 놓는 순간 속도를 재려고 지나온 자리를 몇 개 들고 있는다 (던지기)
+  grab.trail.push({ x: e.clientX, y: e.clientY, t: Date.now() });
+  if (grab.trail.length > 8) grab.trail.shift();
 });
 
 window.addEventListener('mouseleave', () => {
@@ -260,6 +264,7 @@ window.addEventListener('mousedown', (e) => {
     at: { x: e.clientX, y: e.clientY },
     t: Date.now(),
     moved: false,
+    trail: [{ x: e.clientX, y: e.clientY, t: Date.now() }],
   };
   drag = { key: hit.key, x: hit.x, y: hit.y };
   document.body.style.cursor = 'grabbing';
@@ -289,9 +294,32 @@ window.addEventListener('mouseup', () => {
   grab = null;
   drag = null;
   document.body.style.cursor = passThrough ? 'default' : 'grab';
+  // 휙 놓았으면 던진다 — 문턱 판정은 throwPet(stroll.mjs)이 한다: 못 넘으면 여느 놓기처럼
+  // 제자리에 떨어진다(held → drop). 속도는 게가 사는 논리 좌표로 바꿔 넘긴다.
+  const v = flingVelocity(held.trail);
+  if (v) throwPet(world, held.key, v.x / scale, v.y / scale);
   // 끌지 않고 톡 눌렀으면 그 세션을 큰 창에서 편다. 끌었으면 놓은 자리에 떨어질 뿐이다.
   if (!held.moved && Date.now() - held.t < CLICK_MS) window.office?.selectSession?.(held.key);
 });
+
+// 놓기 직전의 커서 속도(창 px/ms). 마지막 표본 한 쌍으로 재면 손이 멈칫한 프레임에 걸려
+// 0이 된다 — 이만큼 되짚은 표본과의 평균 속도를 쓴다.
+const FLING_WINDOW_MS = 120;
+
+function flingVelocity(trail) {
+  if (!trail || trail.length < 2) return null;
+  const last = trail[trail.length - 1];
+  let base = trail[0];
+  for (const s of trail) {
+    if (last.t - s.t <= FLING_WINDOW_MS) {
+      base = s;
+      break;
+    }
+  }
+  const dt = last.t - base.t;
+  if (dt < 8) return null;
+  return { x: (last.x - base.x) / dt, y: (last.y - base.y) / dt };
+}
 
 window.addEventListener('resize', resize);
 

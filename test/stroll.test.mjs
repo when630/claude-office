@@ -25,7 +25,7 @@ globalThis.document = {
   }),
 };
 
-const { createWorld, stepStroll, strollCast, wantAct, saying, petAt, petHitBox, petsInBox, orderMove, strollArea, STROLL_MAX } =
+const { createWorld, stepStroll, strollCast, wantAct, saying, petAt, petHitBox, petsInBox, orderMove, throwPet, strollArea, STROLL_MAX } =
   await import(
   '../renderer/stroll.mjs'
 );
@@ -299,6 +299,58 @@ test('흔들어 놓으면 어지러워하고, 그냥 옮기면 안 그렇다', (
   // 어지러움은 잠깐이고 곧 다시 걷는다
   const over = find(run(world, cast, { frames: 40, t0: 64_000 }), 'a');
   assert.notEqual(over.act, 'dizzy');
+});
+
+test('휙 놓으면 날아가 미끄러지다 서고, 세게 던져졌으면 어지럽다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
+  run(world, cast, { frames: 700, rng: () => 0.1 });
+  run(world, cast, { frames: 5, t0: 800_000, drag: () => ({ key: 'a', x: 80, y: 100 }) });
+  assert.equal(throwPet(world, 'a', 0.9, 0), true, '문턱을 넘겼는데 안 던져진다');
+
+  let flew = 0;
+  let rose = 0;
+  let sawDizzy = false;
+  let pet = null;
+  for (let i = 0; i < 400; i++) {
+    pet = find(stepStroll(world, cast, { w: W, h: H, now: 800_100 + i * 16, dt: 16, rng: () => 0.5 }), 'a');
+    if (pet.act === 'throw') {
+      flew++;
+      if (pet.hop > 0.3) rose++;
+    }
+    if (pet.act === 'dizzy') sawDizzy = true;
+    assert.ok(pet.x >= 0 && pet.x <= W, `날다가 화면을 나갔다: ${pet.x}`);
+  }
+  assert.ok(flew > 10, `날지 않았다: ${flew}프레임`);
+  assert.ok(rose > 3, '몸이 뜨지 않았다 — 던진 게 아니라 밀린 것이다');
+  assert.ok(pet.x > 200, `던진 방향으로 안 갔다: ${pet.x}`);
+  assert.ok(sawDizzy, '세게 던져졌는데 멀쩡하다');
+  assert.equal(pet.hop, 0, '뜬 채로 끝난다');
+});
+
+test('살살 놓으면 던져지지 않는다 — 여느 놓기다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
+  run(world, cast, { frames: 700, rng: () => 0.1 });
+  run(world, cast, { frames: 5, t0: 900_000, drag: () => ({ key: 'a', x: 200, y: 100 }) });
+  assert.equal(throwPet(world, 'a', 0.1, 0.05), false, '문턱 아래인데 던져졌다');
+  const pet = find(run(world, cast, { frames: 2, t0: 900_100 }), 'a');
+  assert.equal(pet.act, 'drop', '놓기로 안 이어진다');
+});
+
+test('가장자리로 던지면 튕겨서 화면 안에 남는다', () => {
+  const area = strollArea(W, H);
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
+  run(world, cast, { frames: 700, rng: () => 0.1 });
+  run(world, cast, { frames: 5, t0: 950_000, drag: () => ({ key: 'a', x: 30, y: 50 }) });
+  // 상한(THROW_MAX)보다 센 값 — 왼쪽 위 모서리로 쏜다
+  assert.equal(throwPet(world, 'a', -2.4, -1.8), true);
+  for (let i = 0; i < 300; i++) {
+    const pet = find(stepStroll(world, cast, { w: W, h: H, now: 950_100 + i * 16, dt: 16, rng: () => 0.5 }), 'a');
+    assert.ok(pet.x >= area.x0 - 0.01 && pet.x <= area.x1 + 0.01, `옆으로 나갔다: ${pet.x}`);
+    assert.ok(pet.y >= area.y0 - 0.01 && pet.y <= area.y1 + 0.01, `위아래로 나갔다: ${pet.y}`);
+  }
 });
 
 test('일하거나 기다리는 중이면 흔들려도 어지러워하지 않는다', () => {

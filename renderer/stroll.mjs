@@ -60,6 +60,25 @@ const DROP_SHORT = 14;
 // 만들면 자리를 바꿀 때마다 별이 돌아, 어지러움이 상태가 아니라 배경 무늬가 된다.
 const SHAKE_LIMIT = 420;
 const DIZZY_MS = 1800;
+// 던지기 — 놓는 순간의 커서 속도(논리 px/ms)가 이 문턱을 넘으면 떨어지는 대신 날아간다.
+// 그 아래는 여느 놓기(drop)다. 상한은 화면 밖으로 쏘아 보내는 손을 잡는다 — 밖으로 나간
+// 게는 가장자리 튕김이 있어도 벽에 몇 번씩 부딪히는 그림이 된다.
+const THROW_MIN = 0.35;
+const THROW_MAX = 1.1;
+// 바닥 속도가 잦아드는 시간 상수 — 0.8px/ms로 던지면 280px쯤 미끄러지고 선다
+const THROW_DECAY_MS = 350;
+// 공중 높이는 **폴짝 단위**(pet.hop과 같은 눈금)로 잰다 — 몇 px로 그릴지는 그리는 쪽 몫이다.
+// 중력을 폴짝 높이(HOP_H=7px)로 나눈 값이라 떨어지는 감은 포탈 낙하와 같다.
+const AIR_G = GRAVITY / 7;
+// 처음 뜨는 높이(폴짝 단위). 세게 던질수록 높이 뜨되 두 배가 상한이다 —
+// 그림자 셈(1 - hop·0.45)이 뒤집히지 않는 한계 안이기도 하다.
+const THROW_APEX_MIN = 0.9;
+const THROW_APEX_MAX = 2;
+// 튕김 — 이 비율로 잦아들고, 이 아래로 약해지면 그대로 선다
+const BOUNCE = 0.45;
+const BOUNCE_STOP = 0.003;
+// 이보다 세게 던져졌으면 착지 후 어지럽다
+const THROW_DIZZY = 0.7;
 // 뛰기 — 목적지를 고를 때 이 확률로 달린다. 속도는 이만큼 곱한다.
 const RUN_CHANCE = 0.28;
 const RUN_MULT = 2.3;
@@ -290,6 +309,30 @@ export function orderMove(world, keys, x, y, w, h) {
   return list.length;
 }
 
+// 손에서 놓는 순간 커서 속도를 실어 던진다(stroll-app의 mouseup). 속도는 논리 px/ms.
+//
+// 문턱(THROW_MIN)을 못 넘으면 **아무것도 하지 않는다** — 그러면 다음 프레임에 held → drop으로
+// 떨어져, 던진 것과 놓은 것이 저절로 갈린다. 문턱이 여기 사는 이유다: 껍데기(stroll-app)가
+// 판정까지 들면 테스트가 못 닿는 자리에 물리가 생긴다.
+export function throwPet(world, key, vx, vy) {
+  const pet = world.pets.get(key);
+  if (!pet || pet.act !== 'held') return false;
+  const speed = Math.hypot(vx, vy);
+  if (speed < THROW_MIN) return false;
+  const k = Math.min(1, THROW_MAX / speed);
+  pet.act = 'throw';
+  pet.tvx = vx * k;
+  pet.tvy = vy * k;
+  // 세게 던질수록 높이 뜬다 — 같은 높이로만 뜨면 살살 던진 것과 세게 던진 것이 같은 그림이다
+  const apex = Math.min(THROW_APEX_MAX, THROW_APEX_MIN + speed * k);
+  pet.hop = 0;
+  pet.vz = Math.sqrt(2 * apex * AIR_G);
+  pet.hardThrow = speed * k > THROW_DIZZY;
+  pet.shake = 0;
+  pet.lap = 0;
+  return true;
+}
+
 // 상자 안에 든 게들. 좌표는 논리 단위다.
 export function petsInBox(pets, box) {
   const x0 = Math.min(box.x0, box.x1);
@@ -358,6 +401,8 @@ export function stepStroll(
       pet.y = drag.y;
       pet.moving = false;
       pet.lap = 0;
+      pet.hop = 0; // 날아가는 중에 낚아채면 뜬 높이가 남는다 — 손에 있는 동안 몸이 붕 뜨면 안 된다
+      pet.vz = 0;
       continue;
     }
 
@@ -371,6 +416,43 @@ export function stepStroll(
       pet.dizzyUntil = (pet.shake ?? 0) > SHAKE_LIMIT ? now + DIZZY_MS : 0;
       pet.shake = 0;
       pet.x = Math.min(Math.max(pet.x, area.x0), area.x1);
+    }
+
+    // 던져져 날아가는 중 — 바닥 자리(x·y)는 관성으로 미끄러지고 몸(hop)은 튕기며 잦아든다.
+    // 발밑 그림자가 바닥 자리를 따라가므로 "허공을 나는" 게 아니라 "튕기며 미끄러지는" 그림이 된다.
+    if (pet.act === 'throw') {
+      pet.moving = false;
+      // 지수 감쇠의 정적분 — 프레임 길이가 널뛰어도(step 상한 64ms) 궤적이 같다
+      const f = Math.exp(-step / THROW_DECAY_MS);
+      pet.x += pet.tvx * THROW_DECAY_MS * (1 - f);
+      pet.y += pet.tvy * THROW_DECAY_MS * (1 - f);
+      pet.tvx *= f;
+      pet.tvy *= f;
+      // 가장자리에서 튕긴다 — 밖으로 나간 게는 영영 안 보인다
+      if (pet.x < area.x0 || pet.x > area.x1) {
+        pet.x = Math.min(Math.max(pet.x, area.x0), area.x1);
+        pet.tvx = -pet.tvx * 0.7;
+      }
+      if (pet.y < area.y0 || pet.y > area.y1) {
+        pet.y = Math.min(Math.max(pet.y, area.y0), area.y1);
+        pet.tvy = -pet.tvy * 0.7;
+      }
+      // 몸의 포물선(폴짝 단위). 닿을 때마다 잦아드는 만큼만 다시 튄다.
+      pet.hop += pet.vz * step;
+      pet.vz -= AIR_G * step;
+      if (pet.hop <= 0) {
+        pet.hop = 0;
+        pet.vz = pet.vz < 0 ? -pet.vz * BOUNCE : 0;
+        if (pet.vz < BOUNCE_STOP) pet.vz = 0;
+      }
+      // 다 잦아들면 선다 — 세게 던져졌으면 어지러운 채로
+      if (pet.hop <= 0 && pet.vz === 0 && Math.hypot(pet.tvx, pet.tvy) < 0.02) {
+        pet.act = 'land';
+        pet.until = now + LAND_MS;
+        pet.dizzyUntil = pet.hardThrow ? now + LAND_MS + DIZZY_MS : 0;
+        pet.hardThrow = false;
+      }
+      continue;
     }
 
     // 놓인 뒤 짧게 떨어지는 중
