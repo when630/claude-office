@@ -25,10 +25,21 @@ globalThis.document = {
   }),
 };
 
-const { createWorld, stepStroll, strollCast, wantAct, saying, petAt, petHitBox, petsInBox, orderMove, throwPet, strollArea, STROLL_MAX } =
-  await import(
-  '../renderer/stroll.mjs'
-);
+const {
+  createWorld,
+  stepStroll,
+  strollCast,
+  wantAct,
+  saying,
+  petAt,
+  petHitBox,
+  petsInBox,
+  orderMove,
+  pinPets,
+  throwPet,
+  strollArea,
+  STROLL_MAX,
+} = await import('../renderer/stroll.mjs');
 
 const W = 400;
 const H = 200;
@@ -786,6 +797,58 @@ test('일하는 게도 부르면 노트북을 접고 간다 — 도착하면 다
   const back = find(run(world, busy, { frames: 2000, t0: 601_000 }), 'a');
   assert.equal(back.act, 'work');
   assert.ok(back.lap > 0.9, `도착했는데 노트북을 안 편다: ${back.lap}`);
+});
+
+test('붙박인 게는 자리를 지키고, 새 이동 명령이 핀을 푼다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
+  run(world, cast, { frames: 700, rng: () => 0.1 });
+
+  assert.equal(pinPets(world, ['a']), 1);
+  const at = find(stepStroll(world, cast, { w: W, h: H, now: 1_000_000, dt: 16 }), 'a');
+  const spot = { x: at.x, y: at.y };
+  // 쉬기(기지개·낮잠)는 그대로 타지만 **자리는 안 바뀐다**
+  for (let i = 1; i < 800; i++) {
+    const p = find(stepStroll(world, cast, { w: W, h: H, now: 1_000_000 + i * 16, dt: 16 }), 'a');
+    assert.ok(Math.abs(p.x - spot.x) < 0.01 && Math.abs(p.y - spot.y) < 0.01, `붙박였는데 움직였다: ${p.x},${p.y}`);
+  }
+
+  orderMove(world, ['a'], spot.x > W / 2 ? 40 : W - 40, 100, W, H);
+  assert.equal(world.pets.get('a').stay, false, '이동 명령을 받았는데 핀이 남아 있다');
+  const moved = find(run(world, cast, { frames: 60, t0: 1_100_000 }), 'a');
+  assert.ok(Math.abs(moved.x - spot.x) > 2, '명령을 받았는데 붙박여 있다');
+});
+
+test('붙박인 게도 일을 받으면 그 자리에서 노트북을 펴고, 핀은 풀린다', () => {
+  const world = createWorld();
+  const idle = strollCast(rooms(['proj', worker('a', 'idle')]));
+  run(world, idle, { frames: 700, rng: () => 0.1 });
+  pinPets(world, ['a']);
+  const spot = find(stepStroll(world, idle, { w: W, h: H, now: 1_200_000, dt: 16 }), 'a').x;
+
+  const busy = strollCast(rooms(['proj', worker('a', 'typing')]));
+  const pet = find(run(world, busy, { frames: 60, t0: 1_200_016 }), 'a');
+  assert.equal(pet.act, 'work');
+  assert.ok(Math.abs(pet.x - spot) < 1, '앉으면서 움직였다');
+  assert.equal(pet.stay, false, '일이 들어왔는데 핀이 남아 있다');
+
+  // 일이 끝나면 여느 게처럼 다시 돌아다닌다
+  const free = strollCast(rooms(['proj', worker('a', 'idle')]));
+  let strayed = false;
+  for (let i = 0; i < 1500 && !strayed; i++) {
+    const p = find(stepStroll(world, free, { w: W, h: H, now: 1_210_000 + i * 16, dt: 16, rng: () => 0.4 }), 'a');
+    if (Math.abs(p.x - spot) > 5) strayed = true;
+  }
+  assert.ok(strayed, '핀이 풀렸는데 영영 그 자리다');
+});
+
+test('붙박인 게를 집어 들면 핀이 풀린다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
+  run(world, cast, { frames: 700, rng: () => 0.1 });
+  pinPets(world, ['a']);
+  run(world, cast, { frames: 3, t0: 1_300_000, drag: () => ({ key: 'a', x: 200, y: 100 }) });
+  assert.equal(world.pets.get('a').stay, false, '손에 있는데 핀이 남아 있다');
 });
 
 test('부른 게는 노는 데 끼지 않는다', () => {
