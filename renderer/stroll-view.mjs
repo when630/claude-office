@@ -6,6 +6,7 @@
 // 밝은 벽지에서도 살아남아야 한다.
 import { SPR, drawSprite } from './sprites.mjs';
 import { glyphKeyFor, showsDizzy } from './talk.mjs';
+import { paperCount, stackPapers } from './render.mjs';
 
 const COLORS = {
   shadow: '#000000',
@@ -238,7 +239,23 @@ function drawPet(ctx, pet, t, opts) {
 
   // 노트북은 몸보다 나중에 — 상판이 하반신을 덮어야 "뒤에 앉았다"가 된다
   const lap = laptopOf(pet.lap, t);
-  if (lap) drawSprite(ctx, lap, x - lap.w / 2, y - lap.h + LAP_DY);
+  if (lap) {
+    drawSprite(ctx, lap, x - lap.w / 2, y - lap.h + LAP_DY);
+    // 컨텍스트 서류 — **큰 창과 같은 문턱**(paperCount)으로 노트북 옆에 쌓인다. 창마다
+    // 문턱이 다르면 서로를 못 믿는다. 다 편 동안만 그린다: 접는 순간 같이 사라지는 것이
+    // "챙겨서 일어났다"로 읽히고, 여닫는 반 초 사이에 더미가 깜빡이지도 않는다.
+    if (pet.lap >= 1) {
+      const n = paperCount(worker.context?.pct);
+      if (n) {
+        // 더미는 왼쪽으로 기울며 자란다(stackPapers) — 노트북 오른편에 두되, 다 쌓여도
+        // 맨 윗장이 노트북(x+7)에 닿지 않게 안쪽에서 시작한다. 오른쪽 화면 끝에서는
+        // 잘려 나가므로 그때만 왼편으로 옮긴다 — 큰 창의 PAPER_LEFT_STATIONS와 같은 사정.
+        const wide = ctx.canvas.width / (opts.scale * opts.dpr);
+        const right = x + 12 + SPR.papers.w <= wide - 2;
+        stackPapers(ctx, right ? x + 12 : x - 8 - SPR.papers.w, y + LAP_DY, n);
+      }
+    }
+  }
 
   // 구멍의 앞쪽 절반은 게 위에 얹는다 — 이 한 겹이 "구멍 안에 있다"를 만든다
   if (inPortal) drawPortal(ctx, x, portalY, pet.portal, t, 'front');

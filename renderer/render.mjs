@@ -992,7 +992,9 @@ function drawFloorMess(ctx, box, tint) {
 // 어긋나는 방향은 **늘 왼쪽**이다. 왼쪽 끝에 놓는 자리에서 오른쪽으로 기울여 봤더니 더미가
 // 오른쪽 비품(실험대 플라스크) 쪽으로 자라 하나로 뭉쳐 보였다 — 방향을 자리마다 뒤집는 대신
 // 왼쪽 끝에 놓는 자리는 PAPER_INSET만큼 안쪽에서 시작한다.
-function stackPapers(ctx, x, bottom, n) {
+// 산책 창도 같은 더미를 쌓는다(stroll-view.mjs) — 문턱(paperCount)과 모양이 창마다 다르면
+// 서로를 못 믿게 된다.
+export function stackPapers(ctx, x, bottom, n) {
   const spr = SPR.papers;
   for (let i = 0; i < n; i++) drawSprite(ctx, spr, x - i * PAPER_DX, bottom - spr.h - i * PAPER_DY);
 }
