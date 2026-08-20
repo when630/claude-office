@@ -124,8 +124,12 @@ const SIP_MS = 5200;
 // 일하는·기다리는 게는 표적이 아니고, 공격당한 게도 일이 들어오면 즉시 복구된다.
 // 걷지 않고 떠다닌다(다리가 없다). 놀이 도구와 같은 공용 쿨다운을 쓰고 동시에 안 뜬다.
 export const VILLAIN_KEY = '__villain';
-const VILLAIN_CHANCE = 0.0006;
-const VILLAIN_MAX_MS = 22_000; // 이걸 버티면 제풀에 포탈로 도망간다
+// 소환 놀이(공 0.0025 · 피크닉 0.0012)와 한 쿨다운을 놓고 경쟁한다 — 이 값이 곧 상대 빈도다.
+// 테스트의 소환 트리거(rng 0.001)가 악당에 안 걸리도록 딱 0.001에 둔다(>= 비교라 경계는 스킵).
+const VILLAIN_CHANCE = 0.001;
+// **안전장치일 뿐이다** — 악당은 퇴치될 때까지 남는 것이 원칙이고(종이→망치 반격이 늘 싸움을
+// 끝내 준다), 이 시간은 그 원칙이 어딘가에서 막혔을 때 화면을 되찾는 마지막 문이다.
+const VILLAIN_MAX_MS = 120_000;
 const VILLAIN_HP = 4; // 종이에 세 대 맞으면(hp 1) 망치 피니셔가 배정된다
 const VILLAIN_GLIDE = 0.03;
 const VILLAIN_DASH = 0.11;
@@ -646,6 +650,18 @@ export function villainAt(world, px, py, scale = 2) {
   return px >= x - w / 2 && px <= x + w / 2 && py >= y - h && py <= y + 6 * scale;
 }
 
+// 돌아올 표적이 하나라도 있나 — 세션이 쉬는(idle) 게라면 지금 날아가는 중이어도 곧 복귀한다.
+// 명령·핀에 매였거나 손에 잡힌 게는 사람 몫이므로 표적이 아니다.
+function hasPrey(world, live) {
+  for (const pet of world.pets.values()) {
+    const entry = live.get(pet.key);
+    if (!entry || wantAct(entry.worker) !== 'walk') continue;
+    if (pet.order || pet.stay || pet.act === 'held') continue;
+    return true;
+  }
+  return false;
+}
+
 // 다음 공격을 고른다 — 셋 중 하나를 난수로.
 function pickAttack(vil, targets, now, rng, area) {
   const kind = ['charge', 'beam', 'bugs'][Math.min(2, Math.floor(rng() * 3))];
@@ -930,13 +946,20 @@ function stepVillain(world, live, { now, step, area, rng, drag }) {
   stepShots(world, live, vil, now, step, area);
   stepPapers(world, vil, now, step);
 
-  const targets = [...world.pets.values()].filter((p) => canPlay(world, live, p.key));
-  if (!targets.length || now - vil.born > VILLAIN_MAX_MS) {
+  // 도망 판정은 "지금 때릴 수 있는가"가 아니라 **"돌아올 게가 있는가"**다. 박치기에 날아가거나
+  // 빔에 찢어진 게는 몇 초면 복귀하는데, 그 잠깐을 표적 없음으로 세면 첫 타격 직후 도망가 버린다
+  // — 한 대 치고 떠나는 건 악당이 아니다. 진짜 표적 없음(전원 일·대기·명령·손)만 2초 여유를
+  // 두고 도망한다(여유가 없으면 마지막 게를 잠깐 집어 든 것만으로 판이 끝난다).
+  if (!hasPrey(world, live)) vil.noPreyAt ??= now;
+  else vil.noPreyAt = null;
+  if ((vil.noPreyAt && now - vil.noPreyAt > 2000) || now - vil.born > VILLAIN_MAX_MS) {
     fleeVillain(world, vil, now);
     return;
   }
   if (now - vil.born > RAGE_MS) armFighters(world, live, vil, now, rng);
-  if (!vil.mode && now >= vil.nextAt) pickAttack(vil, targets, now, rng, area);
+  // 다 나가떨어져 있으면 공격을 안 고르고 떠서 기다린다 — 곧 누군가 일어난다
+  const targets = [...world.pets.values()].filter((p) => canPlay(world, live, p.key));
+  if (!vil.mode && now >= vil.nextAt && targets.length) pickAttack(vil, targets, now, rng, area);
   if (vil.mode) runAttack(world, live, vil, now, step, area, rng);
 }
 
