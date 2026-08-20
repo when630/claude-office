@@ -66,6 +66,8 @@ function bodyOf(pet, t) {
       return SPR.armsHigh; // 두 팔을 쭉 편다
     case 'nap':
       return SPR.asleep;
+    case 'sip':
+      return SPR.sip; // 캔을 홀짝인다 — 큰 창의 자판기 앞과 같은 그림이다
     case 'dizzy':
       // 흔들린 뒤 — **몸은 그대로 두고 머리 위 별만 돌린다.** 큰 창처럼 갸우뚱 프레임을
       // 끼웠더니 줄마다 어긋난 머리가 이 크기에서 "기울었다"가 아니라 "찌그러졌다"로 보였다.

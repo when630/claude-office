@@ -8,7 +8,7 @@
 // 그래서 이 파일은 캔버스를 모르고 `now`와 `dt`를 인자로 받는다 — main/notify.mjs가
 // Electron을 모르는 것과 같은 이유이고, 그래서 test/stroll.test.mjs가 돈다.
 import { miniRoster } from './render.mjs';
-import { chatLines, hashStr } from './talk.mjs';
+import { chatLines, slotNow } from './talk.mjs';
 import { STROLL_DEFAULTS } from '../shared/stroll-choices.mjs';
 
 // 한 화면에 세울 수 있는 인원의 기본값. 세션이 스물이어도 바탕화면이 게로 덮이면 안 된다.
@@ -111,6 +111,15 @@ const REST_LONG_MS = 62_000;
 const STRETCH_MS = 1300;
 const NAP_MS = 9000;
 const NAP_CHANCE = 0.45;
+// 쉬는 모습은 시간대를 탄다 — 구간 이름은 talk.mjs의 slotNow에서 온다(렌더러가 시각 경계를
+// 따로 들면 한쪽만 고치는 일이 생긴다). 심야에는 더 자주(문턱이 짧고) 더 깊이(존다) 쉬고,
+// 점심·오후에는 기지개 대신 캔을 홀짝이기도 한다 — 자판기 앞 풍경의 산책판이다.
+const NIGHT_SLOTS = ['night', 'lateNight'];
+const SIP_SLOTS = ['lunch', 'afternoon'];
+const REST_LONG_NIGHT_MS = 34_000;
+const NAP_CHANCE_NIGHT = 0.8;
+const SIP_CHANCE = 0.5;
+const SIP_MS = 5200;
 // 발자국. 이만큼 걸을 때마다 하나 남고(뛰면 더 성글게), 이 시간 동안 흐려진다.
 const TRACK_GAP = 7;
 const TRACK_GAP_RUN = 11;
@@ -358,6 +367,8 @@ export function stepStroll(
   world.h = h;
   const area = strollArea(w, h);
   const live = new Map(cast.map((e) => [e.worker.key, e]));
+  // 지금이 어느 시간대인가 — 쉬는 모습이 이걸 탄다. 한 프레임에 한 번만 묻는다.
+  const slot = slotNow(new Date(now));
 
   // 새로 온 게 — 모드를 막 켰든 산책 중에 세션이 생겼든 **같은 포탈로 떨어진다**
   for (const [key, entry] of live) {
@@ -548,12 +559,15 @@ export function stepStroll(
     // **놀이는 일 앞에서 즉시 걷힌다.** 일을 받았는데 아직 잡담 중이거나 졸고 있으면
     // 그 세션이 무엇을 하고 있는지가 장난에 가려진다. 폴짝 뛰던 중이면 공중에 뜬 채로
     // 노트북을 펴게 되므로 hop도 같이 걷는다.
-    if (want !== 'walk' && (pet.talk || pet.chase || pet.act === 'nap' || pet.act === 'stretch' || pet.act === 'hop')) {
+    if (
+      want !== 'walk' &&
+      (pet.talk || pet.chase || pet.act === 'nap' || pet.act === 'stretch' || pet.act === 'sip' || pet.act === 'hop')
+    ) {
       pet.talk = null;
       pet.chase = null;
       pet.cheer = false;
       pet.hop = 0;
-      if (pet.act === 'nap' || pet.act === 'stretch' || pet.act === 'hop') pet.act = 'walk';
+      if (pet.act === 'nap' || pet.act === 'stretch' || pet.act === 'sip' || pet.act === 'hop') pet.act = 'walk';
     }
 
     // 노트북 — 일을 받으면 펴고, 일이 끝나면 접는다. **접는 중에도 자리를 뜨지 않는다**
@@ -673,8 +687,8 @@ export function stepStroll(
       pet.lookAt = null;
     }
 
-    // 기지개와 낮잠 — 할 일 없이 오래 지나면 나온다. 자다가 일이 들어오면 위에서 걷어진다.
-    if (pet.act === 'stretch' || pet.act === 'nap') {
+    // 기지개·낮잠·캔 — 할 일 없이 오래 지나면 나온다. 자다가 일이 들어오면 위에서 걷어진다.
+    if (pet.act === 'stretch' || pet.act === 'nap' || pet.act === 'sip') {
       pet.moving = false;
       if (now < pet.until) continue;
       pet.act = 'walk';
@@ -683,10 +697,13 @@ export function stepStroll(
       pet.until = 0;
     }
     if (pet.restSince == null) pet.restSince = now;
-    if (now - pet.restSince > REST_LONG_MS && now >= pet.until) {
-      const nap = rng() < NAP_CHANCE;
-      pet.act = nap ? 'nap' : 'stretch';
-      pet.until = now + (nap ? NAP_MS : STRETCH_MS);
+    const night = NIGHT_SLOTS.includes(slot);
+    if (now - pet.restSince > (night ? REST_LONG_NIGHT_MS : REST_LONG_MS) && now >= pet.until) {
+      let act = 'stretch';
+      if (!night && SIP_SLOTS.includes(slot) && rng() < SIP_CHANCE) act = 'sip';
+      else if (rng() < (night ? NAP_CHANCE_NIGHT : NAP_CHANCE)) act = 'nap';
+      pet.act = act;
+      pet.until = now + (act === 'nap' ? NAP_MS : act === 'sip' ? SIP_MS : STRETCH_MS);
       pet.moving = false;
       pet.restSince = now;
       continue;
