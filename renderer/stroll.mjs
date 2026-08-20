@@ -464,15 +464,19 @@ export function stepStroll(
     const want = gone ? 'walk' : wantAct(pet.entry.worker);
 
     // **놀이는 일 앞에서 즉시 걷힌다.** 일을 받았는데 아직 잡담 중이거나 졸고 있으면
-    // 그 세션이 무엇을 하고 있는지가 장난에 가려진다.
-    if (want !== 'walk' && (pet.talk || pet.chase || pet.act === 'nap' || pet.act === 'stretch')) {
+    // 그 세션이 무엇을 하고 있는지가 장난에 가려진다. 폴짝 뛰던 중이면 공중에 뜬 채로
+    // 노트북을 펴게 되므로 hop도 같이 걷는다.
+    if (want !== 'walk' && (pet.talk || pet.chase || pet.act === 'nap' || pet.act === 'stretch' || pet.act === 'hop')) {
       pet.talk = null;
       pet.chase = null;
-      if (pet.act === 'nap' || pet.act === 'stretch') pet.act = 'walk';
+      pet.cheer = false;
+      pet.hop = 0;
+      if (pet.act === 'nap' || pet.act === 'stretch' || pet.act === 'hop') pet.act = 'walk';
     }
 
     // 노트북 — 일을 받으면 펴고, 일이 끝나면 접는다. **접는 중에도 자리를 뜨지 않는다**
     if (want === 'work') {
+      pet.worked = true; // 접었을 때 자축할지 판정하는 표시
       pet.lap = Math.min(1, pet.lap + step / OPEN_MS);
       pet.act = 'work';
       pet.moving = false;
@@ -483,6 +487,18 @@ export function stepStroll(
       pet.act = 'work';
       pet.moving = false;
       if (pet.lap > 0) continue;
+      // 접기 끝. 방금까지 일하던 게가 **일을 끝내서** 접은 것이면 그 자리에서 자축한다 —
+      // 폴짝 한 번 뛰고 기지개. 곁눈질 화면에서는 이 순간 연출이 곧 "끝났다" 알림이다.
+      // 대기·헤맴으로 바뀐 경우(halt)는 끝난 것이 아니라 나를 부르는 것이므로 걷는다.
+      const finished = pet.worked && want === 'walk';
+      pet.worked = false;
+      if (finished) {
+        pet.cheer = true; // 폴짝이 끝나면 기지개로 이어진다 — 폴짝만으로는 곁눈질에 안 걸린다
+        pet.act = 'hop';
+        pet.hopAt = now;
+        pet.hop = 0;
+        continue;
+      }
     }
 
     if (want === 'halt') {
@@ -501,6 +517,14 @@ export function stepStroll(
         continue;
       }
       pet.hop = 0;
+      // 자축의 두 번째 박자 — 내려선 자리에서 기지개를 켜고 나서야 산책으로 돌아간다
+      if (pet.cheer) {
+        pet.cheer = false;
+        pet.act = 'stretch';
+        pet.until = now + STRETCH_MS;
+        pet.restSince = now;
+        continue;
+      }
       pet.act = 'walk';
       pet.until = now + REST_MIN;
       aim(pet, area, rng, world);
