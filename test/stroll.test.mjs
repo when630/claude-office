@@ -983,12 +983,42 @@ test('악당은 포탈에서 나타나고, 때릴 게가 없으면 도망간다'
   assert.equal(world.villain.state, 'in', '포탈도 없이 놓였다');
   let t = villainLive(world, idle, 4_000_016);
 
-  // 전원 일을 받으면 표적이 없다 — 제풀에 포탈로 도망간다
+  // 전원 일을 받으면 표적이 없다 — 2초 여유를 두고 제풀에 포탈로 도망간다
   const busy = strollCast(rooms(['proj', worker('a', 'typing'), worker('b', 'typing')]));
-  for (let i = 0; i < 200 && world.villain; i++, t += 16) {
+  for (let i = 0; i < 350 && world.villain; i++, t += 16) {
     stepStroll(world, busy, { w: W, h: H, now: t, dt: 16, rng: () => 0.5 });
   }
   assert.equal(world.villain, null, '표적도 없는데 안 물러간다');
+});
+
+test('한 대 쳤다고 도망가지 않는다 — 맞은 게가 복귀할 때까지 남는다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
+  run(world, cast, { frames: 700, rng: () => 0.5 });
+  triggerVillain(world, cast, 4_600_000);
+  let t = villainLive(world, cast, 4_600_016);
+
+  // 하나뿐인 게를 박치기로 날려 보낸다 — 예전에는 이 직후 "표적 없음"으로 도망갔다
+  const vil = world.villain;
+  const a = world.pets.get('a');
+  a.act = 'walk';
+  a.moving = false;
+  a.until = t + 60_000;
+  a.talk = null;
+  vil.x = Math.max(15, a.x - 40);
+  vil.y = a.y;
+  vil.born = t;
+  vil.mode = { kind: 'charge', phase: 'aim', until: t, key: 'a' };
+
+  let thrown = false;
+  for (let i = 0; i < 320; i++, t += 16) {
+    const p = find(stepStroll(world, cast, { w: W, h: H, now: t, dt: 16, rng: () => 0.99 }), 'a');
+    if (p?.act === 'throw') thrown = true;
+  }
+  assert.ok(thrown, '박치기가 안 맞았다');
+  // 5초가 지났다 — 게는 날아갔다 돌아오는 중이고, 악당은 그대로 있어야 한다
+  assert.ok(world.villain, '맞은 게가 돌아오기도 전에 도망갔다');
+  assert.notEqual(world.villain.state, 'sink', '맞은 게가 돌아오기도 전에 가라앉는다');
 });
 
 test('돌진에 걸린 게는 던지기 물리로 날아가고 어지럽다', () => {
