@@ -244,7 +244,8 @@ function portalOpen(age) {
 // 지금 놀 수 있는 게인가 — 쉬는 중이고, 이미 다른 놀이에 붙잡혀 있지 않다.
 function freeToPlay(pet, live, now) {
   if (pet.act !== 'walk' && pet.act !== 'look') return false;
-  if (pet.talk || pet.chase || pet.order) return false;
+  // 붙박인 게는 놀이에 안 낀다 — 놀이는 자리를 옮기는데 머물라는 명령이 먼저다
+  if (pet.talk || pet.chase || pet.order || pet.stay) return false;
   const entry = live.get(pet.key);
   return !!entry && wantAct(entry.worker) === 'walk' && (pet.chatCool ?? 0) < now;
 }
@@ -312,10 +313,26 @@ export function orderMove(world, keys, x, y, w, h) {
     // 명령을 받으면 놀이는 그만둔다 — 부른 곳으로 가는 것이 먼저다
     pet.talk = null;
     pet.chase = null;
+    pet.stay = false; // 새 이동 명령이 곧 핀 해제다
     pet.until = 0;
     pet.dash = list.length > 2 || Math.hypot(pet.x - x, pet.y - y) > 120;
   });
   return list.length;
+}
+
+// 머물기 — 고른 게들을 지금 향하는(또는 선) 자리에 붙박는다(우클릭을 같은 자리에 두 번).
+// 이동 중이면 도착해서 머물고, 도착해 있으면 선 자리에서 머문다. 새 목적지를 안 고를 뿐
+// 커서 쳐다보기·쉬기는 그대로다 — 붙박은 게가 조각상이 되면 산책 창이 아니다.
+// 풀리는 길은 셋: 다시 이동 명령을 받거나, 손에 집히거나, 일이 들어오거나.
+export function pinPets(world, keys) {
+  let n = 0;
+  for (const k of keys) {
+    const pet = world.pets.get(k);
+    if (!pet || pet.act === 'sink') continue;
+    pet.stay = true;
+    n++;
+  }
+  return n;
 }
 
 // 손에서 놓는 순간 커서 속도를 실어 던진다(stroll-app의 mouseup). 속도는 논리 px/ms.
@@ -414,6 +431,7 @@ export function stepStroll(
       pet.lap = 0;
       pet.hop = 0; // 날아가는 중에 낚아채면 뜬 높이가 남는다 — 손에 있는 동안 몸이 붕 뜨면 안 된다
       pet.vz = 0;
+      pet.stay = false; // 손에 집히면 핀이 풀린다 — 옮겨 놓고도 붙박여 있으면 명령이 유령이 된다
       continue;
     }
 
@@ -573,6 +591,7 @@ export function stepStroll(
     // 노트북 — 일을 받으면 펴고, 일이 끝나면 접는다. **접는 중에도 자리를 뜨지 않는다**
     if (want === 'work') {
       pet.worked = true; // 접었을 때 자축할지 판정하는 표시
+      pet.stay = false; // 일이 들어오면 핀이 풀린다 — 일하러 간 게를 붙잡아 둘 이유가 없다
       pet.lap = Math.min(1, pet.lap + step / OPEN_MS);
       pet.act = 'work';
       pet.moving = false;
@@ -706,6 +725,13 @@ export function stepStroll(
       pet.until = now + (act === 'nap' ? NAP_MS : act === 'sip' ? SIP_MS : STRETCH_MS);
       pet.moving = false;
       pet.restSince = now;
+      continue;
+    }
+
+    // 붙박인 게는 새 목적지를 고르지 않고 그 자리에 선다 — 쉬기(위)와 쳐다보기는 그대로 탄다
+    if (pet.stay) {
+      pet.act = 'walk';
+      pet.moving = false;
       continue;
     }
 

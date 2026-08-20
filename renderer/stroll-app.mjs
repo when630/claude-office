@@ -14,6 +14,7 @@ import {
   petAt,
   petsInBox,
   orderMove,
+  pinPets,
   throwPet,
 } from './stroll.mjs';
 import { renderStroll } from './stroll-view.mjs';
@@ -67,6 +68,11 @@ const NO_KEYS = new Set();
 let inBox = NO_KEYS; // 지금 상자 안에 들어와 있는 게의 key (아직 고른 것은 아니다)
 const picks = new Map(); // 고른 직후 이펙트를 돌릴 게 — key → 시작 시각(performance.now)
 let marks = []; // 누른 자리에 찍히는 표식 (논리 좌표)
+// 직전 이동 명령 — 같은 자리를 이 시간 안에 또 찍으면 "가서 머물라"가 된다.
+// 이 창에는 keydown이 올 자리가 없어(초점을 안 받는다) 명령의 가짓수는 마우스로만 늘릴 수 있다.
+let lastOrder = null; // { x, y, t } (논리 좌표)
+const STAY_DBL_MS = 450;
+const STAY_DBL_NEAR = 14;
 
 // 고른 게마다 이펙트를 켤 시각. **한꺼번에 켜면 화면이 한 번 번쩍이고 만다** —
 // 시차를 주면 하나씩 호명되는 것으로 읽힌다.
@@ -240,11 +246,22 @@ window.addEventListener('contextmenu', (e) => {
 window.addEventListener('mousedown', (e) => {
   if (command) {
     e.preventDefault();
-    // 우클릭 — 고른 게들을 그 자리로 보낸다
+    // 우클릭 — 고른 게들을 그 자리로 보낸다. **같은 자리를 잇달아 두 번 찍으면 가서 머문다**
     if (e.button === 2) {
       if (selected.size) {
-        orderMove(world, selected, e.clientX / scale, e.clientY / scale, logical().w, logical().h);
-        mark({ x: e.clientX / scale, y: e.clientY / scale });
+        const x = e.clientX / scale;
+        const y = e.clientY / scale;
+        const again =
+          lastOrder && Date.now() - lastOrder.t < STAY_DBL_MS && Math.hypot(x - lastOrder.x, y - lastOrder.y) < STAY_DBL_NEAR;
+        if (again) {
+          pinPets(world, selected);
+          mark({ x: lastOrder.x, y: lastOrder.y, stay: true });
+          lastOrder = null;
+        } else {
+          orderMove(world, selected, x, y, logical().w, logical().h);
+          mark({ x, y });
+          lastOrder = { x, y, t: Date.now() };
+        }
       }
       return;
     }
@@ -273,18 +290,31 @@ window.addEventListener('mousedown', (e) => {
 window.addEventListener('mouseup', () => {
   if (box) {
     const drawn = drawnBox(box);
-    selected.clear();
-    picks.clear();
     const from = boxLogical(box);
-    // 상자를 그렸으면 그 안을 고르고, 톡 누르기만 했으면 선택을 푼다
-    let picked = [];
     if (drawn) {
-      picked = petsInBox(pets, from);
+      // 상자를 그렸으면 그 안으로 갈아 끼운다
+      selected.clear();
+      picks.clear();
+      const picked = petsInBox(pets, from);
       for (const p of picked) selected.add(p.key);
+      // 그린 상자는 여기서 사라지고, 대신 **게마다 제 네모가 하나씩 물린다**(stroll-view의
+      // drawPickBox). 전체를 감싸는 네모는 "저 무리"까지만 말하고 누구누구인지는 말하지 않는다.
+      if (picked.length) armPicks(picked, { x: from.x0, y: from.y0 }, performance.now());
+    } else {
+      // 톡 — 게 위면 **그 하나만 넣고 뺀다.** 상자만으로는 다섯에서 하나를 뺄 수 없었다.
+      // 빈 곳이면 전부 푼다(원래 하던 일).
+      const hit = petAt(pets, box.x0, box.y0, scale);
+      if (hit && selected.has(hit.key)) {
+        selected.delete(hit.key);
+        picks.delete(hit.key);
+      } else if (hit) {
+        selected.add(hit.key);
+        armPicks([hit], { x: hit.x, y: hit.y }, performance.now());
+      } else {
+        selected.clear();
+        picks.clear();
+      }
     }
-    // 그린 상자는 여기서 사라지고, 대신 **게마다 제 네모가 하나씩 물린다**(stroll-view의
-    // drawPickBox). 전체를 감싸는 네모는 "저 무리"까지만 말하고 누구누구인지는 말하지 않는다.
-    if (picked.length) armPicks(picked, { x: from.x0, y: from.y0 }, performance.now());
     box = null;
     inBox = NO_KEYS;
     return;

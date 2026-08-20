@@ -498,13 +498,39 @@ function drawCursor(ctx, at, ready, opts) {
   ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
 }
 
-// 누른 자리에 남는 표식 — 지금은 "저리로 가라" 하나뿐이다. 고르기는 게마다 따로 물리는
+// 누른 자리에 남는 표식 — "저리로 가라"와 "가서 머물라" 둘이다. 고르기는 게마다 따로 물리는
 // 네모(drawPickBox)가 맡는다: 자리에 찍는 것과 대상에 무는 것은 다른 그림이라야 한다.
 function drawMarks(ctx, marks, now) {
   for (const m of marks) {
     const age = (now - m.t0) / MARK_MS;
     if (age < 0 || age > 1) continue;
-    drawMoveMark(ctx, m, age);
+    if (m.stay) drawStayMark(ctx, m, age);
+    else drawMoveMark(ctx, m, age);
+  }
+}
+
+// 머물기 핀 — 붙박인 게의 발치 옆에 박히는 민트 말뚝. 명령의 결과라 명령 색(MARK_MOVE)을
+// 쓰고, 고른 표시(발밑 흰 고리)와 다른 자리에 서서 겹쳐도 서로를 안 가린다.
+// 어두운 받침 한 줄이 밝은 벽지에서 말뚝을 살린다(흰 고리 밑의 어두운 고리와 같은 사정).
+function drawStay(ctx, pet) {
+  const x = Math.round(pet.x) + 8;
+  const y = Math.round(pet.y);
+  rect(ctx, x - 1, y - 1, 3, 1, PICK_EDGE);
+  rect(ctx, x, y - 4, 1, 4, MARK_MOVE);
+  rect(ctx, x - 1, y - 4, 3, 1, MARK_MOVE);
+}
+
+// 머물기 표식 — 이동 표식(화살표+조여드는 원) 위에 말뚝이 남는다. "가라"와 "가서 머물라"가
+// 같은 그림이면 두 번 찍은 것이 먹었는지 화면이 말해 주지 않는다.
+function drawStayMark(ctx, m, age) {
+  drawMoveMark(ctx, m, age);
+  if (age > 0.22) {
+    const x = Math.round(m.x);
+    const y = Math.round(m.y);
+    ctx.globalAlpha = 1 - age * age;
+    rect(ctx, x, y - 4, 1, 4, MARK_MOVE);
+    rect(ctx, x - 1, y - 4, 3, 1, MARK_MOVE);
+    ctx.globalAlpha = 1;
   }
 }
 
@@ -599,6 +625,8 @@ export function renderStroll(ctx, pets, opts) {
   for (const pet of pets) {
     if (selected?.has(pet.key)) drawPicked(ctx, pet, t, fx.get(pet.key));
     else if (inBox?.has(pet.key)) drawInBox(ctx, pet);
+    // 붙박인 게의 말뚝 — 선택과 무관하게 핀이 살아 있는 동안 내내 보인다
+    if (pet.stay && pet.act !== 'sink') drawStay(ctx, pet);
   }
 
   const perks = new Map();
