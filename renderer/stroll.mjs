@@ -120,6 +120,41 @@ const REST_LONG_NIGHT_MS = 34_000;
 const NAP_CHANCE_NIGHT = 0.8;
 const SIP_CHANCE = 0.5;
 const SIP_MS = 5200;
+// ── 에러코드 악당. 가끔 포탈에서 나타나 쉬는 게들을 습격하는 **연출 이벤트**다 —
+// 일하는·기다리는 게는 표적이 아니고, 공격당한 게도 일이 들어오면 즉시 복구된다.
+// 걷지 않고 떠다닌다(다리가 없다). 놀이 도구와 같은 공용 쿨다운을 쓰고 동시에 안 뜬다.
+export const VILLAIN_KEY = '__villain';
+const VILLAIN_CHANCE = 0.0006;
+const VILLAIN_MAX_MS = 22_000; // 이걸 버티면 제풀에 포탈로 도망간다
+const VILLAIN_HP = 4; // 종이에 세 대 맞으면(hp 1) 망치 피니셔가 배정된다
+const VILLAIN_GLIDE = 0.03;
+const VILLAIN_DASH = 0.11;
+const RAGE_MS = 6000; // 난동이 이만큼 이어지면 게들이 반격을 시작한다
+const ATTACK_GAP_MIN = 1400;
+const ATTACK_GAP_SPAN = 1400;
+// 돌진 — 조준하며 부들부들(aim) → 내달린다(dash). 경로에 걸린 게는 던지기 물리로 날아간다.
+const CHARGE_AIM_MS = 650;
+const CHARGE_HIT = 9;
+const KNOCK_V = 0.55;
+// 글리치 빔 — 파편 하나가 날아가고, 맞은 게는 잠깐 화면이 찢어진다
+const SHOT_V = 0.13;
+const SHOT_HIT = 7;
+const SHOT_TTL = 2400;
+const GLITCH_MS = 2600;
+// 버그 뿌리기 — 지나간 자리에 남고, 게가 밟기 직전 기겁하며 폴짝 피한다
+const BUGS_MS = 2600;
+const BUG_GAP = 9;
+const BUG_TTL = 7000;
+const BUG_NEAR = 10;
+// 반격 — 종이 뭉치 투척과 망치 피니셔. 무기는 게 옆에 톡 열리는 미니 포탈로 온다.
+const PAPER_V = 0.2;
+const PAPER_HIT = 8;
+const PAPER_GAP_MIN = 2000;
+const PAPER_GAP_SPAN = 1000;
+const ARM_FX_MS = 700;
+const SWING_MS = 420;
+const KO_MS = 700; // 납작해져 있는 시간 — 바로 가라앉으면 맞은 것이 아니라 꺼진 것이 된다
+
 // ── 미니 포탈 소환. 놀이 도구는 게가 오가는 것과 **같은 문**으로 온다 — 이 화면의 물건이
 // 나타나는 길은 포탈 하나뿐이라야 세계가 안 갈라진다. 도구는 놀고 나면 같은 구멍으로 반납된다.
 //
@@ -196,8 +231,9 @@ function outsideArea(pet, area) {
 
 export function createWorld() {
   // tracks는 게가 밟고 지나간 자국이다. 게가 사라져도 자국은 제 시간까지 남으므로
-  // pet에 딸리지 않고 세계가 들고 있는다. props는 포탈로 소환된 놀이 도구다.
-  return { pets: new Map(), tracks: [], props: [], playCool: 0, w: 0, h: 0 };
+  // pet에 딸리지 않고 세계가 들고 있는다. props는 포탈로 소환된 놀이 도구,
+  // villain은 에러코드 악당(한 번에 하나), bugs는 악당이 흘린 버그다.
+  return { pets: new Map(), tracks: [], props: [], villain: null, bugs: [], playCool: 0, w: 0, h: 0 };
 }
 
 // 걸은 자리에 자국을 남긴다. **일정 거리마다**이지 일정 시간마다가 아니다 —
@@ -270,8 +306,8 @@ function portalOpen(age) {
 function freeToPlay(pet, live, now) {
   if (pet.act !== 'walk' && pet.act !== 'look') return false;
   // 붙박인 게는 놀이에 안 낀다 — 놀이는 자리를 옮기는데 머물라는 명령이 먼저다.
-  // 공놀이·피크닉에 붙잡힌 게도 겹으로 안 끼운다.
-  if (pet.talk || pet.chase || pet.order || pet.stay || pet.playBall || pet.gathering) return false;
+  // 공놀이·피크닉에 붙잡힌 게, 무기를 든 게(악당과 싸우는 중)도 겹으로 안 끼운다.
+  if (pet.talk || pet.chase || pet.order || pet.stay || pet.playBall || pet.gathering || pet.armed) return false;
   const entry = live.get(pet.key);
   return !!entry && wantAct(entry.worker) === 'walk' && (pet.chatCool ?? 0) < now;
 }
@@ -314,15 +350,18 @@ function clampBox(v, lo, hi) {
   return Math.min(Math.max(v, lo), hi);
 }
 
-// 이 게가 지금 놀이를 계속할 수 있나 — 일·명령·손이 끼어들면 못 한다.
-// (chat·sip은 피크닉 손님이 러그 앞에서 짓는 모습이라 놀이의 일부다)
+// 이 게가 지금 놀이(또는 싸움)를 계속할 수 있나 — 일·명령·손이 끼어들면 못 한다.
+// (chat·sip은 피크닉 손님이 러그 앞에서 짓는 모습이라 놀이의 일부고, 기지개·낮잠은
+// 잠깐 쉬는 것이라 자격이 끊기지 않는다 — 끊으면 쉴 때마다 무기를 뺏었다 다시 준다)
+const PLAYABLE_ACTS = new Set(['walk', 'look', 'hop', 'chat', 'sip', 'stretch', 'nap']);
+
 function canPlay(world, live, key) {
   const pet = world.pets.get(key);
   if (!pet) return false;
   const entry = live.get(key);
   if (!entry || wantAct(entry.worker) !== 'walk') return false;
   if (pet.order || pet.stay) return false;
-  return pet.act === 'walk' || pet.act === 'look' || pet.act === 'hop' || pet.act === 'chat' || pet.act === 'sip';
+  return PLAYABLE_ACTS.has(pet.act);
 }
 
 // 도구를 반납한다 — 그 자리에 포탈이 다시 열리고 도구가 가라앉는다. 붙잡힌 게들은 풀린다.
@@ -349,7 +388,7 @@ function endProp(world, prop, now) {
 
 // 쉬는 둘이 공을 소환한다 — 둘 사이 어디쯤에 미니 포탈이 열리고 공이 떨어진다.
 function startBall(world, live, now, rng, area) {
-  if (world.props.length || now < world.playCool) return;
+  if (world.props.length || world.villain || now < world.playCool) return;
   if (rng() >= BALL_CHANCE) return;
   const idle = [...world.pets.values()].filter((p) => freeToPlay(p, live, now));
   if (idle.length < 2) return;
@@ -383,7 +422,7 @@ function startBall(world, live, now, rng, area) {
 
 // 셋 이상 쉬면 피크닉 — 러그가 내려오고, 손님마다 둘레의 제 자리가 정해진다.
 function startGather(world, live, now, rng, area) {
-  if (world.props.length || now < world.playCool) return;
+  if (world.props.length || world.villain || now < world.playCool) return;
   if (rng() >= GATHER_CHANCE) return;
   const idle = [...world.pets.values()].filter((p) => freeToPlay(p, live, now));
   if (idle.length < GATHER_MIN) return;
@@ -518,6 +557,394 @@ function stepProps(world, live, { now, step, area }) {
   }
 }
 
+// ── 에러코드 악당의 한살이. 포탈에서 떨어져(in) 난동을 부리고(live), 게들의 반격이나
+// 사용자의 던지기에 납작해져(ko) 같은 포탈로 반납된다(sink). 시간을 다 쓰면 그냥 도망간다.
+
+function startVillain(world, live, now, rng, area) {
+  if (world.villain || world.props.length || now < world.playCool) return;
+  if (rng() >= VILLAIN_CHANCE) return;
+  const targets = [...world.pets.values()].filter((p) => canPlay(world, live, p.key));
+  if (!targets.length) return;
+  const top = Math.min(area.y0 + DROP_H, (area.y0 + area.y1) / 2);
+  const gy = top + rng() * Math.max(0, area.y1 - top);
+  world.villain = {
+    state: 'in',
+    x: clampBox(area.x0 + 20 + rng() * Math.max(1, area.x1 - area.x0 - 40), area.x0, area.x1),
+    y: gy - DROP_H,
+    gy,
+    portalY: gy - DROP_H,
+    vy: 0,
+    warpAt: now,
+    portal: 0,
+    born: now,
+    hp: VILLAIN_HP,
+    dir: 1,
+    mode: null,
+    nextAt: 0,
+    shots: [],
+    papers: [],
+    flinch: 0,
+    shake: 0,
+    hammerKey: null,
+    koAt: 0,
+  };
+}
+
+// 무기와 표적 표시를 걷는다 — 악당이 물러가는 모든 길이 여기를 지난다
+function clearFighters(world) {
+  for (const pet of world.pets.values()) {
+    pet.armed = null;
+    pet.armFx = 0;
+  }
+  if (world.villain) world.villain.hammerKey = null;
+}
+
+// 납작 — 맞아서 나가는 길. KO_MS 동안 눌려 있다가 포탈로 가라앉는다.
+function koVillain(world, vil, now) {
+  vil.state = 'ko';
+  vil.koAt = now;
+  vil.mode = null;
+  vil.hp = 0;
+  clearFighters(world);
+}
+
+// 도망 — 제 시간을 다 썼거나 때릴 게가 없다. 납작해지지 않고 곧장 구멍으로 사라진다.
+function fleeVillain(world, vil, now) {
+  vil.state = 'sink';
+  vil.warpAt = now;
+  vil.portalY = vil.y;
+  vil.mode = null;
+  clearFighters(world);
+}
+
+// 사용자가 잡아 던졌다 — 던지기 물리로 구르다 서면 납작해져 반납된다(즉시 격퇴).
+// 살살 놓으면(문턱 아래) 아무것도 안 해서 held → drop으로 처졌다가 다시 난동을 부린다.
+export function throwVillain(world, vx, vy) {
+  const vil = world.villain;
+  if (!vil || vil.state !== 'held') return false;
+  const speed = Math.hypot(vx, vy);
+  if (speed < THROW_MIN) return false;
+  const k = Math.min(1, THROW_MAX / speed);
+  vil.state = 'toss';
+  vil.tvx = vx * k;
+  vil.tvy = vy * k;
+  vil.air = 0;
+  vil.vz = Math.sqrt(2 * THROW_APEX_MAX * AIR_G);
+  vil.mode = null;
+  clearFighters(world);
+  return true;
+}
+
+// 악당 클릭 판정 — 게보다 먼저 짚는다(stroll-app). 스프라이트(12×10)보다 넉넉하다.
+export function villainAt(world, px, py, scale = 2) {
+  const vil = world.villain;
+  if (!vil || (vil.state !== 'live' && vil.state !== 'held' && vil.state !== 'drop')) return false;
+  const w = 26 * scale;
+  const h = 24 * scale;
+  const x = vil.x * scale;
+  const y = vil.y * scale;
+  return px >= x - w / 2 && px <= x + w / 2 && py >= y - h && py <= y + 6 * scale;
+}
+
+// 다음 공격을 고른다 — 셋 중 하나를 난수로.
+function pickAttack(vil, targets, now, rng, area) {
+  const kind = ['charge', 'beam', 'bugs'][Math.min(2, Math.floor(rng() * 3))];
+  const mate = targets[Math.floor(rng() * targets.length) % targets.length];
+  if (kind === 'charge') vil.mode = { kind, phase: 'aim', until: now + CHARGE_AIM_MS, key: mate.key };
+  else if (kind === 'beam') vil.mode = { kind, until: now + 500, key: mate.key };
+  else
+    vil.mode = {
+      kind,
+      until: now + BUGS_MS,
+      gx: area.x0 + rng() * (area.x1 - area.x0),
+      gy: area.y0 + rng() * (area.y1 - area.y0),
+      trail: 0,
+    };
+}
+
+function clampVil(vil, area) {
+  vil.x = clampBox(vil.x, area.x0, area.x1);
+  vil.y = clampBox(vil.y, area.y0, area.y1);
+}
+
+function runAttack(world, live, vil, now, step, area, rng) {
+  const m = vil.mode;
+  if (m.kind === 'charge') {
+    if (m.phase === 'aim') {
+      vil.shake = 1; // 부들부들 — 그리는 쪽이 이 값으로 떤다
+      const t = world.pets.get(m.key);
+      if (t) vil.dir = t.x > vil.x ? 1 : -1;
+      if (now >= m.until) {
+        vil.shake = 0;
+        if (!t) {
+          vil.mode = null;
+          vil.nextAt = now + 600;
+          return;
+        }
+        // 조준이 끝난 순간의 자리로 내달린다 — 그 사이 걸은 만큼은 빗나간다(그게 재미다)
+        const dx = t.x - vil.x;
+        const dy = t.y - vil.y;
+        const h = Math.hypot(dx, dy) || 1;
+        m.phase = 'dash';
+        m.vx = (dx / h) * VILLAIN_DASH;
+        m.vy = (dy / h) * VILLAIN_DASH;
+        m.until = now + Math.min(1400, h / VILLAIN_DASH + 260);
+      }
+      return;
+    }
+    vil.x += m.vx * step;
+    vil.y += m.vy * step;
+    if (vil.x < area.x0 || vil.x > area.x1 || vil.y < area.y0 || vil.y > area.y1) {
+      clampVil(vil, area);
+      m.until = now; // 벽에 박으면 거기서 끝
+    }
+    // 경로에 걸린 쉬는 게는 날아간다 — 박치기는 던지기와 같은 물리다
+    for (const pet of world.pets.values()) {
+      if (!canPlay(world, live, pet.key)) continue;
+      if (Math.hypot(pet.x - vil.x, pet.y - vil.y) < CHARGE_HIT)
+        knockPet(pet, m.vx * (KNOCK_V / VILLAIN_DASH), m.vy * (KNOCK_V / VILLAIN_DASH), { dizzy: true });
+    }
+    if (now >= m.until) {
+      vil.mode = null;
+      vil.nextAt = now + ATTACK_GAP_MIN + rng() * ATTACK_GAP_SPAN;
+    }
+    return;
+  }
+  if (m.kind === 'beam') {
+    const t = world.pets.get(m.key);
+    if (t) vil.dir = t.x > vil.x ? 1 : -1;
+    if (now >= m.until) {
+      if (t) {
+        const dx = t.x - vil.x;
+        const dy = t.y - 6 - (vil.y - 6);
+        const h = Math.hypot(dx, dy) || 1;
+        vil.shots.push({ x: vil.x, y: vil.y - 6, vx: (dx / h) * SHOT_V, vy: (dy / h) * SHOT_V, age: 0 });
+      }
+      vil.mode = null;
+      vil.nextAt = now + ATTACK_GAP_MIN + rng() * ATTACK_GAP_SPAN;
+    }
+    return;
+  }
+  // bugs — 목적지로 흘러가며 버그를 흘린다
+  const dx = m.gx - vil.x;
+  const dy = m.gy - vil.y;
+  const h = Math.hypot(dx, dy);
+  if (h > 2) {
+    const mx = (dx / h) * VILLAIN_GLIDE * 1.6 * step;
+    const my = (dy / h) * VILLAIN_GLIDE * 1.1 * step;
+    vil.x += mx;
+    vil.y += my;
+    vil.dir = dx > 0 ? 1 : -1;
+    m.trail += Math.abs(mx) + Math.abs(my);
+    if (m.trail >= BUG_GAP) {
+      m.trail = 0;
+      world.bugs.push({ x: vil.x + (rng() - 0.5) * 6, y: vil.y + 1, t0: now });
+      if (world.bugs.length > 40) world.bugs.splice(0, world.bugs.length - 40);
+    }
+  }
+  if (now >= m.until || h <= 2) {
+    vil.mode = null;
+    vil.nextAt = now + ATTACK_GAP_MIN + rng() * ATTACK_GAP_SPAN;
+  }
+}
+
+// 글리치 파편 — 맞은 게는 잠깐 화면이 찢어진다(act glitch, 그리는 쪽이 세 조각으로 어긋낸다)
+function stepShots(world, live, vil, now, step, area) {
+  if (!vil.shots.length) return;
+  vil.shots = vil.shots.filter((s) => {
+    s.age += step;
+    s.x += s.vx * step;
+    s.y += s.vy * step;
+    if (s.age > SHOT_TTL || s.x < area.x0 - 4 || s.x > area.x1 + 4 || s.y < 0 || s.y > area.y1 + 4) return false;
+    for (const pet of world.pets.values()) {
+      if (!canPlay(world, live, pet.key)) continue;
+      if (Math.hypot(pet.x - s.x, pet.y - 6 - s.y) < SHOT_HIT) {
+        pet.act = 'glitch';
+        pet.glitchUntil = now + GLITCH_MS;
+        pet.armed = null;
+        pet.moving = false;
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
+// 종이 뭉치 — 맞을 때마다 악당이 움찔 밀리고 체력이 준다. 바닥은 1 — 마지막 한 방은 망치 몫이다.
+function stepPapers(world, vil, now, step) {
+  if (!vil.papers.length) return;
+  vil.papers = vil.papers.filter((p) => {
+    p.age += step;
+    p.x += p.vx * step;
+    p.y += p.vy * step;
+    if (p.age > p.ttl) return false;
+    if (vil.state === 'live' && Math.hypot(vil.x - p.x, vil.y - 5 - p.y) < PAPER_HIT) {
+      vil.hp = Math.max(1, vil.hp - 1);
+      vil.flinch = 1;
+      vil.x += p.vx * 30; // 얻어맞은 쪽으로 살짝 밀린다
+      vil.y += p.vy * 30;
+      return false;
+    }
+    return true;
+  });
+}
+
+// 반격 — 쉬는 게마다 옆에 미니 포탈이 톡 열리며 종이 뭉치를 받고, 체력이 바닥나면
+// 가장 가까운 게가 망치를 받는다. 자격을 잃은 게(일·명령·손)는 그 자리에서 무장 해제된다.
+function armFighters(world, live, vil, now, rng) {
+  for (const pet of world.pets.values()) {
+    if (!canPlay(world, live, pet.key)) {
+      pet.armed = null;
+      pet.armFx = 0;
+      continue;
+    }
+    if (!pet.armed) pet.armed = { kind: 'paper', at: now, nextAt: now + 500 + rng() * PAPER_GAP_SPAN };
+    // 소환 포탈의 진행도 — 그리는 쪽 시계(rAF)와 이곳(Date.now)이 달라 여기서 셈해 넘긴다
+    pet.armFx = Math.min(1, (now - pet.armed.at) / ARM_FX_MS);
+    // 자는·기지개 켜는 중에는 던지지 않는다 — 무기만 쥔 채 쉰다
+    if (pet.armed.kind === 'paper' && now >= pet.armed.nextAt && vil.state === 'live' && pet.act !== 'nap' && pet.act !== 'stretch') {
+      const dx = vil.x - pet.x;
+      const dy = vil.y - 5 - (pet.y - 8);
+      const h = Math.hypot(dx, dy) || 1;
+      vil.papers.push({ x: pet.x, y: pet.y - 8, vx: (dx / h) * PAPER_V, vy: (dy / h) * PAPER_V, age: 0, ttl: h / PAPER_V + 300 });
+      pet.armed.nextAt = now + PAPER_GAP_MIN + rng() * PAPER_GAP_SPAN;
+      pet.dir = dx > 0 ? 1 : -1;
+      if (pet.act === 'walk') {
+        pet.act = 'hop'; // 던지는 반동
+        pet.hopAt = now;
+        pet.hop = 0;
+      }
+    }
+  }
+  // 망치는 한 자루 — 맡은 게가 자격을 잃으면 걷고 다음 프레임에 다시 고른다
+  if (vil.hammerKey && !canPlay(world, live, vil.hammerKey)) vil.hammerKey = null;
+  if (vil.hp <= 1 && !vil.hammerKey) {
+    let best = null;
+    for (const pet of world.pets.values()) {
+      if (!canPlay(world, live, pet.key)) continue;
+      const d = Math.hypot(pet.x - vil.x, pet.y - vil.y);
+      if (!best || d < best.d) best = { pet, d };
+    }
+    if (best) {
+      vil.hammerKey = best.pet.key;
+      best.pet.armed = { kind: 'hammer', at: now, nextAt: 0 };
+    }
+  }
+}
+
+// 악당 한 프레임.
+function stepVillain(world, live, { now, step, area, rng, drag }) {
+  // 버그는 악당이 사라져도 제 시간까지 남는다
+  if (world.bugs.length) world.bugs = world.bugs.filter((b) => now - b.t0 < BUG_TTL);
+  const vil = world.villain;
+  if (!vil) return;
+
+  if (vil.warpAt != null) {
+    vil.portal = portalOpen(now - vil.warpAt);
+    if (vil.portal <= 0 && vil.state === 'live') vil.warpAt = null;
+  }
+
+  // 손에 잡힌 동안 — 난동이 멈춘다. 던져야 나가고, 살살 놓으면 다시 일어난다.
+  if (drag && drag.key === VILLAIN_KEY && (vil.state === 'live' || vil.state === 'held' || vil.state === 'drop')) {
+    vil.state = 'held';
+    vil.x = drag.x;
+    vil.y = drag.y;
+    vil.mode = null;
+    vil.shake = 0;
+    return;
+  }
+  if (vil.state === 'held') {
+    vil.state = 'drop';
+    vil.vy = 0;
+    vil.gy = Math.min(area.y1, vil.y + DROP_SHORT);
+    vil.x = clampBox(vil.x, area.x0, area.x1);
+  }
+  if (vil.state === 'drop') {
+    vil.vy += GRAVITY * step;
+    vil.y += vil.vy * step;
+    if (vil.y >= vil.gy) {
+      vil.y = vil.gy;
+      vil.vy = 0;
+      vil.state = 'live';
+      vil.nextAt = now + 900;
+    }
+    return;
+  }
+  if (vil.state === 'in') {
+    if (now - vil.warpAt >= PORTAL_OPEN_MS) {
+      vil.vy += GRAVITY * step;
+      vil.y += vil.vy * step;
+      if (vil.y >= vil.gy) {
+        vil.y = vil.gy;
+        vil.vy = 0;
+        vil.state = 'live';
+        vil.nextAt = now + 800;
+      }
+    }
+    return;
+  }
+  if (vil.state === 'toss') {
+    const f = Math.exp(-step / THROW_DECAY_MS);
+    vil.x += vil.tvx * THROW_DECAY_MS * (1 - f);
+    vil.y += vil.tvy * THROW_DECAY_MS * (1 - f);
+    vil.tvx *= f;
+    vil.tvy *= f;
+    if (vil.x < area.x0 || vil.x > area.x1) {
+      vil.x = clampBox(vil.x, area.x0, area.x1);
+      vil.tvx = -vil.tvx * 0.7;
+    }
+    if (vil.y < area.y0 || vil.y > area.y1) {
+      vil.y = clampBox(vil.y, area.y0, area.y1);
+      vil.tvy = -vil.tvy * 0.7;
+    }
+    vil.air = (vil.air ?? 0) + vil.vz * step;
+    vil.vz -= AIR_G * step;
+    if (vil.air <= 0) {
+      vil.air = 0;
+      vil.vz = vil.vz < 0 ? -vil.vz * BOUNCE : 0;
+      if (vil.vz < BOUNCE_STOP) vil.vz = 0;
+    }
+    if (vil.air <= 0 && vil.vz === 0 && Math.hypot(vil.tvx, vil.tvy) < 0.02) koVillain(world, vil, now);
+    return;
+  }
+  if (vil.state === 'ko') {
+    if (now - vil.koAt >= KO_MS) {
+      vil.state = 'sink';
+      vil.warpAt = now;
+      vil.portalY = vil.y;
+    }
+    return;
+  }
+  if (vil.state === 'sink') {
+    const age = now - vil.warpAt;
+    if (age >= PORTAL_OPEN_MS) vil.y = Math.min(vil.portalY + SINK_H * 0.7, vil.y + SINK_SPEED * step);
+    if (age > PORTAL_OPEN_MS && vil.portal <= 0) {
+      world.villain = null;
+      world.playCool = now + PLAY_COOL_MS;
+    }
+    return;
+  }
+
+  // ── live
+  vil.flinch = Math.max(0, vil.flinch - step / 260);
+  stepShots(world, live, vil, now, step, area);
+  stepPapers(world, vil, now, step);
+
+  const targets = [...world.pets.values()].filter((p) => canPlay(world, live, p.key));
+  if (!targets.length || now - vil.born > VILLAIN_MAX_MS) {
+    fleeVillain(world, vil, now);
+    return;
+  }
+  if (now - vil.born > RAGE_MS) armFighters(world, live, vil, now, rng);
+  if (!vil.mode && now >= vil.nextAt) pickAttack(vil, targets, now, rng, area);
+  if (vil.mode) runAttack(world, live, vil, now, step, area, rng);
+}
+
+// 지금 화면의 버그들 — 그리는 쪽은 이것만 본다(발자국과 같은 결).
+export function strollBugs(world, now) {
+  return (world.bugs ?? []).map((b) => ({ ...b, fade: Math.max(0, 1 - (now - b.t0) / BUG_TTL) }));
+}
+
 // 쉬고 있는 둘을 골라 술래잡기를 시킨다.
 function startChase(world, live, now, rng) {
   if (rng() >= CHASE_CHANCE) return;
@@ -572,16 +999,9 @@ export function pinPets(world, keys) {
   return n;
 }
 
-// 손에서 놓는 순간 커서 속도를 실어 던진다(stroll-app의 mouseup). 속도는 논리 px/ms.
-//
-// 문턱(THROW_MIN)을 못 넘으면 **아무것도 하지 않는다** — 그러면 다음 프레임에 held → drop으로
-// 떨어져, 던진 것과 놓은 것이 저절로 갈린다. 문턱이 여기 사는 이유다: 껍데기(stroll-app)가
-// 판정까지 들면 테스트가 못 닿는 자리에 물리가 생긴다.
-export function throwPet(world, key, vx, vy) {
-  const pet = world.pets.get(key);
-  if (!pet || pet.act !== 'held') return false;
-  const speed = Math.hypot(vx, vy);
-  if (speed < THROW_MIN) return false;
+// 게 하나를 날려 보낸다 — 사용자의 던지기와 악당의 박치기가 같은 물리를 쓴다.
+function knockPet(pet, vx, vy, { dizzy = null } = {}) {
+  const speed = Math.hypot(vx, vy) || 0.01;
   const k = Math.min(1, THROW_MAX / speed);
   pet.act = 'throw';
   pet.tvx = vx * k;
@@ -590,9 +1010,25 @@ export function throwPet(world, key, vx, vy) {
   const apex = Math.min(THROW_APEX_MAX, THROW_APEX_MIN + speed * k);
   pet.hop = 0;
   pet.vz = Math.sqrt(2 * apex * AIR_G);
-  pet.hardThrow = speed * k > THROW_DIZZY;
-  pet.shake = 0;
+  pet.hardThrow = dizzy ?? speed * k > THROW_DIZZY;
   pet.lap = 0;
+  pet.talk = null;
+  pet.chase = null;
+  pet.stay = false;
+  pet.armed = null;
+}
+
+// 손에서 놓는 순간 커서 속도를 실어 던진다(stroll-app의 mouseup). 속도는 논리 px/ms.
+//
+// 문턱(THROW_MIN)을 못 넘으면 **아무것도 하지 않는다** — 그러면 다음 프레임에 held → drop으로
+// 떨어져, 던진 것과 놓은 것이 저절로 갈린다. 문턱이 여기 사는 이유다: 껍데기(stroll-app)가
+// 판정까지 들면 테스트가 못 닿는 자리에 물리가 생긴다.
+export function throwPet(world, key, vx, vy) {
+  const pet = world.pets.get(key);
+  if (!pet || pet.act !== 'held') return false;
+  if (Math.hypot(vx, vy) < THROW_MIN) return false;
+  knockPet(pet, vx, vy);
+  pet.shake = 0;
   return true;
 }
 
@@ -633,12 +1069,18 @@ export function stepStroll(
   const step = Math.min(dt, 64); // 창이 가려졌다 돌아왔을 때 한 프레임에 순간이동하지 않게
 
   // 놀 짝을 먼저 정한다 — 게 하나씩 도는 아래 루프에서는 둘을 같이 볼 수 없다.
-  // 소환 놀이가 술래잡기보다 먼저다: 같은 프레임에 둘 다 걸리면 드문 쪽이 이겨야 한다.
+  // 악당이 소환 놀이보다, 소환 놀이가 술래잡기보다 먼저다: 같은 프레임에 여럿 걸리면
+  // 드문 쪽이 이겨야 한다. 악당이 있는 동안에는 잡담·술래잡기도 쉰다 — 습격 중의 한가함은
+  // 연출이 아니라 버그로 읽힌다.
+  startVillain(world, live, now, rng, area);
   startGather(world, live, now, rng, area);
   startBall(world, live, now, rng, area);
   stepProps(world, live, { now, step, area });
-  pairChats(world, live, now);
-  startChase(world, live, now, rng);
+  stepVillain(world, live, { now, step, area, rng, drag });
+  if (!world.villain) {
+    pairChats(world, live, now);
+    startChase(world, live, now, rng);
+  }
 
   for (const pet of [...world.pets.values()]) {
     // 포탈은 **어느 상태에 있든 제 시간표대로 닫힌다.** 떨어지는 동안만 갱신했더니 착지 뒤
@@ -759,6 +1201,37 @@ export function stepStroll(
         pet.act = 'walk';
         aim(pet, area, rng, world);
       } else {
+        pet.moving = false;
+        continue;
+      }
+    }
+
+    // 글리치 파편에 맞은 뒤 — 화면이 찢어진 채 부르르 떤다(그리는 쪽이 세 조각으로 어긋낸다).
+    // 어지러움과 같은 결: 일이 들어오면 즉시 걷어낸다.
+    if (pet.act === 'glitch') {
+      const busy = !gone && wantAct(pet.entry.worker) !== 'walk';
+      if (busy || now >= pet.glitchUntil) {
+        pet.glitchUntil = 0;
+        pet.act = 'walk';
+        aim(pet, area, rng, world);
+      } else {
+        pet.moving = false;
+        continue;
+      }
+    }
+
+    // 망치를 내리치는 중 — 반격의 마지막 동작은 악당이 사라져도 끝까지 그린다.
+    // 진행도(swingK)를 여기서 셈해 넘긴다: 그리는 쪽 시계(rAF)와 이곳(Date.now)이 다르다.
+    if (pet.swingAt) {
+      pet.swingK = Math.min(1, (now - pet.swingAt) / SWING_MS);
+      if (pet.swingK >= 1) {
+        pet.swingAt = 0;
+        pet.swingK = 0;
+        pet.act = 'hop'; // 해치웠다 — 폴짝
+        pet.hopAt = now;
+        pet.hop = 0;
+      } else {
+        pet.act = 'walk';
         pet.moving = false;
         continue;
       }
@@ -934,6 +1407,25 @@ export function stepStroll(
       continue;
     }
 
+    // 망치 피니셔 — 맡은 게는 악당에게 내달려 내리친다. 반격이 걷기·쉬기보다 먼저다.
+    const vil = world.villain;
+    if (vil && vil.state === 'live' && vil.hammerKey === pet.key && pet.act !== 'hop') {
+      pet.act = 'walk';
+      pet.dash = true;
+      pet.gx = vil.x;
+      pet.gy = Math.min(area.y1, vil.y + 2);
+      const was = { x: pet.x, y: pet.y };
+      if (advance(pet, step, CHARGE_HIT + 1, speed * RUN_MULT)) {
+        pet.dash = false;
+        pet.swingAt = now; // 내리치기 — 다음 프레임부터 위의 swing 블록이 잇는다
+        pet.swingK = 0;
+        koVillain(world, vil, now);
+      } else {
+        leaveTrack(world, pet, Math.abs(pet.x - was.x) + Math.abs(pet.y - was.y), now);
+      }
+      continue;
+    }
+
     // 소환된 공 — 선수는 공놀이가 걷기·쉬기보다 먼저다(위의 일·명령·손보다는 뒤).
     // 차례인 게가 걸어가 차고, 상대는 공을 보고 선다.
     const ball = world.props.find((p) => p.kind === 'ball' && p.players?.includes(pet.key));
@@ -1023,6 +1515,18 @@ export function stepStroll(
 
     // 산책 — 목적지까지 걷고, 닿으면 잠깐 쉬었다 새 목적지를 고른다
     pet.act = 'walk';
+    // 발밑의 버그 — 밟기 직전이면 기겁하며 폴짝 뛰고(내려서며 새 목적지를 고른다) 잠깐은
+    // 또 안 놀란다. 쿨다운이 없으면 버그밭 위에서 영영 뛰기만 한다.
+    if (world.bugs.length && now > (pet.bugCool ?? 0)) {
+      const bug = world.bugs.find((b) => Math.hypot(b.x - pet.x, b.y - pet.y) < BUG_NEAR);
+      if (bug) {
+        pet.bugCool = now + 2600;
+        pet.act = 'hop';
+        pet.hopAt = now;
+        pet.hop = 0;
+        continue;
+      }
+    }
     if (now < pet.until) {
       pet.moving = false;
       continue;

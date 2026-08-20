@@ -844,6 +844,53 @@ export const PICNIC_RUG = [
   '.iiwwiiwwiiwwiiwwiiwwiiww.',
 ];
 
+// ── 에러코드 악당 (산책 모드). 떠다니는 글리치 덩어리 — 다리가 없어 걷기 프레임이 필요 없고,
+// "에러"는 걷지 않는 편이 어울린다. 두 프레임의 차이는 **가장자리 들쭉과 구멍(x)의 자리**다 —
+// 번갈아 그리면 형태가 지직거린다. 몸은 보라(u): 게 몸(주황)과 정반대 계열이라 한눈에 남이고,
+// 눈은 빨강(i) — 이 화면에서 빨강은 실패의 색이라 "나쁜 것"으로 이미 읽힌다.
+export const VILLAIN_A = [
+  '..u..uu..u..',
+  '.uuuuuuuuuu.',
+  'uuuuuuuuuuuu',
+  'uiiuuuuuuiiu',
+  'uiiuuuuuuiiu',
+  'uuuuxxuuuuuu',
+  'uuuuuuuuuuuu',
+  '.uuuuuuuuuu.',
+  '..uu..uu.u..',
+  '...u...u....',
+];
+
+export const VILLAIN_B = [
+  '.u..uu..uu..',
+  '.uuuuuuuuuu.',
+  'uuuuuuuuuuuu',
+  'uiiuuuuuuiiu',
+  'uiiuuuuuuiiu',
+  'uuuuuuuxxuuu',
+  'uuuuuuuuuuuu',
+  '.uuuuuuuuuu.',
+  '..u..uu..uu.',
+  '....u...u...',
+];
+
+// 망치에 맞아 납작해진 프레임 — 포탈로 반납되기 직전 잠깐 이 모습으로 멈춘다
+export const VILLAIN_FLAT = [
+  '.uuuuuuuuuu.',
+  'uiiuuuuuuiiu',
+  'uuuuuuuuuuuu',
+];
+
+// 디버그 망치 — 반격의 피니셔. 게가 머리 위로 들었다가 내리친다.
+export const HAMMER = [
+  '.sssss.',
+  '.sssSS.',
+  '...m...',
+  '...m...',
+  '...m...',
+  '...m...',
+];
+
 // 자료실 열람석에 펼쳐진 책
 export const BOOK = ['..z...z..', '.zwz.zwz.', 'zwwwzwwwz', 'zwwwzwwwz', 'mmmmmmmmm'];
 

@@ -210,6 +210,79 @@ function drawProp(ctx, prop, t) {
   if (inPortal) drawPortal(ctx, x, portalY, prop.portal, t, 'front', size);
 }
 
+// ── 에러코드 악당. 떠다니므로 몸이 바닥 앵커(y)보다 이만큼 위에 뜨고, 그림자가 그 사이를 잇는다.
+const VILLAIN_FLOAT = 4;
+const VILLAIN_COLORS = { shot: '#7b5bd6', shotCore: '#c94f4f', bug: '#c94f4f' };
+
+function drawVillain(ctx, vil, t) {
+  const x = Math.round(vil.x);
+  const inPortal = vil.portal > 0 && (vil.state === 'in' || vil.state === 'sink');
+  const portalY = Math.round(vil.portalY ?? vil.y);
+  if (inPortal) drawPortal(ctx, x, portalY, vil.portal, t, 'back', 0.8);
+  if (inPortal) {
+    ctx.save();
+    ctx.beginPath();
+    if (vil.state === 'sink') ctx.rect(x - 20, portalY - 60, 40, 60);
+    else ctx.rect(x - 20, portalY, 40, 80);
+    ctx.clip();
+  }
+
+  // 그림자 — 떨어지는 동안에는 내려앉을 자리에. 가라앉는 동안에는 없다(발밑이 구멍이다).
+  if (vil.state !== 'sink') {
+    const sy = vil.state === 'in' ? Math.round(vil.gy) : Math.round(vil.y);
+    ctx.globalAlpha = 0.22;
+    rect(ctx, x - 5, sy - 1, 10, 2, COLORS.shadow);
+    ctx.globalAlpha = 1;
+  }
+
+  // 몸 — 두 프레임이 지직거린다. 잡혀 있으면 더 빠르게 버둥거리고, 조준 중이면 부들부들 떤다.
+  const flick = vil.state === 'held' ? 60 : 110;
+  const body = vil.state === 'ko' ? SPR.villainFlat : Math.floor(t / flick) % 2 ? SPR.villainA : SPR.villainB;
+  const bob = vil.state === 'live' ? Math.round(Math.sin(t / 280) * 1.5) : 0;
+  // 움찔(맞은 직후)과 조준 떨림은 좌우 지터로 낸다 — 이 크기에서 흰 섬광은 형태를 지운다
+  const jit = vil.shake ? (Math.floor(t / 45) % 2 ? 1 : -1) : vil.flinch > 0 ? (Math.floor(t / 40) % 2 ? 2 : -2) : 0;
+  const air = vil.state === 'toss' ? Math.round((vil.air ?? 0) * HOP_H) : 0;
+  const y = Math.round(vil.y) - VILLAIN_FLOAT - bob - air;
+  drawSprite(ctx, body, x - Math.floor(body.w / 2) + jit, y - body.h);
+
+  if (inPortal) ctx.restore();
+  if (inPortal) drawPortal(ctx, x, portalY, vil.portal, t, 'front', 0.8);
+}
+
+// 글리치 파편 — 보라 알갱이가 지그재그로 난다. 궤적은 움직임이 정하고 흔들림만 여기서 얹는다.
+function drawShots(ctx, shots, t) {
+  for (const s of shots) {
+    const wob = Math.round(Math.sin(s.age / 70) * 2);
+    const x = Math.round(s.x);
+    const y = Math.round(s.y) + wob;
+    rect(ctx, x - 1, y - 1, 3, 3, VILLAIN_COLORS.shot);
+    rect(ctx, x, y, 1, 1, VILLAIN_COLORS.shotCore);
+  }
+}
+
+// 날아가는 종이 뭉치 — 살짝 오르내리며 구른다
+function drawPapers(ctx, papers) {
+  const spr = SPR.paperBall;
+  for (const p of papers) {
+    const wob = Math.round(Math.sin(p.age / 90));
+    drawSprite(ctx, spr, Math.round(p.x) - Math.floor(spr.w / 2), Math.round(p.y) - spr.h + wob);
+  }
+}
+
+// 악당이 흘린 버그 — 다리가 번갈아 나와 꿈틀거린다. 발자국처럼 제 시간에 흐려진다.
+function drawBugs(ctx, bugs, t) {
+  for (const b of bugs) {
+    if (b.fade <= 0) continue;
+    const x = Math.round(b.x);
+    const y = Math.round(b.y);
+    ctx.globalAlpha = Math.min(0.9, 0.25 + b.fade * 0.65);
+    rect(ctx, x - 1, y - 1, 3, 2, VILLAIN_COLORS.bug);
+    const leg = Math.floor(t / 160) % 2;
+    rect(ctx, leg ? x - 2 : x + 2, y, 1, 1, VILLAIN_COLORS.bug);
+    ctx.globalAlpha = 1;
+  }
+}
+
 function drawDizzy(ctx, cx, top, t) {
   const a = ((t % DIZZY_CYCLE) / DIZZY_CYCLE) * Math.PI * 2;
   const angles = [];
@@ -281,9 +354,38 @@ function drawPet(ctx, pet, t, opts) {
     else ctx.rect(x - 16, portalY, 32, 80);
     ctx.clip();
   }
-  drawSprite(ctx, body, x - body.w / 2, y - hop - body.h);
+  if (pet.act === 'glitch') {
+    // 글리치 — 몸을 세 조각으로 클립해 좌우로 어긋낸다. 전용 스프라이트 없이 찢는 것이라
+    // 어떤 자세에서 맞았든 그 몸 그대로 찢어진다.
+    const slice = Math.ceil(body.h / 3);
+    for (let i = 0; i < 3; i++) {
+      const off = (Math.floor(t / 90) + i) % 2 ? 1 : -1;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x - body.w, y - hop - body.h + i * slice, body.w * 2, slice);
+      ctx.clip();
+      drawSprite(ctx, body, x - body.w / 2 + off, y - hop - body.h);
+      ctx.restore();
+    }
+  } else {
+    drawSprite(ctx, body, x - body.w / 2, y - hop - body.h);
+  }
   if (inPortal) ctx.restore();
   if (dim) ctx.globalAlpha = 1;
+
+  // 무기 — 반격 중에만 든다. 옆에서 미니 포탈이 톡 열리며 무기가 나온다(소환의 결).
+  if (pet.armFx > 0 && pet.armFx < 1) drawPortal(ctx, x + 10, y + 1, Math.sin(Math.PI * pet.armFx), t, 'all', 0.35);
+  if (pet.armed?.kind === 'paper') drawSprite(ctx, SPR.paperBall, x + 6, y - hop - 10);
+  if (pet.armed?.kind === 'hammer' || (pet.swingK ?? 0) > 0) {
+    // 들었다(머리 위) → 내리친다(앞쪽 아래) — 두 자리 사이를 진행도(swingK)로 건넌다
+    const spr = SPR.hammer;
+    const k = pet.swingK ?? 0;
+    const fwd = pet.dir >= 0 ? 1 : -1;
+    // 자루 끝이 머리에 1px 겹쳐야 "쥐고 있다"가 된다 — 띄우면 떠 있는 물건이 된다
+    const hx = x + (fwd > 0 ? 5 : -5 - spr.w) + Math.round(k * 3) * fwd;
+    const hy = y - hop - body.h - spr.h + 1 + Math.round(k * (body.h + 4));
+    drawSprite(ctx, spr, hx, hy);
+  }
 
   // 노트북은 몸보다 나중에 — 상판이 하반신을 덮어야 "뒤에 앉았다"가 된다
   const lap = laptopOf(pet.lap, t);
@@ -651,6 +753,8 @@ export function renderStroll(ctx, pets, opts) {
   ctx.imageSmoothingEnabled = false;
 
   drawTracks(ctx, tracks);
+  // 버그는 바닥 층이다 — 발자국과 같이 게보다 먼저 깐다
+  if (opts.bugs?.length) drawBugs(ctx, opts.bugs, t);
 
   // 놓는 순간의 이펙트가 어디까지 왔나(0..1). **게가 걸어 다니므로 자리는 저장하지 않고
   // 매 프레임 게에서 읽는다.** 음수는 아직 제 차례가 아니라는 뜻이다(stroll-app의 시차).
@@ -675,18 +779,25 @@ export function renderStroll(ctx, pets, opts) {
   for (const [key, k] of fx) if (k >= 0 && k <= 1) perks.set(key, perkOf(k));
   const petOpts = perks.size ? { ...opts, perks } : opts;
   const tags = [];
-  // 소환 도구도 게와 같은 원근을 탄다 — 아래(앞)에 있는 것이 나중에 그려진다
-  const scene = [...pets.map((p) => ({ y: p.y, pet: p })), ...(opts.props ?? []).map((p) => ({ y: p.y, prop: p }))].sort(
-    (a, b) => a.y - b.y,
-  );
+  // 소환 도구·악당도 게와 같은 원근을 탄다 — 아래(앞)에 있는 것이 나중에 그려진다
+  const scene = [...pets.map((p) => ({ y: p.y, pet: p })), ...(opts.props ?? []).map((p) => ({ y: p.y, prop: p }))];
+  if (opts.villain) scene.push({ y: opts.villain.y, vil: opts.villain });
+  scene.sort((a, b) => a.y - b.y);
   for (const item of scene) {
     if (item.prop) {
       drawProp(ctx, item.prop, t);
       continue;
     }
+    if (item.vil) {
+      drawVillain(ctx, item.vil, t);
+      continue;
+    }
     const at = drawPet(ctx, item.pet, t, petOpts);
     if (hover === item.pet.key && !opts.command) tags.push({ pet: item.pet, at });
   }
+  // 나는 것들은 모두의 위다 — 파편과 종이 뭉치
+  if (opts.villain?.shots?.length) drawShots(ctx, opts.villain.shots, t);
+  if (opts.villain?.papers?.length) drawPapers(ctx, opts.villain.papers);
 
   // 무는 네모는 **게 위에** 얹는다 — 밖에서 조여드는 것이라 몸에 가리면 조여든 것이 아니라
   // 몸 뒤에서 사라진 것이 된다
