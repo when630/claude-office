@@ -614,6 +614,70 @@ test('오래 할 일이 없으면 기지개를 켜거나 존다', () => {
   assert.equal(up.act, 'work', '자다가 일을 못 받는다');
 });
 
+test('심야에는 기지개 대신 존다 — 시간대가 쉬는 모습을 정한다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
+  // 시각은 로컬 필드로 만든다 — epoch 상수를 쓰면 CI(UTC)와 내 자리(KST)의 시간대가 갈린다
+  const NIGHT = new Date(2026, 0, 6, 3, 0, 0).getTime();
+  run(world, cast, { frames: 120, t0: NIGHT, rng: () => 0.6 });
+
+  // rng 0.6은 낮이면 기지개(0.6 ≥ 0.45)인데 심야에는 낮잠(0.6 < 0.8)이다
+  let pet = null;
+  for (let i = 0; i < 3000 && pet?.act !== 'nap'; i++) {
+    pet = find(stepStroll(world, cast, { w: W, h: H, now: NIGHT + 62_000 + i * 16, dt: 16, rng: () => 0.6 }), 'a');
+    assert.notEqual(pet.act, 'stretch', '심야인데 기지개를 골랐다');
+  }
+  assert.equal(pet.act, 'nap', '심야인데 안 존다');
+});
+
+test('점심에는 캔을 홀짝이기도 하고, 다 마시면 다시 걷는다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
+  const LUNCH = new Date(2026, 0, 6, 13, 0, 0).getTime();
+  run(world, cast, { frames: 120, t0: LUNCH, rng: () => 0.4 });
+
+  // rng 0.4는 점심이면 캔(0.4 < 0.5)이고, 캔이 없는 시간대라면 낮잠(0.4 < 0.45)이 됐을 값이다
+  let t = LUNCH + 62_000;
+  let pet = null;
+  for (let i = 0; i < 3000 && pet?.act !== 'sip'; i++) {
+    pet = find(stepStroll(world, cast, { w: W, h: H, now: t + i * 16, dt: 16, rng: () => 0.4 }), 'a');
+    if (pet.act === 'sip') t = t + i * 16;
+  }
+  assert.equal(pet?.act, 'sip', '점심인데 캔을 안 든다');
+
+  const after = find(stepStroll(world, cast, { w: W, h: H, now: t + 6000, dt: 16, rng: () => 0.99 }), 'a');
+  assert.notEqual(after.act, 'sip', '캔을 영영 들고 있다');
+});
+
+test('아침에는 캔이 안 나온다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
+  const MORNING = new Date(2026, 0, 6, 10, 0, 0).getTime();
+  run(world, cast, { frames: 120, t0: MORNING, rng: () => 0.4 });
+  for (let i = 0; i < 3000; i++) {
+    const pet = find(stepStroll(world, cast, { w: W, h: H, now: MORNING + 62_000 + i * 16, dt: 16, rng: () => 0.4 }), 'a');
+    assert.notEqual(pet.act, 'sip', '아침부터 캔을 든다');
+  }
+});
+
+test('캔을 들고 있다가도 일이 들어오면 즉시 노트북을 편다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
+  const LUNCH = new Date(2026, 0, 6, 13, 0, 0).getTime();
+  run(world, cast, { frames: 120, t0: LUNCH, rng: () => 0.4 });
+  let pet = null;
+  let t = LUNCH + 62_000;
+  for (let i = 0; i < 3000 && pet?.act !== 'sip'; i++) {
+    pet = find(stepStroll(world, cast, { w: W, h: H, now: t + i * 16, dt: 16, rng: () => 0.4 }), 'a');
+    if (pet.act === 'sip') t = t + i * 16;
+  }
+  assert.equal(pet?.act, 'sip');
+
+  const busy = strollCast(rooms(['proj', worker('a', 'typing')]));
+  const up = find(stepStroll(world, busy, { w: W, h: H, now: t + 16, dt: 16 }), 'a');
+  assert.equal(up.act, 'work', '캔 마시느라 일을 못 받는다');
+});
+
 test('만남을 만들러 간다 — 가끔 다른 게 옆을 목적지로 잡는다', () => {
   const world = createWorld();
   const cast = strollCast(rooms(['proj', worker('a', 'idle'), worker('b', 'idle')]));
