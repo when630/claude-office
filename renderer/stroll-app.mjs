@@ -16,6 +16,10 @@ import {
   orderMove,
   pinPets,
   throwPet,
+  villainAt,
+  throwVillain,
+  strollBugs,
+  VILLAIN_KEY,
 } from './stroll.mjs';
 import { renderStroll } from './stroll-view.mjs';
 import {
@@ -159,7 +163,8 @@ function tick(now) {
   } else if (pointer) {
     const hit = petAt(pets, pointer.x, pointer.y, scale);
     hover = hit?.key ?? null;
-    setPassThrough(!hit);
+    // 악당도 잡을 수 있어야 하므로 그 위에서도 통과를 끈다 — 이름표는 없다(세션이 아니다)
+    setPassThrough(!hit && !villainAt(world, pointer.x, pointer.y, scale));
   } else {
     hover = null;
     setPassThrough(true);
@@ -192,6 +197,8 @@ function tick(now) {
     // 상자는 창 좌표로 그렸으므로 논리 좌표로 바꿔 넘긴다
     box: box && boxLogical(box),
     props: world.props,
+    villain: world.villain,
+    bugs: strollBugs(world, Date.now()),
     command,
     cursor: command && pointer ? { x: pointer.x / scale, y: pointer.y / scale, ready: selected.size > 0 } : null,
     marks,
@@ -272,6 +279,21 @@ window.addEventListener('mousedown', (e) => {
     return;
   }
   if (e.button !== 0) return;
+  // 악당이 먼저다 — 게와 겹쳐 있으면 말썽꾸러기 쪽이 잡혀야 한다
+  if (villainAt(world, e.clientX, e.clientY, scale)) {
+    grab = {
+      key: VILLAIN_KEY,
+      dx: world.villain.x * scale - e.clientX,
+      dy: world.villain.y * scale - e.clientY,
+      at: { x: e.clientX, y: e.clientY },
+      t: Date.now(),
+      moved: false,
+      trail: [{ x: e.clientX, y: e.clientY, t: Date.now() }],
+    };
+    drag = { key: VILLAIN_KEY, x: world.villain.x, y: world.villain.y };
+    document.body.style.cursor = 'grabbing';
+    return;
+  }
   const hit = petAt(pets, e.clientX, e.clientY, scale);
   if (!hit) return;
   grab = {
@@ -325,9 +347,14 @@ window.addEventListener('mouseup', () => {
   grab = null;
   drag = null;
   document.body.style.cursor = passThrough ? 'default' : 'grab';
-  // 휙 놓았으면 던진다 — 문턱 판정은 throwPet(stroll.mjs)이 한다: 못 넘으면 여느 놓기처럼
-  // 제자리에 떨어진다(held → drop). 속도는 게가 사는 논리 좌표로 바꿔 넘긴다.
+  // 휙 놓았으면 던진다 — 문턱 판정은 throwPet/throwVillain(stroll.mjs)이 한다: 못 넘으면
+  // 여느 놓기처럼 제자리에 떨어진다(held → drop). 속도는 논리 좌표로 바꿔 넘긴다.
   const v = flingVelocity(held.trail);
+  if (held.key === VILLAIN_KEY) {
+    // 악당은 던져야 나간다 — 톡 눌러도 열 세션이 없다
+    if (v) throwVillain(world, v.x / scale, v.y / scale);
+    return;
+  }
   if (v) throwPet(world, held.key, v.x / scale, v.y / scale);
   // 끌지 않고 톡 눌렀으면 그 세션을 큰 창에서 편다. 끌었으면 놓은 자리에 떨어질 뿐이다.
   if (!held.moved && Date.now() - held.t < CLICK_MS) window.office?.selectSession?.(held.key);
@@ -401,6 +428,7 @@ window.__stroll = {
   tuning: () => ({ scale, speed, limit }),
   world: () => world,
   props: () => world.props,
+  villain: () => world.villain,
   selected: () => [...selected],
   inBox: () => [...inBox],
   cmd: () => ({ command, box: !!box, passThrough }),

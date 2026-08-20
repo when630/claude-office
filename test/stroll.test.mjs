@@ -37,6 +37,9 @@ const {
   orderMove,
   pinPets,
   throwPet,
+  throwVillain,
+  villainAt,
+  VILLAIN_KEY,
   strollArea,
   STROLL_MAX,
 } = await import('../renderer/stroll.mjs');
@@ -241,7 +244,7 @@ test('자축 중에 일이 다시 들어오면 즉시 걷힌다', () => {
   let t = 44_000;
   let p = null;
   for (let i = 0; i < 60; i++) {
-    p = find(stepStroll(world, idle, { w: W, h: H, now: t + i * 16, dt: 16 }), 'a');
+    p = find(stepStroll(world, idle, { w: W, h: H, now: t + i * 16, dt: 16, rng: () => 0.5 }), 'a');
     if (p.act === 'hop') {
       t = t + i * 16;
       break;
@@ -402,7 +405,9 @@ test('위아래로도 다닌다 — 아래쪽 띠에 붙어 있지 않는다', (
   const seen = new Set();
   let pets = [];
   for (let i = 0; i < 6000; i++) {
-    pets = stepStroll(world, cast, { w: W, h: H, now: 80_000 + i * 16, dt: 16 });
+    // rng를 고정한다 — 기본(Math.random)이면 수천 프레임 중에 악당·소환이 실제로 걸려
+    // 게가 날아가고, 이동 연속성 판정이 플레이키가 된다
+    pets = stepStroll(world, cast, { w: W, h: H, now: 80_000 + i * 16, dt: 16, rng: () => 0.5 });
     const pet = find(pets, 'a');
     if (pet) seen.add(Math.round(pet.y / 10));
   }
@@ -419,7 +424,7 @@ test('세로가 가로보다 빠르지 않다 — 위아래로 미끄러지면 �
   let prev = find(stepStroll(world, cast, { w: W, h: H, now: 90_000, dt: 16 }), 'a');
   let lastY = prev.y;
   for (let i = 1; i < 1500; i++) {
-    const pet = find(stepStroll(world, cast, { w: W, h: H, now: 90_000 + i * 16, dt: 16 }), 'a');
+    const pet = find(stepStroll(world, cast, { w: W, h: H, now: 90_000 + i * 16, dt: 16, rng: () => 0.5 }), 'a');
     assert.ok(Math.abs(pet.y - lastY) <= 0.75, `세로로 튀었다: ${lastY} → ${pet.y}`);
     lastY = pet.y;
   }
@@ -460,7 +465,7 @@ test('프레임 사이에 튀지 않는다 — 창이 가려졌다 돌아와도'
   for (let i = 1; i < 400; i++) {
     // 5초를 통째로 건너뛴 프레임도 섞는다 (창이 가려져 rAF가 멈췄던 경우)
     const dt = i % 97 === 0 ? 5000 : 16;
-    const pets = stepStroll(world, cast, { w: W, h: H, now: 60_000 + i * 16, dt });
+    const pets = stepStroll(world, cast, { w: W, h: H, now: 60_000 + i * 16, dt, rng: () => 0.5 });
     for (const p of pets) {
       const prev = last.get(p.key);
       // 뛸 때는 그만큼 더 간다(RUN_MULT) — 한 프레임 상한 64ms에 뛰는 속도를 곱한 값이다
@@ -476,7 +481,7 @@ test('화면 안에서만 걷는다', () => {
   const cast = strollCast(rooms(['proj', worker('a', 'idle'), worker('b', 'idle'), worker('c', 'idle')]));
   let pets = run(world, cast, { frames: 600 });
   for (let i = 0; i < 4000; i++) {
-    pets = stepStroll(world, cast, { w: W, h: H, now: 70_000 + i * 16, dt: 16 });
+    pets = stepStroll(world, cast, { w: W, h: H, now: 70_000 + i * 16, dt: 16, rng: () => 0.5 });
     for (const p of pets) {
       if (p.act === 'in' || p.act === 'out') continue;
       assert.ok(p.x >= 0 && p.x <= W, `${p.key}가 화면을 벗어났다: ${p.x}`);
@@ -592,7 +597,7 @@ test('커서가 가까이 오면 멈춰 쳐다보고, 곧 제 갈 길을 간다'
   // 커서가 계속 옆에 있어도 잠깐이면 다시 걷는다 — 마우스를 놓아 두었다고 굳으면 안 된다
   let last = null;
   for (let i = 0; i < 130; i++) {
-    last = find(stepStroll(world, cast, { w: W, h: H, now: 120_016 + i * 16, dt: 16, pointer: at }), 'a');
+    last = find(stepStroll(world, cast, { w: W, h: H, now: 120_016 + i * 16, dt: 16, pointer: at, rng: () => 0.5 }), 'a');
   }
   assert.notEqual(last.act, 'look', '커서 옆에서 영영 굳었다');
 });
@@ -950,6 +955,189 @@ test('피크닉 중에 일이 들어온 손님은 빠지고, 남은 손님이 �
   assert.equal(rug.state === 'out', false, '한 명 빠졌다고 판이 깨졌다');
   assert.ok(!rug.guests.includes('a'), '일하는 게가 아직 손님이다');
   assert.equal(find(after, 'a').gathering, false);
+});
+
+// 악당을 확정적으로 부른다 — 문턱(0.0006)보다 낮은 난수를 한 프레임 준다.
+// 소환 놀이(0.0012·0.0025)는 악당이 먼저 서면서 걸러진다.
+function triggerVillain(world, cast, t) {
+  return stepStroll(world, cast, { w: W, h: H, now: t, dt: 16, rng: () => 0.0004 });
+}
+
+// 악당이 내려앉을 때까지 돌린다
+function villainLive(world, cast, t0) {
+  let t = t0;
+  for (let i = 0; i < 120 && world.villain && world.villain.state !== 'live'; i++, t += 16) {
+    stepStroll(world, cast, { w: W, h: H, now: t, dt: 16, rng: () => 0.5 });
+  }
+  assert.equal(world.villain?.state, 'live', '악당이 안 내려앉는다');
+  return t;
+}
+
+test('악당은 포탈에서 나타나고, 때릴 게가 없으면 도망간다', () => {
+  const world = createWorld();
+  const idle = strollCast(rooms(['proj', worker('a', 'idle'), worker('b', 'idle')]));
+  run(world, idle, { frames: 700, rng: () => 0.5 });
+
+  triggerVillain(world, idle, 4_000_000);
+  assert.ok(world.villain, '악당이 안 나타난다');
+  assert.equal(world.villain.state, 'in', '포탈도 없이 놓였다');
+  let t = villainLive(world, idle, 4_000_016);
+
+  // 전원 일을 받으면 표적이 없다 — 제풀에 포탈로 도망간다
+  const busy = strollCast(rooms(['proj', worker('a', 'typing'), worker('b', 'typing')]));
+  for (let i = 0; i < 200 && world.villain; i++, t += 16) {
+    stepStroll(world, busy, { w: W, h: H, now: t, dt: 16, rng: () => 0.5 });
+  }
+  assert.equal(world.villain, null, '표적도 없는데 안 물러간다');
+});
+
+test('돌진에 걸린 게는 던지기 물리로 날아가고 어지럽다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle'), worker('b', 'idle')]));
+  run(world, cast, { frames: 700, rng: () => 0.5 });
+  triggerVillain(world, cast, 4_100_000);
+  let t = villainLive(world, cast, 4_100_016);
+
+  // 확정적으로 — 악당을 a의 왼쪽에 세우고 돌진을 직접 건다
+  const vil = world.villain;
+  const a = world.pets.get('a');
+  a.act = 'walk';
+  a.moving = false;
+  a.until = t + 60_000;
+  a.talk = null;
+  vil.x = Math.max(15, a.x - 40);
+  vil.y = a.y;
+  vil.born = t; // 반격(종이)이 끼어들지 않게 난동 시계를 되감는다
+  vil.mode = { kind: 'charge', phase: 'aim', until: t, key: 'a' };
+
+  let thrown = false;
+  let dizzy = false;
+  for (let i = 0; i < 500; i++, t += 16) {
+    const p = find(stepStroll(world, cast, { w: W, h: H, now: t, dt: 16, rng: () => 0.99 }), 'a');
+    if (!p) break;
+    if (p.act === 'throw') thrown = true;
+    if (thrown && p.act === 'dizzy') {
+      dizzy = true;
+      break;
+    }
+  }
+  assert.ok(thrown, '박치기에 안 날아간다');
+  assert.ok(dizzy, '박치기에 맞았는데 멀쩡하다');
+});
+
+test('글리치 빔에 맞으면 찢어지고, 일이 들어오면 즉시 걷힌다', () => {
+  const world = createWorld();
+  const idle = strollCast(rooms(['proj', worker('a', 'idle'), worker('b', 'idle')]));
+  run(world, idle, { frames: 700, rng: () => 0.5 });
+  triggerVillain(world, idle, 4_200_000);
+  let t = villainLive(world, idle, 4_200_016);
+
+  const vil = world.villain;
+  const a = world.pets.get('a');
+  a.act = 'walk';
+  a.moving = false;
+  a.until = t + 60_000;
+  a.talk = null;
+  vil.x = Math.max(15, a.x - 60);
+  vil.y = a.y;
+  vil.born = t;
+  vil.mode = { kind: 'beam', until: t, key: 'a' };
+
+  let glitched = false;
+  for (let i = 0; i < 200 && !glitched; i++, t += 16) {
+    const p = find(stepStroll(world, idle, { w: W, h: H, now: t, dt: 16, rng: () => 0.99 }), 'a');
+    if (p?.act === 'glitch') glitched = true;
+  }
+  assert.ok(glitched, '빔에 맞았는데 안 찢어진다');
+
+  const busy = strollCast(rooms(['proj', worker('a', 'typing'), worker('b', 'idle')]));
+  const up = find(stepStroll(world, busy, { w: W, h: H, now: t + 16, dt: 16, rng: () => 0.99 }), 'a');
+  assert.equal(up.act, 'work', '찢어진 채로 일을 못 받는다');
+});
+
+test('버그를 밟기 직전이면 기겁하며 폴짝 피한다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle')]));
+  run(world, cast, { frames: 700, rng: () => 0.5 });
+  const pet = find(stepStroll(world, cast, { w: W, h: H, now: 4_300_000, dt: 16 }), 'a');
+  pet.act = 'walk';
+  pet.until = 0;
+  pet.talk = null;
+  world.bugs.push({ x: pet.x + 2, y: pet.y, t0: 4_300_000 });
+
+  const after = find(stepStroll(world, cast, { w: W, h: H, now: 4_300_016, dt: 16, rng: () => 0.5 }), 'a');
+  assert.equal(after.act, 'hop', '버그를 그냥 밟고 지나간다');
+});
+
+test('반격 — 미니 포탈로 무기를 받고 망치 피니셔로 끝낸다', () => {
+  const world = createWorld();
+  const cast = strollCast(
+    rooms(['proj', worker('a', 'idle'), worker('b', 'idle'), worker('c', 'idle')]),
+  );
+  run(world, cast, { frames: 700, rng: () => 0.5 });
+  triggerVillain(world, cast, 4_400_000);
+  let t = villainLive(world, cast, 4_400_016);
+
+  // 이미 종이에 몰린 참(hp 1)에서 난동 시계를 되감아 반격 국면을 확정적으로 연다
+  const vil = world.villain;
+  vil.hp = 1;
+  vil.born = t - 7000;
+
+  let armed = false;
+  let hammer = false;
+  let ko = false;
+  for (let i = 0; i < 2500 && world.villain; i++, t += 16) {
+    stepStroll(world, cast, { w: W, h: H, now: t, dt: 16, rng: () => 0.5 });
+    const pets = [...world.pets.values()];
+    if (pets.some((p) => p.armed)) armed = true;
+    if (pets.some((p) => p.armed?.kind === 'hammer')) hammer = true;
+    if (world.villain?.state === 'ko') ko = true;
+  }
+  assert.ok(armed, '무기를 안 받는다');
+  assert.ok(hammer, '망치가 배정되지 않는다');
+  assert.ok(ko, '납작해지는 순간이 없다');
+  assert.equal(world.villain, null, '해치웠는데 안 사라진다');
+  assert.ok(world.playCool > t - 16, '쿨다운이 안 걸렸다');
+});
+
+test('악당을 잡아 휙 던지면 즉시 격퇴된다 — 살살 놓으면 다시 일어난다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle'), worker('b', 'idle')]));
+  run(world, cast, { frames: 700, rng: () => 0.5 });
+  triggerVillain(world, cast, 4_500_000);
+  let t = villainLive(world, cast, 4_500_016);
+
+  // 잡는다 — 난동이 멈추고 손을 따라온다
+  const vil = world.villain;
+  assert.ok(villainAt(world, vil.x * 2, (vil.y - 8) * 2, 2), '악당이 안 잡힌다');
+  for (let i = 0; i < 5; i++, t += 16) {
+    stepStroll(world, cast, { w: W, h: H, now: t, dt: 16, drag: { key: VILLAIN_KEY, x: 200, y: 100 }, rng: () => 0.5 });
+  }
+  assert.equal(vil.state, 'held');
+  assert.equal(vil.x, 200);
+
+  // 살살 놓으면 처졌다가 다시 일어난다
+  assert.equal(throwVillain(world, 0.05, 0), false, '문턱 아래인데 던져졌다');
+  for (let i = 0; i < 90 && vil.state !== 'live'; i++, t += 16) {
+    stepStroll(world, cast, { w: W, h: H, now: t, dt: 16, rng: () => 0.5 });
+  }
+  assert.equal(vil.state, 'live', '놓았는데 다시 안 일어난다');
+
+  // 다시 잡아 이번엔 휙 던진다 — 구르다 납작해져 포탈로 반납된다
+  for (let i = 0; i < 5; i++, t += 16) {
+    stepStroll(world, cast, { w: W, h: H, now: t, dt: 16, drag: { key: VILLAIN_KEY, x: 150, y: 100 }, rng: () => 0.5 });
+  }
+  assert.equal(throwVillain(world, 0.9, 0), true);
+  let tossed = false;
+  for (let i = 0; i < 800 && world.villain; i++, t += 16) {
+    stepStroll(world, cast, { w: W, h: H, now: t, dt: 16, rng: () => 0.5 });
+    if (world.villain?.state === 'toss') tossed = true;
+    if (world.villain) {
+      assert.ok(world.villain.x >= 0 && world.villain.x <= W, `던져진 악당이 화면을 나갔다: ${world.villain.x}`);
+    }
+  }
+  assert.ok(tossed, '던졌는데 안 굴렀다');
+  assert.equal(world.villain, null, '던졌는데 안 사라진다');
 });
 
 test('붙박인 게는 자리를 지키고, 새 이동 명령이 핀을 푼다', () => {
