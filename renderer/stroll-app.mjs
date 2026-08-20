@@ -191,6 +191,7 @@ function tick(now) {
     picks,
     // 상자는 창 좌표로 그렸으므로 논리 좌표로 바꿔 넘긴다
     box: box && boxLogical(box),
+    props: world.props,
     command,
     cursor: command && pointer ? { x: pointer.x / scale, y: pointer.y / scale, ready: selected.size > 0 } : null,
     marks,
@@ -399,6 +400,7 @@ window.__stroll = {
   pets: () => pets,
   tuning: () => ({ scale, speed, limit }),
   world: () => world,
+  props: () => world.props,
   selected: () => [...selected],
   inBox: () => [...inBox],
   cmd: () => ({ command, box: !!box, passThrough }),

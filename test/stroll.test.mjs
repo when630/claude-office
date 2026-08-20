@@ -799,6 +799,159 @@ test('일하는 게도 부르면 노트북을 접고 간다 — 도착하면 다
   assert.ok(back.lap > 0.9, `도착했는데 노트북을 안 편다: ${back.lap}`);
 });
 
+// 소환 놀이를 확정적으로 켠다 — 확률 문턱(BALL 0.0025 · GATHER 0.0012)보다 낮은 난수를
+// 한 프레임만 준다. 그 프레임의 다른 굴림(dash·visit)도 같은 값을 받지만 판정에는 안 걸린다.
+function trigger(world, cast, t) {
+  return stepStroll(world, cast, { w: W, h: H, now: t, dt: 16, rng: () => 0.001 });
+}
+
+test('쉬는 둘이 공을 소환한다 — 포탈에서 내려와 주고받고 포탈로 반납한다', () => {
+  const world = createWorld();
+  const cast = strollCast(rooms(['proj', worker('a', 'idle'), worker('b', 'idle')]));
+  run(world, cast, { frames: 700, rng: () => 0.5 });
+  const pets = stepStroll(world, cast, { w: W, h: H, now: 2_000_000, dt: 16, rng: () => 0.5 });
+  for (const p of pets) {
+    p.act = 'walk';
+    p.talk = null;
+    p.chase = null;
+    p.until = 0;
+    p.y = 100;
+  }
+  pets[0].x = 100;
+  pets[1].x = 250;
+
+  trigger(world, cast, 2_000_016);
+  assert.equal(world.props.length, 1, '공이 안 내려온다');
+  const ball = world.props[0];
+  assert.equal(ball.kind, 'ball');
+  assert.equal(ball.state, 'in', '포탈도 없이 공이 놓였다');
+  assert.deepEqual([...ball.players].sort(), ['a', 'b'], '선수가 안 정해졌다');
+
+  // 내려와서 살아난다
+  let t = 2_000_032;
+  for (let i = 0; i < 90 && ball.state !== 'live'; i++, t += 16) {
+    stepStroll(world, cast, { w: W, h: H, now: t, dt: 16, rng: () => 0.5 });
+  }
+  assert.equal(ball.state, 'live', '공이 안 내려앉는다');
+
+  // 주고받는다 — 차는 쪽이 걸어가 차고 공이 구른다
+  const from = ball.x;
+  for (let i = 0; i < 2200 && ball.kicks < 2; i++, t += 16) {
+    stepStroll(world, cast, { w: W, h: H, now: t, dt: 16, rng: () => 0.5 });
+  }
+  assert.ok(ball.kicks >= 2, `공을 안 찬다: ${ball.kicks}`);
+  assert.notEqual(Math.round(ball.x), Math.round(from), '찼는데 공이 제자리다');
+
+  // 다 놀면 반납된다 — 도구가 사라지고 쿨다운이 걸린다
+  for (let i = 0; i < 3200 && world.props.length; i++, t += 16) {
+    stepStroll(world, cast, { w: W, h: H, now: t, dt: 16, rng: () => 0.5 });
+  }
+  assert.equal(world.props.length, 0, '공이 영영 남아 있다');
+  assert.ok(world.playCool > t, '쿨다운이 안 걸렸다');
+  const done = stepStroll(world, cast, { w: W, h: H, now: t + 16, dt: 16, rng: () => 0.5 });
+  assert.ok(done.every((p) => !p.playBall), '반납했는데 선수 표시가 남아 있다');
+});
+
+test('공놀이 중에 일이 들어오면 공은 즉시 반납된다', () => {
+  const world = createWorld();
+  const idle = strollCast(rooms(['proj', worker('a', 'idle'), worker('b', 'idle')]));
+  run(world, idle, { frames: 700, rng: () => 0.5 });
+  const pets = stepStroll(world, idle, { w: W, h: H, now: 2_100_000, dt: 16, rng: () => 0.5 });
+  for (const p of pets) {
+    p.act = 'walk';
+    p.talk = null;
+    p.chase = null;
+    p.until = 0;
+    p.y = 100;
+  }
+  pets[0].x = 100;
+  pets[1].x = 250;
+  trigger(world, idle, 2_100_016);
+  assert.equal(world.props.length, 1);
+
+  const busy = strollCast(rooms(['proj', worker('a', 'typing'), worker('b', 'idle')]));
+  stepStroll(world, busy, { w: W, h: H, now: 2_100_032, dt: 16, rng: () => 0.5 });
+  assert.equal(world.props[0]?.state ?? 'gone', world.props[0] ? 'out' : 'gone', '일이 들어왔는데 공놀이가 계속된다');
+  const a = world.pets.get('a');
+  assert.equal(a.playBall, false, '일하는 게가 아직 선수다');
+});
+
+test('셋 이상 쉬면 피크닉 — 러그 둘레에 모여 담소하고, 끝나면 러그가 반납된다', () => {
+  const world = createWorld();
+  const cast = strollCast(
+    rooms(['proj', worker('a', 'idle'), worker('b', 'idle'), worker('c', 'idle'), worker('d', 'idle')]),
+  );
+  run(world, cast, { frames: 700, rng: () => 0.5 });
+  const pets = stepStroll(world, cast, { w: W, h: H, now: 3_000_000, dt: 16, rng: () => 0.5 });
+  pets.forEach((p, i) => {
+    p.act = 'walk';
+    p.talk = null;
+    p.chase = null;
+    p.until = 0;
+    p.x = 80 + i * 70;
+    p.y = 90 + (i % 2) * 40;
+  });
+
+  trigger(world, cast, 3_000_016);
+  assert.equal(world.props.length, 1, '러그가 안 내려온다');
+  const rug = world.props[0];
+  assert.equal(rug.kind, 'rug', '셋 이상인데 러그가 아니라 다른 것이 왔다');
+  assert.equal(rug.guests.length, 4);
+
+  // 손님들이 제 자리로 모여 담소한다
+  let t = 3_000_032;
+  let gathered = false;
+  for (let i = 0; i < 900 && !gathered; i++, t += 16) {
+    const ps = stepStroll(world, cast, { w: W, h: H, now: t, dt: 16, rng: () => 0.5 });
+    gathered = rug.guests.every((k) => {
+      const p = ps.find((q) => q.key === k);
+      const s = rug.spots[k];
+      return p && s && Math.hypot(p.x - s.gx, p.y - s.gy) < 4;
+    });
+  }
+  assert.ok(gathered, '제 자리에 안 모인다');
+  const faces = new Set(
+    rug.guests.map((k) => stepStroll(world, cast, { w: W, h: H, now: t, dt: 16, rng: () => 0.5 }).find((p) => p.key === k).act),
+  );
+  assert.ok(faces.has('chat') && faces.has('sip'), `담소 반 홀짝임 반이 아니다: ${[...faces]}`);
+
+  // 제 시간이 지나면 흩어지고 러그는 반납된다
+  for (let i = 0; i < 2500 && world.props.length; i++, t += 16) {
+    stepStroll(world, cast, { w: W, h: H, now: t, dt: 16, rng: () => 0.5 });
+  }
+  assert.equal(world.props.length, 0, '러그가 영영 남아 있다');
+  const after = stepStroll(world, cast, { w: W, h: H, now: t + 16, dt: 16, rng: () => 0.5 });
+  assert.ok(after.every((p) => !p.gathering), '반납했는데 손님 표시가 남아 있다');
+});
+
+test('피크닉 중에 일이 들어온 손님은 빠지고, 남은 손님이 둘 이상이면 계속된다', () => {
+  const world = createWorld();
+  const idle = strollCast(
+    rooms(['proj', worker('a', 'idle'), worker('b', 'idle'), worker('c', 'idle'), worker('d', 'idle')]),
+  );
+  run(world, idle, { frames: 700, rng: () => 0.5 });
+  const pets = stepStroll(world, idle, { w: W, h: H, now: 3_100_000, dt: 16, rng: () => 0.5 });
+  pets.forEach((p, i) => {
+    p.act = 'walk';
+    p.talk = null;
+    p.chase = null;
+    p.until = 0;
+    p.x = 80 + i * 70;
+    p.y = 110;
+  });
+  trigger(world, idle, 3_100_016);
+  const rug = world.props[0];
+  assert.equal(rug?.kind, 'rug');
+
+  const busy = strollCast(
+    rooms(['proj', worker('a', 'typing'), worker('b', 'idle'), worker('c', 'idle'), worker('d', 'idle')]),
+  );
+  const after = stepStroll(world, busy, { w: W, h: H, now: 3_100_032, dt: 16, rng: () => 0.5 });
+  assert.equal(rug.state === 'out', false, '한 명 빠졌다고 판이 깨졌다');
+  assert.ok(!rug.guests.includes('a'), '일하는 게가 아직 손님이다');
+  assert.equal(find(after, 'a').gathering, false);
+});
+
 test('붙박인 게는 자리를 지키고, 새 이동 명령이 핀을 푼다', () => {
   const world = createWorld();
   const cast = strollCast(rooms(['proj', worker('a', 'idle')]));

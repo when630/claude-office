@@ -818,6 +818,32 @@ export const LAPTOP_HALF = [
 ];
 
 
+// ── 산책 모드의 소환 소품. 미니 포탈에서 떨어져 놀고, 끝나면 같은 구멍으로 돌아간다.
+//
+// 비치볼 — 세로 세 띠(빨강·흰·물색)라야 이 크기에서 공으로 읽힌다. 무늬 없이 한 색이면
+// 방울이고, 가로 띠면 이 화면의 눌린 원(포탈·표식)들과 헷갈린다.
+export const BEACH_BALL = [
+  '..iwa..',
+  '.iiwaa.',
+  'iiwwaaa',
+  'iiwwaaa',
+  '.iiwaa.',
+  '..iwa..',
+];
+
+// 피크닉 러그 — 빨강·흰 체커. 위에서 내려다본 납작한 판이라 세로가 짧다(포탈과 같은 사정).
+// 모서리 한 픽셀을 비워 천의 둥근 귀를 낸다 — 꽉 찬 사각형은 러그가 아니라 창처럼 보인다.
+// 폭 26px: 20px로 그렸더니 게(16px)가 앞에 서는 것만으로 러그가 통째로 가려졌다(굽어서 확인).
+export const PICNIC_RUG = [
+  '.wwiiwwiiwwiiwwiiwwiiwwii.',
+  'wwiiwwiiwwiiwwiiwwiiwwiiww',
+  'iiwwiiwwiiwwiiwwiiwwiiwwii',
+  'wwiiwwiiwwiiwwiiwwiiwwiiww',
+  'iiwwiiwwiiwwiiwwiiwwiiwwii',
+  'wwiiwwiiwwiiwwiiwwiiwwiiww',
+  '.iiwwiiwwiiwwiiwwiiwwiiww.',
+];
+
 // 자료실 열람석에 펼쳐진 책
 export const BOOK = ['..z...z..', '.zwz.zwz.', 'zwwwzwwwz', 'zwwwzwwwz', 'mmmmmmmmm'];
 

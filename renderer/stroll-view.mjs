@@ -141,10 +141,11 @@ const PORTAL = { rim: '#8fd6b4', hole: '#0a0418' };
 // 통째로 그리면 게가 구멍을 지나가는 것이 아니라 **타원 뒤로 숨거나 앞을 스치는** 것이 된다.
 // 뒤쪽(위) 절반을 먼저, 게를 그 위에, 앞쪽(아래) 절반을 마지막에 얹으면 그제야 게가 구멍
 // **안에** 있는 것으로 읽힌다 — 캐릭터가 구멍을 통과하는 그림의 관례다.
-function drawPortal(ctx, cx, cy, k, t, part = 'all') {
+function drawPortal(ctx, cx, cy, k, t, part = 'all', size = 1) {
   if (k <= 0) return;
-  const w = Math.max(2, PORTAL_W * k);
-  const h = Math.max(1, PORTAL_H * k);
+  // size는 구멍의 몸집이다(소환 도구의 미니 포탈이 쓴다) — k는 열린 정도라 뜻이 다르다
+  const w = Math.max(2, PORTAL_W * size * k);
+  const h = Math.max(1, PORTAL_H * size * k);
   const rows = Math.max(1, Math.round(h));
   const half = rows / 2;
   // 열리는 동안 테두리가 옅게 뛴다 — 가만히 있는 고리는 그려 둔 무늬로 보인다.
@@ -166,6 +167,47 @@ function drawPortal(ctx, cx, cy, k, t, part = 'all') {
     // 보여 구멍이 아니라 그어 놓은 타원이 된다.
     if (rw > 3 && i > 0 && i < rows - 1) rect(ctx, cx - rw + 2, y, rw * 2 - 4, 1, PORTAL.hole);
   }
+}
+
+// 소환된 놀이 도구 — 게와 같은 관례로 구멍을 오간다: 뒤쪽 반 → 도구 → 앞쪽 반, 너머는 자른다.
+// 공은 게보다 작으므로 구멍도 한 뼘 작다(size 0.6). 러그는 넓어서 제 크기 구멍으로 온다.
+const PROP_HOP_H = 7; // 공이 튀는 높이 눈금 — 게의 폴짝(HOP_H)과 같은 값이라 결이 맞는다
+
+function drawProp(ctx, prop, t) {
+  const x = Math.round(prop.x);
+  const inPortal = prop.portal > 0 && prop.state !== 'live';
+  const portalY = Math.round(prop.portalY ?? prop.y);
+  const size = prop.kind === 'rug' ? 1 : 0.6;
+  if (inPortal) drawPortal(ctx, x, portalY, prop.portal, t, 'back', size);
+  if (inPortal) {
+    ctx.save();
+    ctx.beginPath();
+    if (prop.state === 'out') ctx.rect(x - 24, portalY - 60, 48, 60);
+    else ctx.rect(x - 24, portalY, 48, 80);
+    ctx.clip();
+  }
+  const y = Math.round(prop.y);
+  if (prop.kind === 'ball') {
+    // 그림자 — 떨어지는 동안에는 내려앉을 자리에, 살아서는 발밑에. 반납 중에는 없다(발밑이 구멍이다).
+    if (prop.state !== 'out') {
+      const sy = prop.state === 'in' ? Math.round(prop.gy) : y;
+      ctx.globalAlpha = prop.state === 'in' ? 0.18 : 0.25;
+      rect(ctx, x - 3, sy - 1, 7, 2, COLORS.shadow);
+      ctx.globalAlpha = 1;
+    }
+    const spr = SPR.beachBall;
+    drawSprite(ctx, spr, x - Math.floor(spr.w / 2), y - spr.h - Math.round((prop.air ?? 0) * PROP_HOP_H));
+  } else {
+    const spr = SPR.picnicRug;
+    drawSprite(ctx, spr, x - Math.floor(spr.w / 2), y - Math.floor(spr.h / 2));
+    // 간식은 자리 잡은 뒤에 얹는다 — 떨어지는 동안부터 놓여 있으면 차린 것이 아니라 붙은 것이다
+    if (prop.state === 'live') {
+      drawSprite(ctx, SPR.snack, x - 8, y - SPR.snack.h + 1);
+      drawSprite(ctx, SPR.can, x + 4, y - SPR.can.h + 1);
+    }
+  }
+  if (inPortal) ctx.restore();
+  if (inPortal) drawPortal(ctx, x, portalY, prop.portal, t, 'front', size);
 }
 
 function drawDizzy(ctx, cx, top, t) {
@@ -633,9 +675,17 @@ export function renderStroll(ctx, pets, opts) {
   for (const [key, k] of fx) if (k >= 0 && k <= 1) perks.set(key, perkOf(k));
   const petOpts = perks.size ? { ...opts, perks } : opts;
   const tags = [];
-  for (const pet of pets) {
-    const at = drawPet(ctx, pet, t, petOpts);
-    if (hover === pet.key && !opts.command) tags.push({ pet, at });
+  // 소환 도구도 게와 같은 원근을 탄다 — 아래(앞)에 있는 것이 나중에 그려진다
+  const scene = [...pets.map((p) => ({ y: p.y, pet: p })), ...(opts.props ?? []).map((p) => ({ y: p.y, prop: p }))].sort(
+    (a, b) => a.y - b.y,
+  );
+  for (const item of scene) {
+    if (item.prop) {
+      drawProp(ctx, item.prop, t);
+      continue;
+    }
+    const at = drawPet(ctx, item.pet, t, petOpts);
+    if (hover === item.pet.key && !opts.command) tags.push({ pet: item.pet, at });
   }
 
   // 무는 네모는 **게 위에** 얹는다 — 밖에서 조여드는 것이라 몸에 가리면 조여든 것이 아니라
