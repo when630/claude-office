@@ -187,6 +187,62 @@ test('일이 끝나면 노트북을 접고 나서 걷는다 — 접는 동안은
   assert.ok(after.act === 'walk', `다시 안 걷는다: ${after.act}`);
 });
 
+test('일을 끝내면 접고 나서 폴짝 뛰고 기지개를 켠다 — 자리는 그대로다', () => {
+  const world = createWorld();
+  const busy = strollCast(rooms(['proj', worker('a', 'typing')]));
+  run(world, busy, { frames: 700, rng: () => 0.1 });
+  const at = find(run(world, busy, { frames: 1, t0: 40_000 }), 'a').x;
+
+  // 일이 끝났다 — typing → idle이 산책에서 "끝난 순간"이다 (done은 명단에서 빠져 가라앉는다)
+  const idle = strollCast(rooms(['proj', worker('a', 'idle')]));
+  let hopped = null;
+  let stretched = null;
+  for (let i = 0; i < 200 && !stretched; i++) {
+    const p = find(stepStroll(world, idle, { w: W, h: H, now: 40_016 + i * 16, dt: 16, rng: () => 0.5 }), 'a');
+    if (p.act === 'hop') hopped = p;
+    if (hopped && p.act === 'stretch') stretched = p;
+  }
+  assert.ok(hopped, '접고 나서 폴짝을 안 뛴다');
+  assert.ok(stretched, '폴짝 뒤에 기지개가 없다');
+  assert.ok(Math.abs(stretched.x - at) < 1, `자축하며 자리를 떴다: ${at} → ${stretched.x}`);
+});
+
+test('일이 대기로 바뀌면 자축하지 않는다 — 끝난 것이 아니라 나를 부르는 것이다', () => {
+  const world = createWorld();
+  const busy = strollCast(rooms(['proj', worker('a', 'typing')]));
+  run(world, busy, { frames: 700, rng: () => 0.1 });
+
+  const wait = strollCast(rooms(['proj', worker('a', 'waiting')]));
+  for (let i = 0; i < 120; i++) {
+    const p = find(stepStroll(world, wait, { w: W, h: H, now: 41_000 + i * 16, dt: 16 }), 'a');
+    assert.notEqual(p.act, 'hop', '기다리라는데 폴짝 뛴다');
+  }
+  assert.equal(find(stepStroll(world, wait, { w: W, h: H, now: 43_000, dt: 16 }), 'a').act, 'halt');
+});
+
+test('자축 중에 일이 다시 들어오면 즉시 걷힌다', () => {
+  const world = createWorld();
+  const busy = strollCast(rooms(['proj', worker('a', 'typing')]));
+  run(world, busy, { frames: 700, rng: () => 0.1 });
+
+  const idle = strollCast(rooms(['proj', worker('a', 'idle')]));
+  // 접기(300ms)가 끝나 폴짝이 시작된 참을 잡는다
+  let t = 44_000;
+  let p = null;
+  for (let i = 0; i < 60; i++) {
+    p = find(stepStroll(world, idle, { w: W, h: H, now: t + i * 16, dt: 16 }), 'a');
+    if (p.act === 'hop') {
+      t = t + i * 16;
+      break;
+    }
+  }
+  assert.equal(p.act, 'hop');
+
+  const again = find(stepStroll(world, busy, { w: W, h: H, now: t + 16, dt: 16 }), 'a');
+  assert.equal(again.act, 'work', '일을 받았는데 아직 자축 중이다');
+  assert.equal(again.hop, 0, '공중에 뜬 채로 노트북을 폈다');
+});
+
 test('입력 대기는 멈춰 선다', () => {
   const world = createWorld();
   const cast = strollCast(rooms(['proj', worker('a', 'waiting')]));
