@@ -113,6 +113,10 @@ const BUBBLE_H = 11;
 function drawGlyphBubble(ctx, cx, bottom, glyph) {
   const w = 13;
   const h = BUBBLE_H;
+  // 캔버스 위 끝에서는 풍선이 밖으로 나가 윗머리가 잘린다 — 게한테서 떨어져 아래로 밀려서라도
+  // 통째로 보여야 한다. 무엇을 기다리는지가 이 풍선의 전부다(집어서 위쪽에 놓은 직후처럼
+  // 게가 여백보다 위에 서는 구간이 실제로 있다).
+  bottom = Math.max(bottom, h + 1);
   const left = Math.round(cx - w / 2);
   const top = Math.round(bottom - h);
   rect(ctx, left + 1, top, w - 2, h - 1, COLORS.bubble);
@@ -426,7 +430,8 @@ function drawPet(ctx, pet, t, opts) {
   const glyph = glyphKey ? SPR[glyphKey] : null;
   if (glyph) {
     const float = worker.mood === 'waiting' ? Math.round(Math.sin(t / 260) * 1.5) : Math.round(Math.sin(t / 900) * 1);
-    const bottom = y - body.h - GLYPH_GAP + float;
+    // 풍선과 같은 클램프 — 이름표 앵커가 풍선의 실제 자리와 어긋나면 안 된다
+    const bottom = Math.max(y - body.h - GLYPH_GAP + float, BUBBLE_H + 1);
     drawGlyphBubble(ctx, x, bottom, glyph);
     // 이름표는 말풍선 **위**에 선다 — 아래에 두면 무슨 상태인지가 이름에 가린다
     top = bottom - BUBBLE_H;
