@@ -100,6 +100,8 @@ export const SPR = {
   laptopHalf: sprite(PX.LAPTOP_HALF),
   laptopOpen: sprite(PX.LAPTOP_OPEN),
   laptopCode: sprite(PX.LAPTOP_OPEN_CODE),
+  beachBall: sprite(PX.BEACH_BALL),
+  picnicRug: sprite(PX.PICNIC_RUG),
   book: sprite(PX.BOOK),
   pencup: sprite(PX.PENCUP),
   docs: sprite(PX.DOCS),

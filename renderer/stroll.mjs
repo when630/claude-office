@@ -120,6 +120,31 @@ const REST_LONG_NIGHT_MS = 34_000;
 const NAP_CHANCE_NIGHT = 0.8;
 const SIP_CHANCE = 0.5;
 const SIP_MS = 5200;
+// ── 미니 포탈 소환. 놀이 도구는 게가 오가는 것과 **같은 문**으로 온다 — 이 화면의 물건이
+// 나타나는 길은 포탈 하나뿐이라야 세계가 안 갈라진다. 도구는 놀고 나면 같은 구멍으로 반납된다.
+//
+// 쿨다운은 도구 공용이다 — 공이 걷히자마자 러그가 내려오면 바탕화면이 서커스가 된다.
+const PLAY_COOL_MS = 90_000;
+const PROP_DROP_H = 22;
+// 비치볼 — 쉬는 둘이 공을 소환해 주고받는다. 차는 쪽이 걸어가 차고, 받는 쪽은 서서 본다.
+const BALL_CHANCE = 0.0025; // 프레임마다 (모두 쉴 때 30fps 기준 십몇 초에 한 번)
+const BALL_KICKS_MAX = 6;
+const BALL_MAX_MS = 26_000;
+const BALL_DECAY_MS = 520; // 찬 공이 미끄러지는 시간 상수 — 세기는 거리에서 역산한다
+const BALL_V_MAX = 0.22;
+const BALL_LIFT = 0.011; // 차인 공이 뜨는 세기(폴짝 단위) — 튀지 않는 공은 공이 아니라 돌이다
+const KICK_NEAR = 6;
+const BALL_STOP = 0.008;
+// 피크닉 — 셋 이상 쉬면 러그와 간식이 내려오고, 둘레에 둘러서서 담소한다
+const GATHER_CHANCE = 0.0012;
+const GATHER_MIN = 3;
+const GATHER_MAX = 5;
+const GATHER_MS = 16_000;
+// 둘레에 서는 거리 — 게 몸(반폭 8·키 13)이 러그(26×7, 중심 앵커)를 안 덮는 최소치다.
+// 좁게 세웠더니 앞에 선 게 하나가 러그를 통째로 가렸다(굽어서 확인).
+const GATHER_RX = 22;
+const GATHER_RY = 17;
+
 // 발자국. 이만큼 걸을 때마다 하나 남고(뛰면 더 성글게), 이 시간 동안 흐려진다.
 const TRACK_GAP = 7;
 const TRACK_GAP_RUN = 11;
@@ -171,8 +196,8 @@ function outsideArea(pet, area) {
 
 export function createWorld() {
   // tracks는 게가 밟고 지나간 자국이다. 게가 사라져도 자국은 제 시간까지 남으므로
-  // pet에 딸리지 않고 세계가 들고 있는다.
-  return { pets: new Map(), tracks: [], w: 0, h: 0 };
+  // pet에 딸리지 않고 세계가 들고 있는다. props는 포탈로 소환된 놀이 도구다.
+  return { pets: new Map(), tracks: [], props: [], playCool: 0, w: 0, h: 0 };
 }
 
 // 걸은 자리에 자국을 남긴다. **일정 거리마다**이지 일정 시간마다가 아니다 —
@@ -244,8 +269,9 @@ function portalOpen(age) {
 // 지금 놀 수 있는 게인가 — 쉬는 중이고, 이미 다른 놀이에 붙잡혀 있지 않다.
 function freeToPlay(pet, live, now) {
   if (pet.act !== 'walk' && pet.act !== 'look') return false;
-  // 붙박인 게는 놀이에 안 낀다 — 놀이는 자리를 옮기는데 머물라는 명령이 먼저다
-  if (pet.talk || pet.chase || pet.order || pet.stay) return false;
+  // 붙박인 게는 놀이에 안 낀다 — 놀이는 자리를 옮기는데 머물라는 명령이 먼저다.
+  // 공놀이·피크닉에 붙잡힌 게도 겹으로 안 끼운다.
+  if (pet.talk || pet.chase || pet.order || pet.stay || pet.playBall || pet.gathering) return false;
   const entry = live.get(pet.key);
   return !!entry && wantAct(entry.worker) === 'walk' && (pet.chatCool ?? 0) < now;
 }
@@ -279,6 +305,217 @@ export function saying(pet, now) {
   if (!mine) return null;
   const lines = chatLines(pet.talk.pairKey, Math.floor(pet.talk.t0 / 1000));
   return lines[pet.talk.role] || null;
+}
+
+// ── 소환된 도구의 한살이. state는 셋이다: 포탈에서 떨어지는 중(in) → 노는 중(live) →
+// 포탈로 돌아가는 중(out). 게의 warp/sink와 같은 시간표(portalOpen)를 쓴다.
+
+function clampBox(v, lo, hi) {
+  return Math.min(Math.max(v, lo), hi);
+}
+
+// 이 게가 지금 놀이를 계속할 수 있나 — 일·명령·손이 끼어들면 못 한다.
+// (chat·sip은 피크닉 손님이 러그 앞에서 짓는 모습이라 놀이의 일부다)
+function canPlay(world, live, key) {
+  const pet = world.pets.get(key);
+  if (!pet) return false;
+  const entry = live.get(key);
+  if (!entry || wantAct(entry.worker) !== 'walk') return false;
+  if (pet.order || pet.stay) return false;
+  return pet.act === 'walk' || pet.act === 'look' || pet.act === 'hop' || pet.act === 'chat' || pet.act === 'sip';
+}
+
+// 도구를 반납한다 — 그 자리에 포탈이 다시 열리고 도구가 가라앉는다. 붙잡힌 게들은 풀린다.
+function endProp(world, prop, now) {
+  if (prop.state === 'out') return;
+  prop.state = 'out';
+  prop.warpAt = now;
+  prop.portalY = prop.y;
+  prop.rvx = 0;
+  prop.rvy = 0;
+  prop.vz = 0;
+  prop.air = 0;
+  for (const key of prop.players ?? []) {
+    const p = world.pets.get(key);
+    if (p) p.playBall = false;
+  }
+  for (const key of prop.guests ?? []) {
+    const p = world.pets.get(key);
+    if (!p) continue;
+    p.gathering = false;
+    if (p.act === 'chat' || p.act === 'sip') p.act = 'walk';
+  }
+}
+
+// 쉬는 둘이 공을 소환한다 — 둘 사이 어디쯤에 미니 포탈이 열리고 공이 떨어진다.
+function startBall(world, live, now, rng, area) {
+  if (world.props.length || now < world.playCool) return;
+  if (rng() >= BALL_CHANCE) return;
+  const idle = [...world.pets.values()].filter((p) => freeToPlay(p, live, now));
+  if (idle.length < 2) return;
+  const a = idle[Math.floor(rng() * idle.length) % idle.length];
+  const rest = idle.filter((p) => p !== a);
+  const b = rest[Math.floor(rng() * rest.length) % rest.length];
+  if (!a || !b) return;
+  const gy = clampBox((a.y + b.y) / 2, area.y0 + PROP_DROP_H, area.y1 - 4);
+  world.props.push({
+    kind: 'ball',
+    state: 'in',
+    x: clampBox((a.x + b.x) / 2 + (rng() - 0.5) * 30, area.x0 + 12, area.x1 - 12),
+    y: gy - PROP_DROP_H,
+    gy,
+    portalY: gy - PROP_DROP_H,
+    vy: 0,
+    warpAt: now,
+    portal: 0,
+    born: now,
+    players: [a.key, b.key],
+    turn: 0,
+    kicks: 0,
+    rvx: 0,
+    rvy: 0,
+    vz: 0,
+    air: 0,
+  });
+  a.playBall = true;
+  b.playBall = true;
+}
+
+// 셋 이상 쉬면 피크닉 — 러그가 내려오고, 손님마다 둘레의 제 자리가 정해진다.
+function startGather(world, live, now, rng, area) {
+  if (world.props.length || now < world.playCool) return;
+  if (rng() >= GATHER_CHANCE) return;
+  const idle = [...world.pets.values()].filter((p) => freeToPlay(p, live, now));
+  if (idle.length < GATHER_MIN) return;
+  const guests = idle.slice(0, GATHER_MAX);
+  const cx = guests.reduce((s, p) => s + p.x, 0) / guests.length;
+  const cy = guests.reduce((s, p) => s + p.y, 0) / guests.length;
+  const x = clampBox(cx, area.x0 + GATHER_RX + 12, area.x1 - GATHER_RX - 12);
+  const gy = clampBox(cy, area.y0 + PROP_DROP_H + GATHER_RY, area.y1 - GATHER_RY - 2);
+  const spots = {};
+  guests.forEach((p, i) => {
+    // 위(-π/2)에서 시작해 고르게 두른다 — 러그 뒤쪽부터 채워야 앞이 덜 가려진다
+    const ang = -Math.PI / 2 + (i / guests.length) * Math.PI * 2;
+    spots[p.key] = {
+      gx: clampBox(x + Math.cos(ang) * GATHER_RX, area.x0, area.x1),
+      gy: clampBox(gy + Math.sin(ang) * GATHER_RY, area.y0, area.y1),
+    };
+    p.gathering = true;
+  });
+  world.props.push({
+    kind: 'rug',
+    state: 'in',
+    x,
+    y: gy - PROP_DROP_H,
+    gy,
+    portalY: gy - PROP_DROP_H,
+    vy: 0,
+    warpAt: now,
+    portal: 0,
+    born: now,
+    guests: guests.map((p) => p.key),
+    spots,
+    until: now + GATHER_MS,
+  });
+}
+
+// 공이 서 있나 — 서 있어야 차례인 게가 다가가 찬다. 구르는 공을 쫓아가 차면 헛발질 루프가 된다.
+function ballStopped(prop) {
+  return prop.air <= 0 && prop.vz === 0 && Math.hypot(prop.rvx, prop.rvy) < BALL_STOP;
+}
+
+// 뻥 — 상대 쪽으로 찬다. 세기는 거리에서 역산하므로 대충 상대 앞에 가서 선다.
+function kickBall(world, ball, kicker, rng) {
+  const mateKey = ball.players.find((k) => k !== kicker.key);
+  const mate = world.pets.get(mateKey);
+  const dx = (mate?.x ?? ball.x) + (rng() - 0.5) * 26 - ball.x;
+  const dy = (mate?.y ?? ball.y) + (rng() - 0.5) * 14 - ball.y;
+  const h = Math.hypot(dx, dy) || 1;
+  const v = Math.min(BALL_V_MAX, Math.max(24, h) / BALL_DECAY_MS);
+  ball.rvx = (dx / h) * v;
+  ball.rvy = (dy / h) * v;
+  ball.vz = BALL_LIFT;
+  ball.air = 0.01;
+  ball.turn = ball.players.indexOf(mateKey);
+  ball.kicks++;
+}
+
+// 도구 한 프레임 — 포탈 시간표, 낙하, 구르기, 끝낼 때 판정.
+function stepProps(world, live, { now, step, area }) {
+  for (const prop of [...world.props]) {
+    if (prop.warpAt != null) {
+      prop.portal = portalOpen(now - prop.warpAt);
+      if (prop.portal <= 0 && prop.state === 'live') prop.warpAt = null;
+    }
+
+    // 붙잡힌 게들의 사정이 먼저다 — 일이 들어온 선수·손님은 즉시 빠진다
+    if (prop.state !== 'out') {
+      if (prop.kind === 'ball' && !prop.players.every((k) => canPlay(world, live, k))) {
+        endProp(world, prop, now);
+      } else if (prop.kind === 'rug') {
+        const stayed = prop.guests.filter((k) => canPlay(world, live, k));
+        if (stayed.length !== prop.guests.length) {
+          for (const key of prop.guests) {
+            if (stayed.includes(key)) continue;
+            const p = world.pets.get(key);
+            if (p) p.gathering = false;
+          }
+          prop.guests = stayed;
+        }
+        if (stayed.length < 2 || now >= prop.until) endProp(world, prop, now);
+      }
+    }
+
+    if (prop.state === 'in') {
+      // 포탈이 다 열린 뒤에 떨어진다 — 게의 등장과 같은 순서다
+      if (now - prop.warpAt >= PORTAL_OPEN_MS) {
+        prop.vy += GRAVITY * step;
+        prop.y += prop.vy * step;
+        if (prop.y >= prop.gy) {
+          prop.y = prop.gy;
+          prop.vy = 0;
+          prop.state = 'live';
+        }
+      }
+      continue;
+    }
+
+    if (prop.state === 'live' && prop.kind === 'ball') {
+      const f = Math.exp(-step / BALL_DECAY_MS);
+      prop.x += prop.rvx * BALL_DECAY_MS * (1 - f);
+      prop.y += prop.rvy * BALL_DECAY_MS * (1 - f);
+      prop.rvx *= f;
+      prop.rvy *= f;
+      if (prop.x < area.x0 || prop.x > area.x1) {
+        prop.x = clampBox(prop.x, area.x0, area.x1);
+        prop.rvx = -prop.rvx * 0.7;
+      }
+      if (prop.y < area.y0 || prop.y > area.y1) {
+        prop.y = clampBox(prop.y, area.y0, area.y1);
+        prop.rvy = -prop.rvy * 0.7;
+      }
+      // 통통 — 차일 때 받은 수직 속도가 튕기며 잦아든다
+      prop.air += prop.vz * step;
+      prop.vz -= AIR_G * step;
+      if (prop.air <= 0) {
+        prop.air = 0;
+        prop.vz = prop.vz < 0 ? -prop.vz * 0.5 : 0;
+        if (prop.vz < 0.002) prop.vz = 0;
+      }
+      if ((prop.kicks >= BALL_KICKS_MAX && ballStopped(prop)) || now - prop.born > BALL_MAX_MS) endProp(world, prop, now);
+      continue;
+    }
+
+    if (prop.state === 'out') {
+      // 게의 sink와 같은 결 — 구멍이 열린 뒤 잠기고, 구멍이 닫히면 사라진다
+      const age = now - prop.warpAt;
+      if (age >= PORTAL_OPEN_MS) prop.y = Math.min(prop.portalY + SINK_H * 0.6, prop.y + SINK_SPEED * step);
+      if (age > PORTAL_OPEN_MS && prop.portal <= 0) {
+        world.props.splice(world.props.indexOf(prop), 1);
+        world.playCool = now + PLAY_COOL_MS;
+      }
+    }
+  }
 }
 
 // 쉬고 있는 둘을 골라 술래잡기를 시킨다.
@@ -395,7 +632,11 @@ export function stepStroll(
 
   const step = Math.min(dt, 64); // 창이 가려졌다 돌아왔을 때 한 프레임에 순간이동하지 않게
 
-  // 놀 짝을 먼저 정한다 — 게 하나씩 도는 아래 루프에서는 둘을 같이 볼 수 없다
+  // 놀 짝을 먼저 정한다 — 게 하나씩 도는 아래 루프에서는 둘을 같이 볼 수 없다.
+  // 소환 놀이가 술래잡기보다 먼저다: 같은 프레임에 둘 다 걸리면 드문 쪽이 이겨야 한다.
+  startGather(world, live, now, rng, area);
+  startBall(world, live, now, rng, area);
+  stepProps(world, live, { now, step, area });
   pairChats(world, live, now);
   startChase(world, live, now, rng);
 
@@ -690,6 +931,51 @@ export function stepStroll(
       const was = { x: pet.x, y: pet.y };
       advance(pet, step, NEAR, speed * RUN_MULT);
       leaveTrack(world, pet, Math.abs(pet.x - was.x) + Math.abs(pet.y - was.y), now);
+      continue;
+    }
+
+    // 소환된 공 — 선수는 공놀이가 걷기·쉬기보다 먼저다(위의 일·명령·손보다는 뒤).
+    // 차례인 게가 걸어가 차고, 상대는 공을 보고 선다.
+    const ball = world.props.find((p) => p.kind === 'ball' && p.players?.includes(pet.key));
+    if (ball && pet.act !== 'hop') {
+      if (ball.state !== 'live' || !ballStopped(ball) || ball.players[ball.turn] !== pet.key) {
+        pet.act = 'walk';
+        pet.moving = false;
+        if (Math.abs(ball.x - pet.x) > 1) pet.dir = ball.x > pet.x ? 1 : -1;
+        continue;
+      }
+      pet.act = 'walk';
+      pet.gx = ball.x;
+      pet.gy = Math.min(area.y1, ball.y + 4); // 공 조금 앞에 선다 — 겹치면 발이 공을 가린다
+      const was = { x: pet.x, y: pet.y };
+      if (advance(pet, step, KICK_NEAR, speed)) {
+        kickBall(world, ball, pet, rng);
+        pet.act = 'hop'; // 뻥 — 차는 순간 몸이 뜬다
+        pet.hopAt = now;
+        pet.hop = 0;
+      } else {
+        leaveTrack(world, pet, Math.abs(pet.x - was.x) + Math.abs(pet.y - was.y), now);
+      }
+      continue;
+    }
+
+    // 피크닉 — 손님은 러그 둘레 제 자리로 걸어가 러그를 보고 서서 담소한다.
+    const rug = world.props.find((p) => p.kind === 'rug' && p.guests?.includes(pet.key));
+    if (rug && pet.act !== 'hop') {
+      const spot = rug.spots[pet.key];
+      if (spot && Math.hypot(pet.x - spot.gx, pet.y - spot.gy) > NEAR + 0.3) {
+        pet.act = 'walk';
+        pet.gx = spot.gx;
+        pet.gy = spot.gy;
+        const was = { x: pet.x, y: pet.y };
+        advance(pet, step, NEAR, speed);
+        leaveTrack(world, pet, Math.abs(pet.x - was.x) + Math.abs(pet.y - was.y), now);
+      } else {
+        // 절반은 마시고 절반은 떠든다 — 큰 창의 모임(정수기 앞) 풍경과 같은 배합이다
+        pet.act = rug.guests.indexOf(pet.key) % 2 ? 'sip' : 'chat';
+        pet.moving = false;
+        if (Math.abs(rug.x - pet.x) > 1) pet.dir = rug.x > pet.x ? 1 : -1;
+      }
       continue;
     }
 
