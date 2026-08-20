@@ -7,6 +7,7 @@
 import { SPR, drawSprite } from './sprites.mjs';
 import { glyphKeyFor, showsDizzy } from './talk.mjs';
 import { paperCount, stackPapers } from './render.mjs';
+import { SWING_RAISE_K, SWING_HIT_K } from './stroll.mjs';
 
 const COLORS = {
   shadow: '#000000',
@@ -85,6 +86,9 @@ function bodyOf(pet, t) {
     default:
       break;
   }
+  // 망치 스윙 — 드는 동안 두 팔이 번쩍 올라가고, 내리치면 내려온다. act 케이스들(held 등)이
+  // 먼저다: 집힌 채로도 스윙 시계는 끝까지 돌지만 그때 보여야 하는 것은 버둥거림이다.
+  if ((pet.swingK ?? 0) > 0) return pet.swingK < SWING_RAISE_K ? SPR.armsHigh : SPR.stand;
   // 뛰는 동안은 걸음이 빨라진다 — 자리만 빨리 흐르고 다리가 그대로면 미끄러지는 것으로 보인다
   if (pet.moving) return Math.floor(t / (pet.dash ? 95 : 160)) % 2 ? SPR.stepA : SPR.stepB;
   if (worker.mood === 'waiting') return SPR.armsHigh;
@@ -381,14 +385,38 @@ function drawPet(ctx, pet, t, opts) {
   if (pet.armFx > 0 && pet.armFx < 1) drawPortal(ctx, x + 10, y + 1, Math.sin(Math.PI * pet.armFx), t, 'all', 0.35);
   if (pet.armed?.kind === 'paper') drawSprite(ctx, SPR.paperBall, x + 6, y - hop - 10);
   if (pet.armed?.kind === 'hammer' || (pet.swingK ?? 0) > 0) {
-    // 들었다(머리 위) → 내리친다(앞쪽 아래) — 두 자리 사이를 진행도(swingK)로 건넌다
-    const spr = SPR.hammer;
+    // 들어올림(세로) → 내리침(수평) → 꽂힘(뒤집힘) — 대가리가 머리 위에서 앞바닥으로
+    // 호를 그리며 넘어간다. 국면 경계는 움직임 쪽(SWING_RAISE_K·HIT_K)과 같은 값이다.
     const k = pet.swingK ?? 0;
     const fwd = pet.dir >= 0 ? 1 : -1;
-    // 자루 끝이 머리에 1px 겹쳐야 "쥐고 있다"가 된다 — 띄우면 떠 있는 물건이 된다
-    const hx = x + (fwd > 0 ? 5 : -5 - spr.w) + Math.round(k * 3) * fwd;
-    const hy = y - hop - body.h - spr.h + 1 + Math.round(k * (body.h + 4));
-    drawSprite(ctx, spr, hx, hy);
+    const top = y - hop - body.h;
+    if (k < SWING_RAISE_K) {
+      // 쥔 채(k=0)와 들어올리는 중 — 세로 그대로, 뒤로 젖히며 살짝 든다.
+      // 자루 끝이 머리(들었을 때는 번쩍 든 집게 모서리)에 붙어야 "쥐고 있다"가 된다 —
+      // 더 띄우면 떠 있는 물건이 된다(굽어서 확인했다: 5px는 집게에서 4px 떠 보였다).
+      const spr = SPR.hammer;
+      const r = k / SWING_RAISE_K;
+      const hx = x + (fwd > 0 ? 5 : -5 - spr.w) - Math.round(r * 3) * fwd;
+      drawSprite(ctx, spr, hx, top - spr.h + 1 - Math.round(r * 2));
+    } else if (k < SWING_HIT_K) {
+      // 내리치는 찰나 — 몸 앞에서 수평으로 눕는다. 한 박자(빠른 국면)라 프레임 하나로 족하다
+      const spr = fwd > 0 ? SPR.hammerSide : SPR.hammerSideL;
+      drawSprite(ctx, spr, fwd > 0 ? x + 5 : x - 5 - spr.w, top - 4);
+    } else {
+      // 꽂혔다 — 대가리가 앞(납작해진 악당의 가까운 쪽 등) 바닥에 박힌 채 끝까지 멈춘다.
+      // 11은 움직임 쪽 SMASH_GAP(14)과 짝이다 — 옆에 선 자리에서 대가리가 닿는 거리.
+      const spr = SPR.hammerDown;
+      const ix = x + fwd * 11;
+      drawSprite(ctx, spr, ix - Math.floor(spr.w / 2), y - hop - 7 - spr.h);
+      // 박히는 순간의 불꽃 — 두어 프레임만 반짝하고 사라진다
+      if (k < SWING_HIT_K + 0.12) {
+        const iy = y - hop - 10;
+        rect(ctx, ix - 5, iy - 3, 1, 1, COLORS.sel);
+        rect(ctx, ix + 4, iy - 3, 1, 1, COLORS.sel);
+        rect(ctx, ix - 3, iy - 6, 1, 1, COLORS.sel);
+        rect(ctx, ix + 2, iy - 6, 1, 1, COLORS.sel);
+      }
+    }
   }
 
   // 노트북은 몸보다 나중에 — 상판이 하반신을 덮어야 "뒤에 앉았다"가 된다

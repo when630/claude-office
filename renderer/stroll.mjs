@@ -158,7 +158,16 @@ const PAPER_HIT = 8;
 const PAPER_GAP_MIN = 2000;
 const PAPER_GAP_SPAN = 1000;
 const ARM_FX_MS = 700;
-const SWING_MS = 420;
+// 스윙은 세 국면 — 들어올림(0~RAISE) → 내리침(RAISE~HIT) → 꽂힌 채 멈춤(HIT~1).
+// 들어올림이 절반을 넘게 느긋해야 내리침 한 박자가 빨라 보인다(예비 동작이 강세를 만든다).
+// 그리는 쪽(stroll-view)이 같은 경계로 프레임을 고르므로 여기서 내보낸다.
+const SWING_MS = 640;
+export const SWING_RAISE_K = 0.55;
+export const SWING_HIT_K = 0.7;
+// 내리칠 때는 악당 옆에 선다 — 위로 겹쳐 서면 제 머리를 때리는 그림이 된다.
+// 14는 반폭 합(게 8 + 악당 6)이다: 몸이 안 겹치는 최소 거리라, 대가리(앞으로 11px)가
+// 악당의 가까운 쪽 몸통에 떨어진다(굽어서 확인했다 — 9로는 몸이 5px 겹쳐 뒤엉킨다).
+const SMASH_GAP = 14;
 const KO_MS = 700; // 납작해져 있는 시간 — 바로 가라앉으면 맞은 것이 아니라 꺼진 것이 된다
 
 // ── 미니 포탈 소환. 놀이 도구는 게가 오가는 것과 **같은 문**으로 온다 — 이 화면의 물건이
@@ -606,11 +615,15 @@ function clearFighters(world) {
 }
 
 // 납작 — 맞아서 나가는 길. KO_MS 동안 눌려 있다가 포탈로 가라앉는다.
+// 떨림·움찔은 산 몸의 것이라 여기서 끈다 — 남겨 두면 live에서만 줄어드는 값이라 납작한
+// 몸이 사라질 때까지 덜덜 떤다.
 function koVillain(world, vil, now) {
   vil.state = 'ko';
   vil.koAt = now;
   vil.mode = null;
   vil.hp = 0;
+  vil.shake = 0;
+  vil.flinch = 0;
   clearFighters(world);
 }
 
@@ -620,6 +633,7 @@ function fleeVillain(world, vil, now) {
   vil.warpAt = now;
   vil.portalY = vil.y;
   vil.mode = null;
+  vil.shake = 0;
   clearFighters(world);
 }
 
@@ -959,6 +973,17 @@ function stepVillain(world, live, { now, step, area, rng, drag }) {
     return;
   }
   if (now - vil.born > RAGE_MS) armFighters(world, live, vil, now, rng);
+  // 망치가 나온 뒤에는 겁먹고 얼어붙는다 — 이 크기에서 도망치는 표적을 쫓아가 때리는
+  // 그림은 안 나온다. 굳은 것을 마주 보고 내리치는 것이 피니셔다. **떨지는 않는다**:
+  // 좌우 지터는 맞은 순간(flinch)과 돌진 조준의 것이라, 몇 초씩 이어지는 이 국면에
+  // 얹으면 악당이 내내 좌우로 덜덜거린다.
+  const swinger = vil.hammerKey ? world.pets.get(vil.hammerKey) : null;
+  if (swinger) {
+    vil.mode = null;
+    vil.shake = 0; // 조준 도중 망치가 배정되면 mode만 걷혀 떨림이 켜진 채 남는다
+    vil.dir = swinger.x > vil.x ? 1 : -1;
+    return;
+  }
   // 다 나가떨어져 있으면 공격을 안 고르고 떠서 기다린다 — 곧 누군가 일어난다
   const targets = [...world.pets.values()].filter((p) => canPlay(world, live, p.key));
   if (!vil.mode && now >= vil.nextAt && targets.length) pickAttack(vil, targets, now, rng, area);
@@ -1249,12 +1274,21 @@ export function stepStroll(
     // 진행도(swingK)를 여기서 셈해 넘긴다: 그리는 쪽 시계(rAF)와 이곳(Date.now)이 다르다.
     if (pet.swingAt) {
       pet.swingK = Math.min(1, (now - pet.swingAt) / SWING_MS);
+      // 악당은 **꽂히는 순간에** 납작해진다 — 도착하자마자 눕히면 망치가 시체 위로 떨어진다
+      const vil = world.villain;
+      if (pet.swingK >= SWING_HIT_K && vil && vil.state === 'live' && vil.hammerKey === pet.key)
+        koVillain(world, vil, now);
       if (pet.swingK >= 1) {
         pet.swingAt = 0;
         pet.swingK = 0;
-        pet.act = 'hop'; // 해치웠다 — 폴짝
-        pet.hopAt = now;
-        pet.hop = 0;
+        // 내리치는 사이 악당을 집어 갔으면 헛스윙이다 — 자축 없이 걷고, 놓이면 다시 쫓는다
+        if (world.villain && world.villain.state === 'live') {
+          pet.act = 'walk';
+        } else {
+          pet.act = 'hop'; // 해치웠다 — 폴짝
+          pet.hopAt = now;
+          pet.hop = 0;
+        }
       } else {
         pet.act = 'walk';
         pet.moving = false;
@@ -1432,19 +1466,21 @@ export function stepStroll(
       continue;
     }
 
-    // 망치 피니셔 — 맡은 게는 악당에게 내달려 내리친다. 반격이 걷기·쉬기보다 먼저다.
+    // 망치 피니셔 — 맡은 게는 악당 **옆자리**로 내달려 마주 보고 내리친다. 반격이
+    // 걷기·쉬기보다 먼저다. 납작해지는 것은 여기가 아니라 위의 swing 블록, 꽂히는 순간이다.
     const vil = world.villain;
     if (vil && vil.state === 'live' && vil.hammerKey === pet.key && pet.act !== 'hop') {
       pet.act = 'walk';
       pet.dash = true;
-      pet.gx = vil.x;
+      const side = pet.x <= vil.x ? -1 : 1; // 지금 있는 쪽에서 다가간다 — 빙 돌면 뜸을 들인다
+      pet.gx = clampBox(vil.x + side * SMASH_GAP, area.x0, area.x1);
       pet.gy = Math.min(area.y1, vil.y + 2);
       const was = { x: pet.x, y: pet.y };
-      if (advance(pet, step, CHARGE_HIT + 1, speed * RUN_MULT)) {
+      if (advance(pet, step, NEAR, speed * RUN_MULT)) {
         pet.dash = false;
-        pet.swingAt = now; // 내리치기 — 다음 프레임부터 위의 swing 블록이 잇는다
+        pet.dir = -side; // 악당을 마주 본다 — 대가리가 이 방향 앞으로 떨어진다
+        pet.swingAt = now; // 들어올리기 — 다음 프레임부터 위의 swing 블록이 잇는다
         pet.swingK = 0;
-        koVillain(world, vil, now);
       } else {
         leaveTrack(world, pet, Math.abs(pet.x - was.x) + Math.abs(pet.y - was.y), now);
       }
