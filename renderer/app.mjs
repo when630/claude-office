@@ -1799,8 +1799,40 @@ function notifyBlock() {
 }
 
 // 언어와 이름표 — 화면에 무엇이 어떤 말로 적히는지.
+// 업데이트 줄 — 상태를 사전의 문구로. 트레이의 재시작 항목과 같은 사실을 말한다.
+let updateCfg = null;
+function updateLine(u) {
+  if (!u) return '';
+  const p = { v: u.version ?? '', p: u.percent ?? 0, cur: u.current ?? '' };
+  const key = `cfg.updateState.${u.status}`;
+  // 오류는 종류별 문구가 있으면 그것을, 없으면 원문을 그대로
+  if (u.status === 'error') {
+    const k = `cfg.updateError.${u.error}`;
+    const s = t(k);
+    return t('cfg.updateState.error', { e: s === k ? u.error ?? '' : s });
+  }
+  return t(key, p);
+}
+function updateButton(u) {
+  if (!u || u.status === 'unsupported') return '';
+  if (u.status === 'ready') return `<button type="button" class="btn" id="cfg-update-install">${t('cfg.updateInstall')}</button>`;
+  if (u.status === 'manual') return `<button type="button" class="btn" id="cfg-update-install">${t('cfg.updateOpen')}</button>`;
+  const busy = u.status === 'checking' || u.status === 'downloading' || u.status === 'available';
+  return `<button type="button" class="btn" id="cfg-update-check"${busy ? ' disabled' : ''}>${t('cfg.updateCheck')}</button>`;
+}
+
 function generalPane() {
   return `
+    <section class="block">
+      <h3>${t('cfg.updateSection')}${hintBtn('cfg.updateHint')}</h3>
+      <div class="cfg-row">
+        <label><b>${t('cfg.updateCurrent', { cur: esc(updateCfg?.current ?? meta?.version ?? '') })}</b><small>${esc(
+          updateLine(updateCfg),
+        )}</small></label>
+        ${updateButton(updateCfg)}
+      </div>
+    </section>
+
     <section class="block">
       <h3>${t('cfg.langSection')}${hintBtn('cfg.langHint')}</h3>
       <div class="cfg-row">
@@ -1966,6 +1998,7 @@ async function saveNotify(patch) {
 async function openCfgTab() {
   notifyCfg = (await window.office?.getNotify?.().catch(() => null)) ?? notifyCfg;
   hotkeyCfg = (await window.office?.getHotkeys?.().catch(() => null)) ?? hotkeyCfg;
+  updateCfg = (await window.office?.getUpdate?.().catch(() => null)) ?? updateCfg;
   capturing = null;
   setPanelTab('cfg');
 }
@@ -2080,8 +2113,32 @@ function handleHintClick(target) {
   return false;
 }
 
+// 받는 중 %가 바뀌면 설정 창의 그 줄도 따라간다 — 열려 있을 때만 다시 그린다
+window.office?.onUpdate?.((st) => {
+  updateCfg = st;
+  if (panelTab === 'cfg' && cfgTab === 'general') drawCfg();
+});
+
+async function runUpdateAction(id) {
+  if (id === 'cfg-update-install') {
+    const r = await window.office?.installUpdate?.().catch(() => null);
+    // 설치면 앱이 곧 재시작한다. 받는 곳을 열었으면 그대로 두고, 아무것도 못 했으면 상태를 다시 읽는다
+    if (!r?.installing && !r?.opened) updateCfg = (await window.office?.getUpdate?.().catch(() => null)) ?? updateCfg;
+    drawCfg();
+    return;
+  }
+  updateCfg = { ...(updateCfg ?? {}), status: 'checking' };
+  drawCfg();
+  updateCfg = (await window.office?.checkUpdate?.().catch(() => null)) ?? updateCfg;
+  drawCfg();
+}
+
 cfgBody.addEventListener('click', (e) => {
   if (handleHintClick(e.target)) return;
+  if (e.target.id === 'cfg-update-check' || e.target.id === 'cfg-update-install') {
+    runUpdateAction(e.target.id);
+    return;
+  }
   if (e.target.classList?.contains('cfg-reset')) {
     saveView({ roomThemes: {} }).then(drawCfg);
     return;

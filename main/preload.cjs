@@ -30,6 +30,11 @@ contextBridge.exposeInMainWorld('office', {
   // 전역 단축키 — 저장된 조합과 못 잡은 조합을 함께 돌려준다
   getHotkeys: () => ipcRenderer.invoke('office:getHotkeys'),
   setHotkeys: (patch) => ipcRenderer.invoke('office:setHotkeys', patch),
+  // 업데이트 — 지금 상태·지금 확인·지금 설치(맥은 받는 곳 열기). 진행 상황은 onUpdate로 밀어준다.
+  getUpdate: () => ipcRenderer.invoke('office:getUpdate'),
+  checkUpdate: () => ipcRenderer.invoke('office:checkUpdate'),
+  installUpdate: () => ipcRenderer.invoke('office:installUpdate'),
+  onUpdate: (cb) => ipcRenderer.on('office:update', (_e, st) => cb(st)),
   // 설정 창의 표시 설정 — 저장된 뒤의 값을 되돌려준다
   getView: () => ipcRenderer.invoke('office:getView'),
   setView: (patch) => ipcRenderer.invoke('office:setView', patch),

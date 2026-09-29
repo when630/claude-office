@@ -26,7 +26,7 @@ import {
   manualGuide as notifyManualGuide,
   reasonText as notifyTapReason,
 } from './notify-tap.mjs';
-import { initUpdater, installNow } from './updater.mjs';
+import { initUpdater, installNow, checkNow, installFromSettings, updaterState } from './updater.mjs';
 import {
   createNotifyState,
   decideNotifications,
@@ -1370,6 +1370,20 @@ if (!app.requestSingleInstanceLock()) {
       return { hotkeys: settings.hotkeys, failed: applyHotkeys() };
     });
 
+    // 업데이트. 설정 창의 일반 탭이 지금 상태를 읽고, 확인·설치를 누른다.
+    // 확인은 끝날 때까지 기다렸다가 상태를 돌려준다. 맥(manual)은 갈아끼울 수 없으니 받는 곳을 연다.
+    const RELEASES_URL = 'https://github.com/when630/claude-office/releases/latest';
+    ipcMain.handle('office:getUpdate', () => ({ ...updaterState(), current: app.getVersion() }));
+    ipcMain.handle('office:checkUpdate', async () => ({ ...(await checkNow()), current: app.getVersion() }));
+    ipcMain.handle('office:installUpdate', () => {
+      const st = updaterState();
+      if (st.status === 'manual') {
+        openExternal(RELEASES_URL);
+        return { installing: false, opened: true };
+      }
+      return { ...installFromSettings(), opened: false };
+    });
+
     // 설정 창(렌더러)이 쓰는 표시 설정. 저장된 값을 되돌려주므로 렌더러는 반영만 하면 된다.
     ipcMain.handle('office:getView', () => settings.view);
     ipcMain.handle('office:setView', (_e, patch) => {
@@ -1411,6 +1425,8 @@ if (!app.requestSingleInstanceLock()) {
           openExternal('https://github.com/when630/claude-office/releases/latest'),
         );
       },
+      // 설정 창이 열려 있으면 진행 상황(받는 중 %)이 따라 바뀌어야 한다
+      onChange: (st) => win?.webContents?.send?.('office:update', { ...st, current: app.getVersion() }),
     });
 
     await tick();
