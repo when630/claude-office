@@ -653,6 +653,13 @@ function createStroll() {
 
   // 기본은 통과. 게 위에 커서가 오면 렌더러가 알려 준다(office:stroll-pass).
   stroll.setIgnoreMouseEvents(true, { forward: true });
+  // **이게 없으면 게 위를 스치는 순간 아래 앱들이 얼어붙는다.** 통과를 끄면 WS_EX_TRANSPARENT가
+  // 빠지고, Chromium의 occlusion 판정은 그런 창을 "작업 영역 전체를 덮는 불투명 창"으로 센다 —
+  // 밑의 브라우저·Electron 앱이 가려졌다고 보고 그리기를 멈춘다. 통과를 다시 켜도 스타일만 바뀌고
+  // 재계산을 부를 창 이벤트가 없어서, 휠을 굴려도 화면이 안 바뀌다가 그 앱을 클릭해야 건너뛴다.
+  // 알파가 255 미만인 레이어드 창은 판정에서 빠지므로(gfx::IsWindowVisibleAndFullyOpaque)
+  // 0.99를 걸어 WS_EX_LAYERED를 늘 남긴다. 게가 1% 옅어지는 것 말고는 그림도 클릭도 그대로다.
+  if (process.platform === 'win32') stroll.setOpacity(0.99);
   // 작업 표시줄 위에 남아야 한다 — 미니와 같은 사정이다(위 createMini의 긴 주석).
   if (process.platform === 'win32') stroll.setAlwaysOnTop(true, 'pop-up-menu');
   // 데스크톱을 바꿔도 게는 따라온다. 전체화면 앱 위에까지 올라가지는 않는다 —
