@@ -93,7 +93,11 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   "게 위에 왔다"를 알 수 있다(Electron에서 통과 중 전달되는 것은 mousemove뿐이다).
   **`backgroundThrottling: false`가 빠지면 게가 얼어붙는다** — 아무것도 안 그린 투명 창은
   Chromium의 occlusion 판정에 걸려 `visibilityState: hidden`이 되고 rAF가 멈춘다(실제 앱을
-  띄워 확인했다. 창은 떠 있는데 게만 멈춘 그림이 된다). 투명 창은 크기를 못 바꾸므로
+  띄워 확인했다. 창은 떠 있는데 게만 멈춘 그림이 된다). 같은 판정이 **반대 방향으로도** 문다 —
+  통과를 끄면 `WS_EX_TRANSPARENT`가 빠져 산책 창이 "화면을 덮는 불투명 창"으로 세어지고, 밑의
+  브라우저·Electron 앱이 그리기를 멈춘다(휠을 굴려도 화면이 안 바뀌다가 클릭해야 건너뛴다).
+  Windows에서 `setOpacity(0.99)`를 거는 이유다 — 알파가 255 미만인 레이어드 창은 판정에서 빠진다.
+  투명 창은 크기를 못 바꾸므로
   `resizable: false`이고 자리는 `fitStroll`이 작업 영역에 맞춰 다시 잡는다.
   Windows만 `focusable: false`다 — 게를 끌어도 작업 중인 창의 초점을 뺏지 않아야 하는데,
   맥에서는 초점을 못 받는 창이 마우스 눌림을 받는 보장이 없어 집어 드는 것 자체를 잃는다
