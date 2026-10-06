@@ -1109,32 +1109,44 @@ function wirePlan() {
 
 // 터미널을 띄우는 일은 main이 한다(main/terminal.mjs). 여기서는 누구인지만 넘긴다 —
 // 명령 문자열을 넘기면 그게 임의 명령 실행 통로가 되므로 id만 보낸다.
-function wireJump() {
-  const btn = paneSession.querySelector('.go');
-  if (!btn) return;
-  btn.addEventListener('click', async () => {
-    const w = selected ? findWorker(selected) : null;
-    const msg = paneSession.querySelector('#jump-msg');
-    if (!w) return;
-    btn.disabled = true;
-    const res = await window.office?.openTerminal?.({ cwd: w.cwd, jobId: w.jobId, sessionId: w.sessionId }).catch(
-      () => null,
-    );
-    btn.disabled = false;
-    if (res?.ok) {
+// 패널 바닥 버튼 · 목록 행의 바로가기 · Enter가 전부 여기로 온다. btn은 눌린 것(없을 수도 있다) —
+// 패널 버튼이면 글자를, 행의 아이콘이면 색을 잠깐 바꿔 "됐다"를 낸다.
+// 못 띄웠을 때의 안내는 패널에만 자리가 있으므로 그 자리를 골라 패널에 적는다.
+async function openTerminalFor(w, btn) {
+  if (!w) return;
+  const isPanelBtn = btn?.classList?.contains('go');
+  if (isPanelBtn) btn.disabled = true;
+  const res = await window.office?.openTerminal?.({ cwd: w.cwd, jobId: w.jobId, sessionId: w.sessionId }).catch(
+    () => null,
+  );
+  if (isPanelBtn) btn.disabled = false;
+  if (res?.ok) {
+    if (isPanelBtn) {
       btn.textContent = t('panel.opened');
-      if (msg) msg.textContent = '';
       setTimeout(() => {
         btn.textContent = t('panel.open');
       }, 1500);
-      return;
+    } else if (btn) {
+      btn.classList.add('done');
+      setTimeout(() => btn.classList.remove('done'), 1500);
     }
-    // 못 띄웠으면 명령을 클립보드에 넣어준다 — 손으로 붙여넣을 수 있어야 한다
-    if (res?.cmd) window.office?.copy(res.cmd);
-    if (msg) {
-      msg.textContent = [res?.message, res?.cmd && t('panel.copiedCmd')].filter(Boolean).join(' ');
-    }
-  });
+    const msg = paneSession.querySelector('#jump-msg');
+    if (msg) msg.textContent = '';
+    return;
+  }
+  if (selected !== w.key) selectKey(w.key);
+  const msg = paneSession.querySelector('#jump-msg');
+  // 못 띄웠으면 명령을 클립보드에 넣어준다 — 손으로 붙여넣을 수 있어야 한다
+  if (res?.cmd) window.office?.copy(res.cmd);
+  if (msg) {
+    msg.textContent = [res?.message, res?.cmd && t('panel.copiedCmd')].filter(Boolean).join(' ');
+  }
+}
+
+function wireJump() {
+  const btn = paneSession.querySelector('.go');
+  if (!btn) return;
+  btn.addEventListener('click', () => openTerminalFor(selected ? findWorker(selected) : null, btn));
 }
 
 // ── 패널 탭 (세션 · 출근부 · 설정)
@@ -1360,8 +1372,32 @@ function drawStageEmpty() {
   const empty = MINI ? !shown.some((r) => r.workers?.length) : rooms.length > 0 && shown.length === 0;
   stageEmpty.hidden = !empty;
   canvas.hidden = empty;
-  if (empty) stageEmpty.textContent = t(MINI ? 'mini.nobody' : 'topbar.allHidden');
+  if (!empty) return;
+  if (MINI) {
+    stageEmpty.textContent = t('mini.nobody');
+    return;
+  }
+  // 왜 비었는지 — 거르기 값과 접어 둔 방 수. 둘 중 하나는 반드시 참이다(그래서 비었다).
+  const why = [
+    roomFilter && t('topbar.emptyFilter', { q: roomFilter }),
+    cfg.collapsed.length && t('topbar.emptyCollapsed', { n: cfg.collapsed.length }),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  stageEmpty.innerHTML = `<b>${t('topbar.allHidden')}</b>${why ? `<span>${esc(why)}</span>` : ''}
+    <button type="button" class="btn" id="stage-unhide">${t('topbar.hiddenTitle')}</button>`;
 }
+
+// 걸러 놓은 것과 접어 둔 것을 한꺼번에 푼다 — 상태줄 배지와 빈 화면의 버튼이 같은 길이다
+function unhideAll() {
+  roomFilter = '';
+  filterEl.value = '';
+  if (cfg.collapsed.length) saveView({ collapsed: [] }).then(drawCfg);
+  else refresh();
+}
+stageEmpty.addEventListener('click', (e) => {
+  if (e.target.closest?.('#stage-unhide')) unhideAll();
+});
 
 function drawStats() {
   const s = state.stats ?? {};
@@ -1470,9 +1506,15 @@ function railMeta(w) {
   return '';
 }
 
-function railRow(key, mood, name, meta) {
+// 행 안의 **터미널 열기**. 이 앱에서 가장 잦은 동작인데 전에는 행 클릭 → 패널 바닥 버튼의 두 번이었다(#217).
+// 행이 <button>이라 안에 버튼을 못 넣는다 — span에 role을 주고 클릭은 railList가 가로챈다.
+// 퇴근한 자리(recent)는 세션이 끝나 열 터미널이 없으므로 안 붙인다.
+function railRow(key, mood, name, meta, { go = true } = {}) {
+  const goBtn = go
+    ? `<span class="rail-go" role="button" tabindex="-1" data-go="${esc(key)}" title="${esc(t('panel.open'))}">${icon('go')}</span>`
+    : '';
   return `<button type="button" class="rail-row${key === selected ? ' on' : ''}" data-key="${esc(key)}"
-    title="${esc(name)}"><span class="dot ${esc(mood)}"></span><span class="nm">${esc(name)}</span>${meta}</button>`;
+    title="${esc(name)}"><span class="dot ${esc(mood)}"></span><span class="nm">${esc(name)}</span>${goBtn}${meta}</button>`;
 }
 
 function drawRail() {
@@ -1497,7 +1539,7 @@ function drawRail() {
     parts.push(`<div class="rail-group">${t('idle.recent')}<span class="c">${recent.length}</span></div>`);
     parts.push(
       recent
-        .map((r) => railRow(r.key, r.state, panelName(r), `<time>${fmtTime(r.at)}</time>`))
+        .map((r) => railRow(r.key, r.state, panelName(r), `<time>${fmtTime(r.at)}</time>`, { go: false }))
         .join(''),
     );
   }
@@ -1515,8 +1557,77 @@ function tickRail() {
 }
 
 railList.addEventListener('click', (e) => {
+  const go = e.target.closest?.('.rail-go');
+  if (go) {
+    e.stopPropagation();
+    const w = findWorker(go.dataset.go);
+    if (w) openTerminalFor(w, go);
+    return;
+  }
   const row = e.target.closest?.('.rail-row');
   if (row) selectKey(row.dataset.key);
+});
+
+// ── 키보드 길. 손이 터미널에 있는 사람의 앱인데 목록이 Tab으로만 닿았다(#217).
+//   /       거르기 칸으로
+//   ↑ ↓     목록에서 다음·이전 자리 (화면에 보이는 순서 그대로)
+//   Enter   고른 자리의 터미널 열기
+//   1 2 3   패널 탭 — 세션 · 출근부 · 설정 (탭 클릭과 같은 길을 탄다 — 두 판은 열 때 값을 받아 와야 한다)
+//   Esc     단계적 — 캡션·도움말 닫기 → 거르기 비우기 → 창 내리기(트레이로)
+// 글자를 치는 중(입력칸)이면 Esc 말고는 손대지 않고, 단축키 조합을 받는 중(capturing)이면 전부 비킨다.
+// Space(가운데로)·Ctrl+[ ]는 자기 핸들러가 있다.
+function moveSelection(step) {
+  const rows = [...railList.querySelectorAll('.rail-row')];
+  if (!rows.length) return;
+  const at = rows.findIndex((r) => r.dataset.key === selected);
+  const idx = at < 0 ? (step > 0 ? 0 : rows.length - 1) : Math.min(rows.length - 1, Math.max(0, at + step));
+  const next = rows[idx];
+  if (!next || next.dataset.key === selected) return;
+  selectKey(next.dataset.key);
+  railList.querySelector(`.rail-row[data-key="${CSS.escape(next.dataset.key)}"]`)?.scrollIntoView({ block: 'nearest' });
+}
+
+function clearFilter() {
+  if (!roomFilter && !filterEl.value) return false;
+  roomFilter = '';
+  filterEl.value = '';
+  refresh();
+  return true;
+}
+
+window.addEventListener('keydown', (e) => {
+  if (MINI || capturing) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const field = e.target?.closest?.('input, select, textarea');
+  if (e.key === 'Escape') {
+    if (roomDrag) return; // 끌던 방을 놓는 Esc는 그쪽 핸들러의 몫이다
+    if (captionOn) return closeCaption();
+    if (!helpBox.hidden) return setHelp(false);
+    if (field) {
+      if (field === filterEl) clearFilter();
+      field.blur();
+      return;
+    }
+    if (clearFilter()) return;
+    window.office?.winCmd?.('close');
+    return;
+  }
+  if (field) return;
+  // 초점이 버튼 위에 있으면 Enter는 그 버튼의 것이다 — 여기서 또 열면 두 번 일어난다
+  const onControl = e.target?.closest?.('button, a, summary, [role="button"], [role="tab"]');
+  if (e.key === '/') {
+    e.preventDefault();
+    filterEl.focus();
+    filterEl.select();
+  } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    moveSelection(e.key === 'ArrowDown' ? 1 : -1);
+  } else if (e.key === 'Enter' && !onControl) {
+    const w = selected ? findWorker(selected) : null;
+    if (w) openTerminalFor(w, paneSession.querySelector('.go'));
+  } else if (e.key === '1' && !onControl) setPanelTab('session');
+  else if (e.key === '2' && !onControl) openAttTab();
+  else if (e.key === '3' && !onControl) openCfgTab();
 });
 
 // ── 양쪽 열 접기
@@ -2488,12 +2599,7 @@ filterEl.addEventListener('input', () => {
 });
 
 // 배지를 누르면 걸러 놓은 것과 접어 둔 것을 한꺼번에 푼다 — 빠져나오는 길은 한 번에 닿아야 한다
-shownBtn.addEventListener('click', () => {
-  roomFilter = '';
-  filterEl.value = '';
-  if (cfg.collapsed.length) saveView({ collapsed: [] }).then(drawCfg);
-  else refresh();
-});
+shownBtn.addEventListener('click', unhideAll);
 
 // ── 미니 모드 여닫기. 창을 갈아 끼우는 일이라 main이 한다(별도 창이다).
 document.getElementById('mini-open').addEventListener('click', () => window.office?.setMode?.('mini'));
@@ -2546,10 +2652,6 @@ helpBtn.addEventListener('click', (e) => {
 document.addEventListener('click', (e) => {
   if (!helpBox.hidden && !helpBox.contains(e.target)) setHelp(false);
 });
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !helpBox.hidden) setHelp(false);
-});
-
 // ── 언어
 //
 // 실제로 쓰는 언어는 main이 정한다(설정값 + OS 로케일). 여기는 받아서 이 프로세스의
@@ -2601,6 +2703,8 @@ const ICONS = {
   // 무대 가장자리의 열 접기 손잡이 — 접히는 쪽을 가리키는 꺾쇠
   chevL: '<path d="M7.5 2.5 4 6l3.5 3.5"/>',
   chevR: '<path d="M4.5 2.5 8 6l-3.5 3.5"/>',
+  // 목록 행의 터미널 열기 — 상자 밖으로 나가는 화살표
+  go: '<path d="M3 9l6-6M4.5 3H9v4.5"/>',
 };
 
 function icon(name) {

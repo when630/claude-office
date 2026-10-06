@@ -293,6 +293,11 @@ the status bar at the bottom, the tray menu, or the shortcuts.
 | Back to the middle | tap `Space` |
 | Back to auto scale and centre | `Ctrl+0` (`Ctrl+=` · `Ctrl+-` step the scale) |
 | Fold either side column | `Ctrl+[` · `Ctrl+]`, or the handles on either edge of the office |
+| Jump to the room filter | `/` |
+| Previous · next session in the list | `↑` · `↓` |
+| Open the selected session's terminal | `Enter` (or the arrow that appears on a hovered row) |
+| Panel tabs | `1` · `2` · `3` — session · attendance · settings |
+| Step back | `Esc` — closes a caption, then clears the filter, then drops the window to the tray |
 
 `⌘` stands in for `Ctrl` on macOS.
 

@@ -33,7 +33,10 @@ export default {
     filter: '방 이름',
     hidden: '{n}개 숨김',
     hiddenTitle: '거르기와 접기를 모두 푼다',
-    allHidden: '조건에 맞는 방이 없습니다. 목록 위의 이름 칸을 비우거나 접어 둔 방을 펴면 다시 보입니다.',
+    allHidden: '조건에 맞는 방이 없습니다',
+    // 빈 화면의 이유 — 거르기 값 · 접어 둔 방 수. 둘 다면 ' · '로 잇는다
+    emptyFilter: '"{q}"로 거르는 중',
+    emptyCollapsed: '접어 둔 방 {n}개',
     in: '출근',
     typing: '작업 중',
     waiting: '입력 대기',
