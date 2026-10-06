@@ -50,6 +50,8 @@ import {
   STROLL_SCALES,
   STROLL_SPEEDS,
   STROLL_DEFAULTS,
+  STROLL_DISPLAY_PRIMARY,
+  pickStrollDisplay,
   pickStroll,
 } from '../shared/stroll-choices.mjs';
 import {
@@ -362,6 +364,8 @@ function sanitizeView(v) {
     strollScale: pickStroll(v?.strollScale, STROLL_SCALES, defaults.view.strollScale),
     // 걷는 속도(배수)
     strollSpeed: pickStroll(v?.strollSpeed, STROLL_SPEEDS, defaults.view.strollSpeed),
+    // 어느 모니터에 내보낼까(#212). id는 돌 때만 뜻이 있어 모양만 보고, 빠진 모니터는 strollArea가 주 모니터로 돌린다
+    strollDisplay: pickStrollDisplay(v?.strollDisplay),
   };
 }
 
@@ -616,10 +620,33 @@ function createMini() {
 //   - Windows는 `focusable: false`다 — 게를 끌어도 **작업 중인 창의 초점을 뺏지 않아야**
 //     한다. 맥은 켜 두지 않는다: 초점을 못 받는 창이 마우스 눌림을 받는 보장이 없어,
 //     여기서 아끼자고 집어 드는 것 자체를 잃을 수는 없다.
+// 산책이 나갈 모니터. 설정(view.strollDisplay)이 가리키는 모니터가 지금 꽂혀 있으면 그것,
+// 아니면 주 모니터다 — 노트북을 들고 나가 외장 모니터가 빠져도 게는 어딘가에는 있어야 한다.
+// 모니터 하나에만 나간다: 여러 모니터에 걸치는 창은 배율이 다른 화면에서 게가 늘어난다.
+function strollDisplay() {
+  const want = settings.view?.strollDisplay;
+  if (want !== STROLL_DISPLAY_PRIMARY) {
+    const found = screen.getAllDisplays().find((d) => d.id === want);
+    if (found) return found;
+  }
+  return screen.getPrimaryDisplay();
+}
+
 function strollArea() {
-  // 주 모니터의 작업 영역. 여러 모니터에 걸치는 창은 배율이 다른 화면에서 게가 늘어나므로
-  // 우선 한 화면만 쓴다(README의 한계에 적어 두었다).
-  return screen.getPrimaryDisplay().workArea;
+  return strollDisplay().workArea;
+}
+
+// 설정 창에 내줄 모니터 목록. 이름은 OS가 주는 label이 비는 일이 많아 렌더러가 번호·크기로 적는다.
+function listDisplays() {
+  const primary = screen.getPrimaryDisplay().id;
+  return screen.getAllDisplays().map((d, i) => ({
+    id: d.id,
+    index: i + 1,
+    label: d.label ?? '',
+    width: d.size.width,
+    height: d.size.height,
+    primary: d.id === primary,
+  }));
 }
 
 function fitStroll() {
@@ -1413,8 +1440,12 @@ if (!app.requestSingleInstanceLock()) {
     ipcMain.handle('office:setView', (_e, patch) => {
       settings.view = sanitizeView({ ...settings.view, ...(patch ?? {}) });
       saveSettings();
+      // 산책 창이 떠 있는 채로 모니터를 바꾸면 그 자리에서 옮긴다(모드는 배타라 보통은 다음 산책 때 읽힌다)
+      if (patch && 'strollDisplay' in patch) fitStroll();
       return settings.view;
     });
+    // 산책을 내보낼 모니터 목록 — 설정 창의 select가 고를 것
+    ipcMain.handle('office:displays', () => listDisplays());
 
     // 설정 창의 언어 전환. 트레이 메뉴에서 바꾼 것과 같은 문을 지난다.
     ipcMain.handle('office:setLang', (_e, pref) => {

@@ -13,7 +13,16 @@ export const STROLL_MAXES = [2, 4, 6, 8, 12, 20];
 export const STROLL_SCALES = [2, 3, 4];
 export const STROLL_SPEEDS = [0.6, 1, 1.6];
 
-export const STROLL_DEFAULTS = { strollMax: 6, strollScale: 2, strollSpeed: 1 };
+// 어느 모니터에 내보낼까 — 'primary'(주 모니터) 또는 Electron display.id(정수). 모니터 목록은
+// 돌 때만 알 수 있으므로 여기서는 모양만 정하고, 없는 id는 쓰는 쪽(main의 strollArea)이 주 모니터로 돌린다.
+export const STROLL_DISPLAY_PRIMARY = 'primary';
+export function pickStrollDisplay(v) {
+  if (v === STROLL_DISPLAY_PRIMARY || v == null) return STROLL_DISPLAY_PRIMARY;
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 ? n : STROLL_DISPLAY_PRIMARY;
+}
+
+export const STROLL_DEFAULTS = { strollMax: 6, strollScale: 2, strollSpeed: 1, strollDisplay: STROLL_DISPLAY_PRIMARY };
 
 export function pickStroll(v, allowed, fallback) {
   const n = Number(v);

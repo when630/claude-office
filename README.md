@@ -359,8 +359,8 @@ rather than leaving you with a shortcut that quietly does nothing.
   it left off once the window is visible again — that is the browser engine saving your battery,
   not a hang. **The desktop stroll is the exception and keeps running** — a mascot that freezes
   the moment something covers it is no use at the corner of your eye
-- The stroll only covers the **work area of your primary display**. With several monitors the crabs
-  stay on the main one, and they do not climb over fullscreen apps
+- The stroll covers the work area of **one display** — the primary one unless you pick another under
+  **Settings › Desktop stroll › Monitor**. The crabs do not climb over fullscreen apps
 - Builds are not code signed — on Windows that means the SmartScreen warning, and on macOS one
   `xattr -cr` before first launch plus manual updates
 - The `~/.claude` layout is Claude Code's internal arrangement and can change between versions
