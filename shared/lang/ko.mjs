@@ -33,7 +33,7 @@ export default {
     filter: '방 이름',
     hidden: '{n}개 숨김',
     hiddenTitle: '거르기와 접기를 모두 푼다',
-    allHidden: '조건에 맞는 방이 없습니다. 상단바의 이름 칸을 비우거나 접어 둔 방을 펴면 다시 보입니다.',
+    allHidden: '조건에 맞는 방이 없습니다. 목록 위의 이름 칸을 비우거나 접어 둔 방을 펴면 다시 보입니다.',
     in: '출근',
     typing: '작업 중',
     waiting: '입력 대기',
@@ -131,7 +131,7 @@ export default {
   rail: {
     rest: '쉬는 중',
     empty: '보이는 세션이 없습니다',
-    emptyHint: '상단바의 이름 칸을 비우거나 접어 둔 방을 펴면 다시 보입니다.',
+    emptyHint: '위의 이름 칸을 비우거나 접어 둔 방을 펴면 다시 보입니다.',
   },
 
   idle: {

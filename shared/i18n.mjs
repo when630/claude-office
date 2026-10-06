@@ -137,8 +137,11 @@ export function fmtTime(at) {
   return d.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
+// 헤더의 시각. 시:분만 — 초는 아무 결정에도 안 쓰이는데 헤더에서 매초 움직이는 유일한 글자가 된다.
+// 형제 when 앱도 '15:50'이다. 한국어 로케일은 '15시 50분'으로 길어지므로 두 언어가 같은 꼴을 쓴다.
 export function fmtClock(at = Date.now()) {
-  return new Date(at).toLocaleTimeString(locale(), { hour12: false });
+  const d = new Date(at);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 // 출근부의 구간 표시 — `7/31`. 짧아야 하고 앞뒤로 붙어 나오므로 두 언어가 같다.
