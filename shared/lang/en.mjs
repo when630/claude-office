@@ -36,7 +36,7 @@ export default {
     filter: 'Room name',
     hidden: '{n} hidden',
     hiddenTitle: 'Clear the filter and unfold every room',
-    allHidden: 'No room matches. Clear the name box in the top bar, or unfold a room you collapsed.',
+    allHidden: 'No room matches. Clear the name box above the list, or unfold a room you collapsed.',
     in: 'in',
     typing: 'working',
     waiting: 'waiting on you',
@@ -129,7 +129,7 @@ export default {
   rail: {
     rest: 'Resting',
     empty: 'No sessions in view',
-    emptyHint: 'Clear the name box in the top bar, or un-collapse a room, to see them again.',
+    emptyHint: 'Clear the name box above, or un-collapse a room, to see them again.',
   },
 
   idle: {
