@@ -92,8 +92,9 @@ const DY_MEET_FAR = { name: MEET_TOP + MEET_RIM + 9, bar: MEET_TOP + MEET_RIM + 
 const DY_MEET_NEAR = { name: 28, bar: 30, aide: 17, mark: 6, markH: 22 };
 
 const COLORS = {
-  floor: '#101319',
-  floorLine: '#151a22',
+  // 껍데기의 --bg-inset(#131419)과 같은 값 — 사무실이 들어앉는 무대와 바닥이 한 면이어야 한다(#208)
+  floor: '#131419',
+  floorLine: '#191c24',
   wall: '#2a3140',
   wallTop: '#39435a',
   board: '#dfe4ee',

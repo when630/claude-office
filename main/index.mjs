@@ -440,7 +440,15 @@ function createWindow(show = true) {
     // 개발 인스턴스는 패키징본과 userData가 달라 락이 안 겹친다 → 둘이 동시에 뜬다.
     // 트레이 아이콘이 두 개 보일 때 어느 쪽인지 알아볼 수 있게 표시해 둔다.
     title: app.isPackaged ? 'Claude Office' : 'Claude Office (dev)',
-    backgroundColor: '#0b0d12',
+    // 형제 앱과 같이 OS 제목 표시줄을 걷는다 — 헤더가 드래그 바이고 최소화·닫기는 헤더 끝에 있다(#208).
+    // Windows는 프레임을 통째로 뺀다. resizable은 그대로라 WS_THICKFRAME이 남아 가장자리 끌기·
+    // 둥근 모서리·그림자가 산다(끄면 셋이 같이 사라진다 — whenwork가 확인한 것).
+    // 맥은 프레임을 빼지 않고 제목 표시줄만 감춘다 — 신호등은 OS가 그리고 렌더러가 왼쪽을 비운다(body.mac).
+    ...(process.platform === 'darwin'
+      ? { titleBarStyle: 'hidden', trafficLightPosition: { x: 12, y: 11 } }
+      : { frame: false }),
+    // 첫 페인트 전 바탕 — style.css의 --bg-app과 같은 값이어야 창이 뜰 때 번쩍이지 않는다
+    backgroundColor: '#16171c',
     autoHideMenuBar: true,
     icon: icon('icon.png'),
     webPreferences: {
@@ -534,7 +542,7 @@ function createMini() {
     frame: false,
     alwaysOnTop: true,
     skipTaskbar: true,
-    backgroundColor: '#0b0d12',
+    backgroundColor: '#16171c',
     icon: icon('icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -1303,10 +1311,19 @@ if (!app.requestSingleInstanceLock()) {
       claudeDir: CLAUDE_DIR,
       usageFile: USAGE_FILE,
       version: app.getVersion(),
+      // 맥은 창 버튼을 OS가 그린다 — 렌더러가 제 것을 숨기려면 알아야 한다
+      platform: process.platform,
       // 렌더러는 제 프로세스에서 언어를 세워야 한다 — 여기로 실어 보낸다
       ...langPayload(),
     }));
     ipcMain.on('office:open-external', (_e, url) => openExternal(url));
+    // 헤더의 창 버튼. 보낸 창에만 듣는다 — 닫기는 그 창의 close 처리(큰 창은 트레이로)를 그대로 탄다.
+    ipcMain.on('office:win', (e, cmd) => {
+      const w = BrowserWindow.fromWebContents(e.sender);
+      if (!w || w.isDestroyed()) return;
+      if (cmd === 'minimize') w.minimize();
+      else if (cmd === 'close') w.close();
+    });
     // 승인받은 계획서 열기. 경로 검증은 main에서 한다(openPlan) — 렌더러 값을 그대로 믿지 않는다.
     ipcMain.handle('office:openPlan', (_e, file) => openPlan(file));
     ipcMain.on('office:copy', (_e, text) => clipboard.writeText(String(text ?? '')));

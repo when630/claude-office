@@ -41,10 +41,15 @@ main/updater.mjs    GitHub Releases 자동 업데이트 — 받아두고 트레�
                     (서명 없는 맥은 설치가 거부되므로 검사만 하고 알림으로 안내)
 main/preload.cjs    contextBridge (샌드박스라 CJS여야 한다)
 renderer/           픽셀 렌더러 (app · render · sprites · themes · talk · style)
-                    창은 네 덩이다 — 상단바 · 왼쪽 세션 목록(`#rail`) · 사무실 · 오른쪽 패널.
-                    양쪽 열은 접을 수 있고 접힘은 설정에 남는다(`view.railOpen`·`view.panelOpen`).
+                    창은 다섯 덩이다 — 헤더 · 왼쪽 세션 목록(`#rail`) · 사무실 · 오른쪽 패널 ·
+                    하단 상태줄(`#statusbar`). OS 제목 표시줄이 없어 **헤더가 드래그 바**이고
+                    최소화·닫기도 헤더 끝에 우리가 그린다(형제 when 앱과 같은 문법, #208).
+                    헤더는 워드마크(점이 상태등) · 대기 칩 · 패널 탭 · 시각 · 창 버튼이고,
+                    상태 수치·토큰·사용률·모습 전환·버전은 상태줄에 산다.
+                    양쪽 열은 무대 가장자리 손잡이로 접고 접힘은 설정에 남는다
+                    (`view.railOpen`·`view.panelOpen`).
                     패널은 판이 셋(세션 · 출근부 · 설정) — 설정·출근부가 `<dialog>`에서
-                    여기로 들어왔다
+                    여기로 들어왔고, 탭은 패널 밖 헤더에 있다(접어 둔 채로도 보인다)
                     미니 모드는 같은 index.html을 `?mini=1`로 연 **별도 창**이다 — 프레임
                     유무는 창을 만들 때 정해지고 나중에 못 바꾸기 때문이다.
                     캔버스는 큰 창과 **다른 함수**를 탄다(`layoutMini`·`renderMini`) —
@@ -139,7 +144,12 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
   시계(Date.now)가 달라 시각을 넘기면 어긋난다
 - `renderer/style.css` — **껍데기의 값은 다 `:root`에 있다.** 리터럴 hex는 그 정의부 밖에
   하나도 없어야 한다(모서리·글자 크기도 단으로 접혀 있고, 예외는 모양이 값을 정하는 곳뿐 —
-  주석에 이유가 적혀 있다). 버튼 생김새는 셋(`.btn`·`.btn-go`·`.btn-toggle`)이고 그 위에
+  주석에 이유가 적혀 있다). 토큰은 **형제 when 앱의 `renderer/tokens.css`(D-09 팔레트) 사본**이고
+  단일 원본은 그쪽이다 — 이 앱이 더하는 것은 `--wait` 계열(노랑은 대기에만)과 `--broken`,
+  상태색의 `-dim` 변형뿐이다. 글자 크기만 형제 앱보다 한 단 작다(패널 330px 때문). 캔버스의
+  바닥(`render.mjs` COLORS.floor)과 서버 장애 별(`sprites.mjs` dizzy)은 각각 `--bg-inset`·
+  `--broken`과 같은 값이어야 한다 — 무대와 바닥이 한 면이고, 별과 칩이 같은 것을 가리킨다.
+  시안은 `design/mockups/shell-options.html`(채택안 ㉢). 버튼 생김새는 셋(`.btn`·`.btn-go`·`.btn-toggle`)이고 그 위에
   모양 조각(`.btn-round`·`.btn-pill`·`.btn-wide`·`.btn-quiet`·`.btn-ico`)을 얹는다 —
   **동작을 가리키는 클래스(`.copy`·`.go`·`.hint-btn`…)는 JS가 잡으므로 건드리지 않는다.**
   `display`를 정하는 규칙에는 `[hidden]`을 같이 적는다 — UA의 `[hidden]{display:none}`은

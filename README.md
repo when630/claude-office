@@ -222,7 +222,7 @@ where it does.
 
 <img src="docs/images/en/mini.png" width="420" alt="The mini window — the front row is whoever is waiting on you, the back row is everyone working" align="right" />
 
-The `▭` button in the top bar (or the tray menu) drops the office into a small frameless window
+The **Mini** switch in the bottom status bar (or the tray menu) drops the office into a small frameless window
 that stays **always on top**. No rooms here — just the crabs, **gathered in one place**.
 
 - The **front row** is whoever is waiting on you, stuck, cut off by a server outage or failed, with
@@ -280,7 +280,7 @@ across it.
   the stroll
 
 The three modes are exclusive — the window, the corner, and the desktop. Switch between them from
-the top bar, the tray menu, or the shortcuts.
+the status bar at the bottom, the tray menu, or the shortcuts.
 
 ### Moving the office around
 
@@ -292,7 +292,7 @@ the top bar, the tray menu, or the shortcuts.
 | Scroll | the wheel vertically, `Shift+wheel` horizontally |
 | Back to the middle | tap `Space` |
 | Back to auto scale and centre | `Ctrl+0` (`Ctrl+=` · `Ctrl+-` step the scale) |
-| Fold either side column | `Ctrl+[` · `Ctrl+]`, or the two buttons in the top bar |
+| Fold either side column | `Ctrl+[` · `Ctrl+]`, or the handles on either edge of the office |
 
 `⌘` stands in for `Ctrl` on macOS.
 

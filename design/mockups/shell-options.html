@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Claude Office 껍데기 변형안</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+<style>
+/* ────────────────────────────────────────────────────────────
+   Claude Office 껍데기(상단바·세션 목록·패널) 변형안. 확정된 전제로만 그린다:
+     · 디자인 토큰은 형제 앱 renderer/tokens.css(D-09 팔레트)를 그대로 쓴다.
+       이 앱이 더하는 것은 --wait 한 쌍뿐 — 노랑은 "나를 기다린다"에만 쓴다는
+       기존 규칙을 지키기 위해서다(형제 팔레트의 --warning은 "헤매는 중"이 가져간다)
+     · OS 제목 표시줄을 걷는다(frame:false). 헤더가 곧 드래그 바이고, 최소화·닫기는
+       헤더 오른쪽 끝(형제 앱과 같은 자리·같은 크기 38×28). 닫기는 트레이로 내려간다
+     · 사무실(캔버스)은 건드리지 않는다 — 바닥 바탕색만 새 팔레트로 맞춘다
+     · 왼쪽 목록 · 사무실 · 오른쪽 패널 세 덩이 구조는 유지한다(접힘 설정이 살아야 한다)
+   레이아웃: 후보 셋을 실제 창 비율(1180×~560)로 세로로 세우고, 그 아래 셋에 공통으로
+   들어가는 UX 손질과 결정 사항을 적는다.
+   ──────────────────────────────────────────────────────────── */
+@font-face {
+  font-family: 'Pretendard Variable';
+  src: local('Pretendard Variable'), local('Pretendard');
+  font-weight: 100 900;
+  font-display: swap;
+}
+:root {
+  color-scheme: dark;
+  /* 형제 앱 토큰 사본 */
+  --bg-app: #16171c; --bg-raised: #1e2027; --bg-inset: #131419; --bg-hover: #262933;
+  --border: #2e323d; --border-focus: #7aa2f7;
+  --text-primary: #e6e8ee; --text-secondary: #a8afbd; --text-muted: #7b8294;
+  --accent: #7aa2f7; --accent-dim: rgba(122,162,247,.14);
+  --success: #9ece6a; --warning: #e0af68; --danger: #f7768e;
+  --purple: #bb9af7; --purple-dim: rgba(187,154,247,.16);
+  /* 이 앱이 더하는 한 쌍 */
+  --wait: #ffcf5c; --wait-dim: rgba(255,207,92,.16); --wait-line: rgba(255,207,92,.38);
+
+  --font-sans: 'Pretendard Variable', 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', 'D2Coding', Consolas, monospace;
+  --fs-lg: 16px; --fs-md: 14px; --fs-sm: 13px; --fs-xs: 12px;
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px;
+  --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-xl: 16px;
+  --shadow-pop: 0 12px 40px rgba(0,0,0,.5), 0 2px 8px rgba(0,0,0,.35);
+
+  /* 지금 앱의 값 — 대응표에서만 쓴다 */
+  --old-s0: #0b0d12; --old-s1: #12151c; --old-s2: #171b23; --old-s3: #232936;
+  --old-b1: #1e232d; --old-t1: #dde3ee; --old-t2: #7b8698; --old-t3: #5d6779;
+  --old-acc: #ffcf5c; --old-work: #58a6e0; --old-done: #4fbf7f; --old-stuck: #e0a95c;
+  --old-fail: #e2624a; --old-broken: #b9a1f0; --old-warn: #e7b24a;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { background: #0c0d11; }
+body {
+  color: var(--text-primary); font-family: var(--font-sans); font-size: var(--fs-md);
+  line-height: 1.5; padding-inline: 22px; padding-block: 28px 80px;
+  -webkit-font-smoothing: antialiased;
+}
+.page { max-width: 1240px; margin: 0 auto; }
+h1 { font-size: 20px; font-weight: 650; letter-spacing: -.4px; margin-bottom: 4px; text-wrap: balance; }
+.lede { color: var(--text-muted); font-size: 13px; line-height: 1.75; margin-bottom: 10px; max-width: 72ch; }
+.lede b, .sublede b, .note b { color: var(--text-secondary); font-weight: 600; }
+code { font-family: var(--font-mono); font-size: 11.5px; color: var(--accent); }
+h2 { font-size: 14.5px; font-weight: 680; margin: 38px 0 3px; padding-top: 18px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+h2 .n { font-family: var(--font-mono); font-size: 11px; color: var(--accent); background: var(--accent-dim); border-radius: 4px; padding: 1px 6px; }
+h2 .rec { font-family: var(--font-mono); font-size: 10.5px; color: var(--success); background: rgba(158,206,106,.14); border-radius: 4px; padding: 0 6px; }
+.sublede { color: var(--text-muted); font-size: 12.5px; line-height: 1.7; margin-bottom: 16px; max-width: 76ch; }
+.note { font-size: 12px; color: var(--text-muted); line-height: 1.75; margin-top: 10px; max-width: 100ch; }
+.note .no { color: var(--danger); } .note .yes { color: var(--success); }
+.note ul { padding-left: 18px; } .note li { margin: 2px 0; }
+
+/* 페이지 도구 — 드래그 영역 보기 */
+.tools { display: flex; gap: 14px; align-items: center; margin: 14px 0 6px; font-size: 12.5px; color: var(--text-secondary); flex-wrap: wrap; }
+.tools label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.tools input { accent-color: var(--accent); }
+.legend-drag { display: inline-block; width: 26px; height: 12px; vertical-align: -2px; border: 1px dashed var(--accent); background: repeating-linear-gradient(135deg, var(--accent-dim) 0 4px, transparent 4px 8px); }
+body.show-drag .drag { position: relative; }
+body.show-drag .drag::before { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 5;
+  border: 1px dashed var(--accent); background: repeating-linear-gradient(135deg, var(--accent-dim) 0 4px, transparent 4px 8px); }
+body.show-drag .nodrag { position: relative; z-index: 6; }
+
+/* 창 시안 바탕 */
+.scroller { overflow-x: auto; padding-bottom: 6px; }
+.win { width: 1180px; border-radius: var(--r-md); overflow: hidden; border: 1px solid var(--border);
+  background: var(--bg-app); box-shadow: var(--shadow-pop); user-select: none; font-size: var(--fs-sm); }
+.hdr { height: 40px; display: flex; align-items: center; gap: 12px; padding-left: 14px; border-bottom: 1px solid var(--border); background: var(--bg-app); }
+.hdr.tall { height: 44px; }
+.hdr.thin { height: 36px; }
+.title { font-size: var(--fs-xs); font-weight: 750; letter-spacing: .8px; display: inline-flex; align-items: center; gap: 7px; flex: none; }
+.title::before { content: ''; width: 9px; height: 9px; border-radius: 99px; background: var(--accent); box-shadow: 0 0 9px var(--accent-dim); }
+.title.waiting::before { background: var(--wait); box-shadow: 0 0 10px var(--wait-dim); }
+.winbtns { display: flex; gap: 2px; margin-left: 4px; padding-right: 4px; align-self: stretch; align-items: center; }
+.winbtns .wb { width: 38px; height: 28px; display: grid; place-items: center; border-radius: var(--r-sm); color: var(--text-muted); }
+.winbtns .wb svg { width: 12px; height: 12px; stroke: currentColor; stroke-width: 1.2; fill: none; }
+.winbtns .wb:hover { background: var(--bg-hover); color: var(--text-primary); }
+.winbtns .wb.close:hover { background: var(--danger); color: #fff; }
+.right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.clock { font-variant-numeric: tabular-nums; color: var(--text-secondary); font-size: var(--fs-xs); }
+.nums { display: flex; gap: 10px; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+.icobtn { width: 26px; height: 24px; display: grid; place-items: center; border-radius: var(--r-sm); color: var(--text-muted); border: 1px solid var(--border); background: var(--bg-raised); }
+.icobtn svg { width: 12px; height: 12px; stroke: currentColor; stroke-width: 1.3; fill: none; }
+.icobtn.on { color: var(--text-primary); border-color: var(--border-focus); }
+
+/* 대기 칩 — 헤더에서 유일하게 배경이 찬 것 */
+.waitchip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 99px;
+  border: 1px solid var(--wait-line); background: var(--wait-dim); color: var(--wait); font-size: var(--fs-xs); font-weight: 600; font-variant-numeric: tabular-nums; }
+.waitchip .t { color: var(--warning); font-weight: 500; }
+.waitchip::before { content: '!'; width: 13px; height: 13px; border-radius: 99px; background: var(--wait); color: #1a1500; font-size: 10px; font-weight: 800; display: grid; place-items: center; }
+
+/* 상태 묶음 — 글자(㉠) 또는 칩(㉡) */
+.stats { display: flex; gap: 8px; align-items: center; color: var(--text-secondary); font-size: var(--fs-xs); white-space: nowrap; }
+.stats b { color: var(--text-primary); font-weight: 650; }
+.stats i { font-style: normal; color: var(--border); }
+.stats .w { color: var(--accent); } .stats .s { color: var(--warning); } .stats .k { color: var(--purple); } .stats .f { color: var(--danger); }
+.chips { display: flex; gap: 4px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px 2px 7px; border-radius: 99px; border: 1px solid var(--border);
+  background: var(--bg-inset); color: var(--text-secondary); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.chip .dot { width: 7px; height: 7px; border-radius: 99px; }
+.chip b { color: var(--text-primary); font-weight: 650; }
+.chip.on { border-color: var(--border-focus); background: var(--accent-dim); }
+
+/* 모드 전환 (㉡) */
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; background: var(--bg-inset); }
+.seg span { padding: 3px 10px; font-size: var(--fs-xs); color: var(--text-muted); border-right: 1px solid var(--border); }
+.seg span:last-child { border-right: 0; }
+.seg span.on { background: var(--bg-raised); color: var(--text-primary); }
+
+/* 헤더 탭 (㉢) — 형제 앱의 .tab */
+.htabs { display: flex; gap: 2px; }
+.htab { padding: 4px 12px; border-radius: var(--r-sm); color: var(--text-secondary); font-size: var(--fs-sm); }
+.htab.on { background: var(--bg-raised); color: var(--text-primary); }
+
+/* 몸통 */
+.bod { display: flex; height: 516px; }
+.rail { width: 200px; flex: none; display: flex; flex-direction: column; border-right: 1px solid var(--border); background: var(--bg-app); }
+.rail.w220 { width: 220px; }
+.rhead { padding: 8px 10px; }
+.search { height: 28px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--bg-inset); color: var(--text-muted); font-size: var(--fs-xs);
+  display: flex; align-items: center; gap: 7px; padding: 0 9px; }
+.search kbd { margin-left: auto; font-family: var(--font-mono); font-size: 10px; background: var(--bg-raised); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; color: var(--text-muted); }
+.grp { display: flex; align-items: baseline; padding: 12px 10px 4px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+.grp.waiting { color: var(--wait); } .grp.broken { color: var(--purple); }
+.grp .c { margin-left: auto; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.row { display: flex; align-items: center; gap: 8px; padding: 5px 10px; margin: 0 6px; border-radius: var(--r-sm); color: var(--text-secondary); }
+.row .d { width: 7px; height: 7px; border-radius: 99px; flex: none; }
+.row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row time { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.row time.t { color: var(--wait); }
+.row.on { background: var(--bg-raised); color: var(--text-primary); box-shadow: inset 2px 0 0 var(--accent); }
+.row.hover { background: var(--bg-hover); color: var(--text-primary); }
+.row .go { width: 18px; height: 18px; border-radius: 4px; display: grid; place-items: center; color: var(--success); border: 1px solid rgba(158,206,106,.35); }
+.row .go svg { width: 10px; height: 10px; stroke: currentColor; stroke-width: 1.5; fill: none; }
+.rfoot { margin-top: auto; border-top: 1px solid var(--border); padding: 10px 12px 12px; display: grid; gap: 8px; }
+.mini-g { font-size: 11px; color: var(--text-muted); display: grid; gap: 3px; }
+.mini-g .l { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+.mini-g .l b { color: var(--text-secondary); font-weight: 600; }
+.bar { height: 4px; border-radius: 99px; background: var(--bg-inset); border: 1px solid var(--border); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--success); }
+.bar i.mid { background: var(--warning); } .bar i.hi { background: var(--danger); }
+
+.stage { flex: 1; min-width: 0; position: relative; background: var(--bg-inset); overflow: hidden; }
+.stage img { position: absolute; width: calc(1760px * var(--k)); left: calc(-200px * var(--k)); top: calc(-42px * var(--k)); max-width: none; image-rendering: auto; }
+/* 바닥 바탕색만 새 팔레트로 올린다 — 어두운 픽셀만 들어 올리고 그림은 그대로 둔다 */
+.stage::after { content: ''; position: absolute; inset: 0; background: var(--bg-inset); mix-blend-mode: lighten; pointer-events: none; }
+.stage .help { position: absolute; right: 12px; bottom: 12px; width: 26px; height: 26px; border-radius: 99px; border: 1px solid var(--border); background: var(--bg-raised); color: var(--text-muted); display: grid; place-items: center; font-size: 12px; z-index: 2; }
+.stage .edge { position: absolute; top: 50%; width: 10px; height: 44px; margin-top: -22px; background: var(--bg-raised); border: 1px solid var(--border); color: var(--text-muted); display: grid; place-items: center; z-index: 2; font-size: 9px; }
+.stage .edge.l { left: 0; border-left: 0; border-radius: 0 var(--r-sm) var(--r-sm) 0; }
+.stage .edge.r { right: 0; border-right: 0; border-radius: var(--r-sm) 0 0 var(--r-sm); }
+
+.panel { width: 330px; flex: none; border-left: 1px solid var(--border); background: var(--bg-app); display: flex; flex-direction: column; }
+.panel.w320 { width: 320px; }
+.ptabs { display: flex; gap: 2px; padding: 8px 10px 0; border-bottom: 1px solid var(--border); }
+.ptab { padding: 5px 11px 7px; color: var(--text-muted); border-bottom: 2px solid transparent; font-size: var(--fs-sm); }
+.ptab.on { color: var(--text-primary); border-bottom-color: var(--accent); }
+.ptabs.pills { border-bottom: 0; padding: 8px 10px 4px; gap: 4px; }
+.ptabs.pills .ptab { border: 0; border-radius: var(--r-sm); padding: 4px 11px; }
+.ptabs.pills .ptab.on { background: var(--bg-raised); }
+.pbody { padding: 14px; display: grid; gap: 14px; align-content: start; flex: 1; overflow: hidden; }
+.lab { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
+.kv { display: grid; grid-template-columns: 1fr auto 1fr auto; gap: 4px 12px; font-size: var(--fs-xs); color: var(--text-secondary);
+  background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px 12px; }
+.kv b { color: var(--text-primary); font-weight: 650; font-variant-numeric: tabular-nums; text-align: right; }
+.kv b.hi { color: var(--danger); }
+.g { display: grid; gap: 4px; font-size: var(--fs-xs); color: var(--text-secondary); }
+.g .l { display: flex; justify-content: space-between; } .g .l b { color: var(--warning); font-variant-numeric: tabular-nums; }
+.g .l b.ok { color: var(--success); }
+.g .bar { height: 6px; }
+.recent { display: grid; gap: 8px; }
+.recent .r { display: flex; gap: 8px; font-size: var(--fs-xs); color: var(--text-secondary); line-height: 1.4; }
+.recent .r .d { width: 7px; height: 7px; border-radius: 99px; flex: none; margin-top: 5px; }
+.recent .r b { color: var(--text-primary); font-weight: 600; display: block; }
+.recent .r small { color: var(--text-muted); font-family: var(--font-mono); font-size: 10.5px; }
+.pfoot { margin-top: auto; border-top: 1px solid var(--border); padding: 10px 14px; display: flex; gap: 8px; align-items: center; }
+.btn { border: 1px solid var(--border); background: var(--bg-raised); border-radius: var(--r-sm); padding: 6px 10px; font-size: 11.5px; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 8px; }
+.btn.go { border-color: rgba(158,206,106,.4); background: rgba(158,206,106,.1); color: var(--success); font-weight: 600; }
+.btn.wide { flex: 1; justify-content: space-between; }
+.btn code { color: var(--text-muted); font-size: 10.5px; }
+.ver { margin-top: auto; font-size: 11px; color: var(--text-muted); }
+
+/* 하단 상태줄 (㉢) */
+.sbar { height: 26px; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-top: 1px solid var(--border); background: var(--bg-app); font-size: 11.5px; color: var(--text-secondary); }
+.sbar .nums { font-size: 10.5px; }
+.sbar .seg span { padding: 1px 8px; font-size: 11px; }
+
+/* 대응표 */
+.map { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 10px; }
+.map th, .map td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.map th { color: var(--text-muted); font-weight: 600; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+.sw { display: inline-block; width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(255,255,255,.08); vertical-align: -3px; margin-right: 6px; }
+.map td.c { color: var(--text-muted); font-size: 12px; }
+.map td code { font-size: 11px; }
+
+/* 공통 손질 — 디테일 선반 */
+.shelf { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; margin-top: 14px; }
+.mock { min-width: 0; }
+.mock .cap { font-size: 13px; font-weight: 650; margin-bottom: 6px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.mock .cap span { font-size: 11.5px; color: var(--text-muted); font-weight: 400; }
+.card { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg-app); padding: 10px; overflow: hidden; }
+.card .hdr { border-radius: var(--r-sm) var(--r-sm) 0 0; }
+.card .rail { width: 100%; border-right: 0; }
+.mac { padding-left: 76px; position: relative; }
+.mac::before { content: ''; position: absolute; left: 12px; top: 50%; margin-top: -6px; width: 12px; height: 12px; border-radius: 99px; background: #ff5f57;
+  box-shadow: 20px 0 0 #febc2e, 40px 0 0 #28c840; }
+.toast { display: inline-flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: var(--r-md); background: var(--bg-raised); border: 1px solid var(--border); box-shadow: var(--shadow-pop); font-size: 12.5px; }
+.toast .ic { width: 22px; height: 22px; border-radius: 6px; background: var(--accent-dim); color: var(--accent); display: grid; place-items: center; font-size: 12px; }
+.toast small { color: var(--text-muted); display: block; font-size: 11.5px; }
+.kbdrow { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 12.5px; color: var(--text-secondary); align-items: center; }
+kbd { font-family: var(--font-mono); font-size: 10.5px; background: var(--bg-inset); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; color: var(--text-secondary); white-space: nowrap; }
+.empty { padding: 26px 18px; text-align: center; color: var(--text-secondary); font-size: 12.5px; line-height: 1.7; background: var(--bg-inset); border-radius: var(--r-md); }
+.empty b { color: var(--text-primary); display: block; font-size: 13.5px; margin-bottom: 4px; }
+.empty .btn { margin-top: 10px; }
+
+/* 비교표 */
+.cmp { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 12px; }
+.cmp th, .cmp td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.55; }
+.cmp th { color: var(--text-muted); font-weight: 600; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+.cmp td:first-child { color: var(--text-secondary); white-space: nowrap; }
+.cmp .yes { color: var(--success); } .cmp .no { color: var(--danger); } .cmp .so { color: var(--warning); }
+
+.decide { display: grid; gap: 10px; margin-top: 12px; }
+.decide .q { border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 14px; background: var(--bg-app); font-size: 12.5px; line-height: 1.65; color: var(--text-secondary); }
+.decide .q b { color: var(--text-primary); }
+.decide .q .pick { color: var(--success); }
+
+@media (max-width: 640px) {
+  body { padding-inline: 16px; }
+  .kbdrow { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .row, .chip, .wb { transition: background .1s, color .1s; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Claude Office 껍데기 변형안 — 형제 앱 테마 · 프레임 없는 창</h1>
+  <p class="lede">
+    상단바 · 왼쪽 세션 목록 · 오른쪽 패널을 <b>형제 앱(whennote·whenwork·whencalendar·whenmusic·whencommand)의
+    토큰</b>으로 다시 입히고, OS 제목 표시줄을 걷어 헤더가 드래그 바가 되는 안이다. 사무실(캔버스)은 그대로다 —
+    세 안 모두 바닥 바탕색만 <code>--bg-inset</code>으로 맞춘다. 셋은 <b>헤더에 무엇을 두는가</b>로 갈린다.
+    이 앱이 팔레트에 더하는 토큰은 <code>--wait</code> 한 쌍뿐이다(아래 §0).
+  </p>
+  <div class="tools">
+    <label><input type="checkbox" id="dragToggle" /> 드래그 영역 보기 <span class="legend-drag"></span></label>
+    <span>빗금 친 곳을 잡으면 창이 움직인다. 버튼·입력칸·목록은 <code>no-drag</code>.</span>
+  </div>
+
+  <!-- ─────────────────────────────── §0 토큰 대응 ─────────────────────────────── -->
+  <h2><span class="n">§0</span>토큰 대응표 — 지금 값 → 형제 앱 값</h2>
+  <p class="sublede">
+    <code>renderer/style.css</code>의 <code>:root</code>는 리터럴 hex가 정의부 밖에 없도록 돼 있어 <b>정의부만 갈아 끼우면 껍데기 전체가 따라온다.</b>
+    바탕 4단·선 3단·글자 4단이 형제 앱의 4·1·3단으로 접힌다. 뜻이 있는 색은 아래처럼 대응한다.
+  </p>
+  <table class="map">
+    <thead><tr><th>뜻</th><th>지금</th><th>형제 앱</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr><td>창 바닥 / 열 바탕</td><td><span class="sw" style="background:var(--old-s0)"></span><code>--s0 #0b0d12</code> · <span class="sw" style="background:var(--old-s1)"></span><code>--s1</code></td><td><span class="sw" style="background:var(--bg-inset)"></span><code>--bg-inset</code> · <span class="sw" style="background:var(--bg-app)"></span><code>--bg-app</code></td><td class="c">사무실이 들어앉는 무대만 한 겹 가라앉힌다(inset). 열과 헤더는 app</td></tr>
+      <tr><td>떠 있는 것 / 눌린 것</td><td><span class="sw" style="background:var(--old-s2)"></span><code>--s2</code> · <span class="sw" style="background:var(--old-s3)"></span><code>--s3</code></td><td><span class="sw" style="background:var(--bg-raised)"></span><code>--bg-raised</code> · <span class="sw" style="background:var(--bg-hover)"></span><code>--bg-hover</code></td><td class="c">카드·버튼은 raised, hover·켜짐은 hover</td></tr>
+      <tr><td>선</td><td><code>--b0 --b1 --b2</code> 3단</td><td><span class="sw" style="background:var(--border)"></span><code>--border</code> 1단 + <code>--border-focus</code></td><td class="c">가장 잦은 b1이 border로. b0(줄 사이)는 선 대신 여백으로 가른다</td></tr>
+      <tr><td>글자</td><td><code>--t1 --t2 --t3 --t4</code></td><td><code>--text-primary / secondary / muted</code></td><td class="c">t3·t4가 muted 하나로 접힌다 — t4는 쓰는 곳이 적어 잃는 것이 없다</td></tr>
+      <tr><td><b>나를 기다린다</b></td><td><span class="sw" style="background:var(--old-acc)"></span><code>--acc #ffcf5c</code></td><td><span class="sw" style="background:var(--wait)"></span><code>--wait #ffcf5c</code> <b>(이 앱이 더하는 토큰)</b></td><td class="c">형제 팔레트의 노랑(--warning #e0af68)은 톤이 가라앉아 "유일한 신호" 역할이 약하다. whenmusic이 <code>--music</code>을 더한 것과 같은 자리</td></tr>
+      <tr><td>작업 중 · 초점 · 선택</td><td><span class="sw" style="background:var(--old-work)"></span><code>--work #58a6e0</code></td><td><span class="sw" style="background:var(--accent)"></span><code>--accent #7aa2f7</code></td><td class="c">고른 행의 띠도 accent로 바꾼다 — 지금은 노랑이라 대기 신호와 같은 색이다</td></tr>
+      <tr><td>끝남 · 주 동작(터미널 열기)</td><td><span class="sw" style="background:var(--old-done)"></span><code>--done #4fbf7f</code></td><td><span class="sw" style="background:var(--success)"></span><code>--success #9ece6a</code></td><td class="c">--go-* 셋은 success의 dim 변형으로 접는다</td></tr>
+      <tr><td>헤매는 중 · 게이지 60%</td><td><span class="sw" style="background:var(--old-stuck)"></span><code>--stuck</code> · <span class="sw" style="background:var(--old-warn)"></span><code>--warn</code></td><td><span class="sw" style="background:var(--warning)"></span><code>--warning #e0af68</code></td><td class="c">둘이 하나로. 노랑 계열이 셋(acc·stuck·warn)에서 둘(wait·warning)로 준다</td></tr>
+      <tr><td>실패 · 게이지 85%</td><td><span class="sw" style="background:var(--old-fail)"></span><code>--fail #e2624a</code></td><td><span class="sw" style="background:var(--danger)"></span><code>--danger #f7768e</code></td><td class="c">닫기 버튼 hover도 이 색(형제 앱과 같음)</td></tr>
+      <tr><td>서버 응답 없음</td><td><span class="sw" style="background:var(--old-broken)"></span><code>--broken #b9a1f0</code></td><td><span class="sw" style="background:var(--purple)"></span><code>#bb9af7</code> (whenwork --ai · whencalendar --cal-3)</td><td class="c">캔버스의 도는 별(sprites.mjs dizzy #b9a1f0)과 같은 값이어야 한다 — 별 색도 함께 맞춘다</td></tr>
+      <tr><td>모서리</td><td><code>2 / 4 / 8px</code></td><td><code>6 / 10 / 14 / 16px</code></td><td class="c">버튼·입력칸 6, 카드 10, 창 자체는 OS가 깎는다(<code>roundedCorners</code>)</td></tr>
+      <tr><td>글자 크기</td><td><code>11 / 12 / 13 / 16 / 22</code></td><td><code>12 / 13 / 14 / 16</code></td><td class="c">본문 13→14는 패널 폭(330)에서 줄바꿈이 늘어난다 — 패널만 13을 유지할지 §5에서 결정</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ─────────────────────────────── §1 ㉠ ─────────────────────────────── -->
+  <h2><span class="n">㉠</span>최소 이식 — 지금 구조 그대로, 옷만 갈아입는다</h2>
+  <p class="sublede">
+    정보구조는 손대지 않는다. 헤더 왼쪽에 형제 앱식 워드마크(점 + 대문자), 오른쪽 끝에 최소화·닫기가 들어오고,
+    기존 아이콘 버튼 넷(목록·패널 접기, 미니, 산책)은 그 왼쪽에 그대로 선다. <b>회귀 위험이 가장 낮고</b> 하루면 끝난다.
+  </p>
+  <div class="scroller">
+  <div class="win" style="--k:.527">
+    <div class="hdr drag">
+      <span class="title waiting">CLAUDE OFFICE</span>
+      <span class="waitchip nodrag">2 입력 대기 <span class="t">최장 3분</span></span>
+      <div class="stats"><b>7</b> 출근 <i>·</i> <b class="w">2</b> 작업 중 <i>·</i> <b class="s">1</b> 헤매는 중 <i>·</i> <b class="k">1</b> 서버 응답 없음 <i>·</i> <b class="f">1</b> 실패</div>
+      <div class="right">
+        <div class="nums"><span>3.19M tok</span><span>5h 42%</span><span>wk 63%</span></div>
+        <span class="clock">15:50</span>
+        <div class="nodrag" style="display:flex;gap:4px">
+          <span class="icobtn on"><svg viewBox="0 0 12 12"><rect x="1" y="2" width="10" height="8" rx="1"/><path d="M4 2v8"/></svg></span>
+          <span class="icobtn on"><svg viewBox="0 0 12 12"><rect x="1" y="2" width="10" height="8" rx="1"/><path d="M8 2v8"/></svg></span>
+          <span class="icobtn"><svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" rx="1"/><rect x="5" y="5" width="6" height="6" rx="1"/></svg></span>
+          <span class="icobtn"><svg viewBox="0 0 12 12"><path d="M1 9l3-3 2 2 3-4 2 3"/><path d="M1 11h10"/></svg></span>
+        </div>
+        <div class="winbtns nodrag">
+          <span class="wb"><svg viewBox="0 0 12 12"><path d="M1 6h10"/></svg></span>
+          <span class="wb close"><svg viewBox="0 0 12 12"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9"/></svg></span>
+        </div>
+      </div>
+    </div>
+    <div class="bod">
+      <aside class="rail">
+        <div class="rhead"><div class="search">방 이름</div></div>
+        <div class="grp waiting">입력 대기 <span class="c">2</span></div>
+        <div class="row"><span class="d" style="background:var(--wait)"></span><span class="nm">api-gateway</span><time class="t">3m</time></div>
+        <div class="row"><span class="d" style="background:var(--wait)"></span><span class="nm">portal</span><time class="t">1m</time></div>
+        <div class="grp">헤매는 중 <span class="c">1</span></div>
+        <div class="row"><span class="d" style="background:var(--warning)"></span><span class="nm">claude-office</span><time>47m</time></div>
+        <div class="grp broken">서버 응답 없음 <span class="c">1</span></div>
+        <div class="row"><span class="d" style="background:var(--purple)"></span><span class="nm">api-gateway</span><time>2m</time></div>
+        <div class="grp">실패 <span class="c">1</span></div>
+        <div class="row"><span class="d" style="background:var(--danger)"></span><span class="nm">billing</span><time></time></div>
+        <div class="grp">작업 중 <span class="c">2</span></div>
+        <div class="row on"><span class="d" style="background:var(--accent)"></span><span class="nm">claude-office</span><time>47m</time></div>
+        <div class="row"><span class="d" style="background:var(--accent)"></span><span class="nm">portal</span><time>47m</time></div>
+        <div class="grp">퇴근 <span class="c">3</span></div>
+        <div class="row"><span class="d" style="background:var(--success)"></span><span class="nm">usage-tap</span><time>15:25</time></div>
+        <div class="row"><span class="d" style="background:var(--success)"></span><span class="nm">release-notes</span><time>14:14</time></div>
+        <div class="row"><span class="d" style="background:var(--danger)"></span><span class="nm">tray-icons</span><time>13:30</time></div>
+      </aside>
+      <div class="stage"><img src="../../docs/images/en/office.png" alt="사무실 캔버스 (현재 스크린샷)" /><span class="help">?</span></div>
+      <aside class="panel">
+        <div class="ptabs"><span class="ptab on">세션</span><span class="ptab">출근부</span><span class="ptab">설정</span></div>
+        <div class="pbody">
+          <div><div class="lab">사무실</div>
+            <div class="kv"><span>출근</span><b>7</b><span>작업 중</span><b>2</b><span>입력 대기</span><b>2</b><span>헤매는 중</span><b>1</b><span>서버 응답 없음</span><b>1</b><span>최고 컨텍스트</span><b class="hi">96%</b><span>서브에이전트</span><b>1</b><span>예비 슬롯</span><b>1</b></div></div>
+          <div><div class="lab">계정 사용량</div>
+            <div class="g"><div class="l"><span>세션 (5시간)</span><b class="ok">42%</b></div><div class="bar"><i style="width:42%"></i></div></div>
+            <div class="g" style="margin-top:8px"><div class="l"><span>주간 (7일)</span><b>63%</b></div><div class="bar"><i class="mid" style="width:63%"></i></div></div></div>
+          <div><div class="lab">퇴근한 작업</div>
+            <div class="recent">
+              <div class="r"><span class="d" style="background:var(--success)"></span><div><b>usage-tap</b><small>15:25 · 210K</small> statusline 탭 설정 정리</div></div>
+              <div class="r"><span class="d" style="background:var(--success)"></span><div><b>release-notes</b><small>14:14 · 88K</small> 릴리스 노트 초안</div></div>
+              <div class="r"><span class="d" style="background:var(--danger)"></span><div><b>tray-icons</b><small>13:30 · 12K</small> 아이콘 빌드 실패</div></div>
+            </div></div>
+          <div class="ver">Claude Office 1.6.0</div>
+        </div>
+      </aside>
+    </div>
+  </div>
+  </div>
+  <p class="note">
+    <b class="yes">좋은 점</b> — 설정(<code>view.railOpen</code>·<code>panelOpen</code>·<code>roomSlots</code>)과 JS가 잡는 선택자가 하나도 안 바뀐다. <code>:root</code> 정의부 교체 + 헤더 끝에 버튼 둘 + <code>frame:false</code>가 전부다.<br>
+    <b class="no">아쉬운 점</b> — 헤더 오른쪽에 아이콘 버튼 여섯이 줄지어 서서, 지금도 "좁은 창에서 먼저 밀리는 자리"였던 곳이 더 붐빈다. 아이콘 넷은 여전히 글자 없이 생김새로만 구분된다.
+  </p>
+
+  <!-- ─────────────────────────────── §2 ㉡ ─────────────────────────────── -->
+  <h2><span class="n">㉡</span>헤더 재편 — 상태는 칩으로, 수치는 목록 바닥으로</h2>
+  <p class="sublede">
+    헤더는 <b>"지금 사무실이 어떤가"</b>만 말한다. 워드마크의 점이 전체 상태등이 되고(대기 있으면 노랑), 상태 다섯이 <b>누를 수 있는 칩</b>으로 선다 —
+    누르면 목록과 캔버스가 그 상태만 남긴다(거르기 칸과 같은 길, 새 기능). 미니·산책은 아이콘 둘 대신 <b>모드 전환기</b> 하나다(설정의 <code>mode</code>가 이미 배타다).
+    토큰 총량·계정 사용률은 헤더를 떠나 <b>세션 목록 바닥</b>에 작은 게이지로 내려간다 — 패널이 설정 탭에 가 있어도 늘 보인다.
+    열 접기는 각 열 가장자리의 손잡이가 맡아 헤더에서 빠진다.
+  </p>
+  <div class="scroller">
+  <div class="win" style="--k:.519">
+    <div class="hdr tall drag">
+      <span class="title waiting">CLAUDE OFFICE</span>
+      <div class="chips nodrag">
+        <span class="waitchip">2 입력 대기 <span class="t">최장 3분</span></span>
+        <span class="chip"><span class="dot" style="background:var(--accent)"></span><b>2</b> 작업 중</span>
+        <span class="chip"><span class="dot" style="background:var(--warning)"></span><b>1</b> 헤매는 중</span>
+        <span class="chip"><span class="dot" style="background:var(--purple)"></span><b>1</b> 서버 응답 없음</span>
+        <span class="chip"><span class="dot" style="background:var(--danger)"></span><b>1</b> 실패</span>
+        <span class="chip" style="border-style:dashed;background:none"><b>7</b> 출근</span>
+      </div>
+      <div class="right">
+        <div class="seg nodrag"><span class="on">사무실</span><span>미니</span><span>산책</span></div>
+        <span class="clock">15:50</span>
+        <div class="winbtns nodrag">
+          <span class="wb"><svg viewBox="0 0 12 12"><path d="M1 6h10"/></svg></span>
+          <span class="wb close"><svg viewBox="0 0 12 12"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9"/></svg></span>
+        </div>
+      </div>
+    </div>
+    <div class="bod">
+      <aside class="rail w220">
+        <div class="rhead"><div class="search">방 이름 <kbd>/</kbd></div></div>
+        <div class="grp waiting">입력 대기 <span class="c">2</span></div>
+        <div class="row"><span class="d" style="background:var(--wait)"></span><span class="nm">api-gateway</span><time class="t">3m</time></div>
+        <div class="row hover"><span class="d" style="background:var(--wait)"></span><span class="nm">portal</span><span class="go"><svg viewBox="0 0 10 10"><path d="M2 8l6-6M4 2h4v4"/></svg></span><time class="t">1m</time></div>
+        <div class="grp">헤매는 중 <span class="c">1</span></div>
+        <div class="row"><span class="d" style="background:var(--warning)"></span><span class="nm">claude-office</span><time>47m</time></div>
+        <div class="grp broken">서버 응답 없음 <span class="c">1</span></div>
+        <div class="row"><span class="d" style="background:var(--purple)"></span><span class="nm">api-gateway</span><time>2m</time></div>
+        <div class="grp">실패 <span class="c">1</span></div>
+        <div class="row"><span class="d" style="background:var(--danger)"></span><span class="nm">billing</span><time></time></div>
+        <div class="grp">작업 중 <span class="c">2</span></div>
+        <div class="row on"><span class="d" style="background:var(--accent)"></span><span class="nm">claude-office</span><time>47m</time></div>
+        <div class="row"><span class="d" style="background:var(--accent)"></span><span class="nm">portal</span><time>47m</time></div>
+        <div class="grp">퇴근 <span class="c">3</span></div>
+        <div class="row"><span class="d" style="background:var(--success)"></span><span class="nm">usage-tap</span><time>15:25</time></div>
+        <div class="row"><span class="d" style="background:var(--success)"></span><span class="nm">release-notes</span><time>14:14</time></div>
+        <div class="rfoot">
+          <div class="mini-g"><div class="l"><span>세션 5h</span><b>42%</b></div><div class="bar"><i style="width:42%"></i></div></div>
+          <div class="mini-g"><div class="l"><span>주간 7d</span><b>63%</b></div><div class="bar"><i class="mid" style="width:63%"></i></div></div>
+          <div class="mini-g"><div class="l"><span>토큰</span><b>3.19M</b></div></div>
+        </div>
+      </aside>
+      <div class="stage"><img src="../../docs/images/en/office.png" alt="사무실 캔버스 (현재 스크린샷)" /><span class="edge l">‹</span><span class="edge r">›</span><span class="help">?</span></div>
+      <aside class="panel w320">
+        <div class="ptabs"><span class="ptab on">세션</span><span class="ptab">출근부</span><span class="ptab">설정</span></div>
+        <div class="pbody">
+          <div><div class="lab">사무실</div>
+            <div class="kv"><span>출근</span><b>7</b><span>작업 중</span><b>2</b><span>입력 대기</span><b>2</b><span>헤매는 중</span><b>1</b><span>서버 응답 없음</span><b>1</b><span>최고 컨텍스트</span><b class="hi">96%</b><span>서브에이전트</span><b>1</b><span>예비 슬롯</span><b>1</b></div></div>
+          <div><div class="lab">퇴근한 작업</div>
+            <div class="recent">
+              <div class="r"><span class="d" style="background:var(--success)"></span><div><b>usage-tap</b><small>15:25 · 210K</small> statusline 탭 설정 정리</div></div>
+              <div class="r"><span class="d" style="background:var(--success)"></span><div><b>release-notes</b><small>14:14 · 88K</small> 릴리스 노트 초안</div></div>
+              <div class="r"><span class="d" style="background:var(--danger)"></span><div><b>tray-icons</b><small>13:30 · 12K</small> 아이콘 빌드 실패</div></div>
+            </div></div>
+          <div><div class="lab">읽고 있는 곳</div><code style="color:var(--text-muted)">C:\Users\you\.claude</code></div>
+          <div class="ver">Claude Office 1.6.0</div>
+        </div>
+      </aside>
+    </div>
+  </div>
+  </div>
+  <p class="note">
+    <b class="yes">좋은 점</b> — 헤더가 이 앱의 존재 이유(대기)와 상태만 말한다. 아이콘 넷이 사라지고 글자 있는 컨트롤 하나(모드)만 남아 좁은 창에서도 읽힌다. 칩이 곧 거르기라 "실패한 것만 보자"가 한 번 누르기다.
+    계정 사용량은 목록 바닥에 상주하니 패널 세션 판의 <b>계정 사용량</b> 블록은 뺄 수 있다(세션 판이 그만큼 짧아진다).<br>
+    <b class="no">치를 값</b> — 상태 칩 거르기는 새 기능이라 <code>roomsToDraw</code>에 상태 조건이 하나 더 들어간다(목록과 캔버스가 같은 것을 보는 규칙은 그대로). 열 접기 손잡이는 캔버스 위에 떠서 <code>#stage</code>의 absolute 배치에 둘이 더 얹힌다.
+    헤더 44px — 지금 42px에서 2px 는다(칩 높이).
+  </p>
+
+  <!-- ─────────────────────────────── §3 ㉢ ─────────────────────────────── -->
+  <h2><span class="n">㉢</span>형제 앱 헤더 그대로 — 탭은 헤더에, 수치는 하단 상태줄에 <span class="rec">채택 (#208)</span></h2>
+  <p class="sublede">
+    whencalendar·whenwork와 <b>같은 헤더 문법</b>이다: 워드마크 → 탭 → (오른쪽) 시각 → 창 버튼. 세션·출근부·설정 탭이 패널 안에서 헤더로 올라오고
+    패널은 내용만 남는다. 상태 수치 다섯은 왼쪽 목록의 묶음 머리가 이미 세고 있으니 헤더에서 뺀다(대기 칩만 남긴다).
+    토큰·사용률·모드·버전은 <b>26px 하단 상태줄</b>로 내려간다.
+  </p>
+  <div class="scroller">
+  <div class="win" style="--k:.527">
+    <div class="hdr thin drag">
+      <span class="title waiting">CLAUDE OFFICE</span>
+      <span class="waitchip nodrag">2 입력 대기 <span class="t">최장 3분</span></span>
+      <div class="right">
+        <div class="htabs nodrag"><span class="htab on">세션</span><span class="htab">출근부</span><span class="htab">설정</span></div>
+        <span class="clock">15:50</span>
+        <div class="winbtns nodrag">
+          <span class="wb"><svg viewBox="0 0 12 12"><path d="M1 6h10"/></svg></span>
+          <span class="wb close"><svg viewBox="0 0 12 12"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9"/></svg></span>
+        </div>
+      </div>
+    </div>
+    <div class="bod" style="height:494px">
+      <aside class="rail">
+        <div class="rhead"><div class="search">방 이름 <kbd>/</kbd></div></div>
+        <div class="grp waiting">입력 대기 <span class="c">2</span></div>
+        <div class="row"><span class="d" style="background:var(--wait)"></span><span class="nm">api-gateway</span><time class="t">3m</time></div>
+        <div class="row"><span class="d" style="background:var(--wait)"></span><span class="nm">portal</span><time class="t">1m</time></div>
+        <div class="grp">헤매는 중 <span class="c">1</span></div>
+        <div class="row"><span class="d" style="background:var(--warning)"></span><span class="nm">claude-office</span><time>47m</time></div>
+        <div class="grp broken">서버 응답 없음 <span class="c">1</span></div>
+        <div class="row"><span class="d" style="background:var(--purple)"></span><span class="nm">api-gateway</span><time>2m</time></div>
+        <div class="grp">실패 <span class="c">1</span></div>
+        <div class="row"><span class="d" style="background:var(--danger)"></span><span class="nm">billing</span><time></time></div>
+        <div class="grp">작업 중 <span class="c">2</span></div>
+        <div class="row on"><span class="d" style="background:var(--accent)"></span><span class="nm">claude-office</span><time>47m</time></div>
+        <div class="row"><span class="d" style="background:var(--accent)"></span><span class="nm">portal</span><time>47m</time></div>
+        <div class="grp">퇴근 <span class="c">3</span></div>
+        <div class="row"><span class="d" style="background:var(--success)"></span><span class="nm">usage-tap</span><time>15:25</time></div>
+        <div class="row"><span class="d" style="background:var(--success)"></span><span class="nm">release-notes</span><time>14:14</time></div>
+        <div class="row"><span class="d" style="background:var(--danger)"></span><span class="nm">tray-icons</span><time>13:30</time></div>
+      </aside>
+      <div class="stage"><img src="../../docs/images/en/office.png" alt="사무실 캔버스 (현재 스크린샷)" /><span class="edge l">‹</span><span class="edge r">›</span><span class="help">?</span></div>
+      <aside class="panel">
+        <div class="pbody" style="padding-top:16px">
+          <div><div class="lab">사무실</div>
+            <div class="kv"><span>출근</span><b>7</b><span>작업 중</span><b>2</b><span>입력 대기</span><b>2</b><span>헤매는 중</span><b>1</b><span>서버 응답 없음</span><b>1</b><span>최고 컨텍스트</span><b class="hi">96%</b><span>서브에이전트</span><b>1</b><span>예비 슬롯</span><b>1</b></div></div>
+          <div><div class="lab">계정 사용량</div>
+            <div class="g"><div class="l"><span>세션 (5시간)</span><b class="ok">42%</b></div><div class="bar"><i style="width:42%"></i></div></div>
+            <div class="g" style="margin-top:8px"><div class="l"><span>주간 (7일)</span><b>63%</b></div><div class="bar"><i class="mid" style="width:63%"></i></div></div></div>
+          <div><div class="lab">퇴근한 작업</div>
+            <div class="recent">
+              <div class="r"><span class="d" style="background:var(--success)"></span><div><b>usage-tap</b><small>15:25 · 210K</small> statusline 탭 설정 정리</div></div>
+              <div class="r"><span class="d" style="background:var(--success)"></span><div><b>release-notes</b><small>14:14 · 88K</small> 릴리스 노트 초안</div></div>
+              <div class="r"><span class="d" style="background:var(--danger)"></span><div><b>tray-icons</b><small>13:30 · 12K</small> 아이콘 빌드 실패</div></div>
+            </div></div>
+        </div>
+      </aside>
+    </div>
+    <div class="sbar">
+      <div class="nums"><span>3.19M tok</span><span>5h 42%</span><span>wk 63%</span><span>갱신 1분 전</span></div>
+      <div class="right">
+        <div class="seg"><span class="on">사무실</span><span>미니</span><span>산책</span></div>
+        <span style="color:var(--text-muted);font-size:11px">1.6.0</span>
+      </div>
+    </div>
+  </div>
+  </div>
+  <p class="note">
+    <b class="yes">좋은 점</b> — 트레이에 나란히 사는 형제 앱과 <b>헤더가 같은 문법</b>이라 한 사람의 앱으로 읽힌다. 헤더 36px로 가장 얇다. 패널 탭이 헤더에 있으니 패널을 접어 둔 채로도 탭이 보인다(지금은 접으면 탭도 사라져 자리 클릭만이 패널을 여는 길이다).<br>
+    <b class="no">치를 값</b> — 상태 다섯이 헤더에서 사라져 <b>목록을 접으면 "작업 중 2 · 실패 1"을 볼 곳이 없다</b>(대기만 남는다). 탭이 패널 밖에 있어 "탭이 두 판으로 가는 유일한 문" 규칙(#135)은 지키지만, 탭과 그것이 바꾸는 판이 떨어져 선다. 하단 상태줄은 창 높이 26px를 먹는다 — 미니 모드엔 못 둔다.
+  </p>
+
+  <!-- ─────────────────────────────── §4 공통 손질 ─────────────────────────────── -->
+  <h2><span class="n">§4</span>세 안에 공통으로 들어가는 손질</h2>
+  <p class="sublede">어느 안을 고르든 함께 간다. 각각은 작지만 "쓰기 편하다"의 대부분이 여기서 온다.</p>
+  <div class="shelf">
+    <div class="mock">
+      <div class="cap">닫기는 트레이로 <span>첫 번째 닫기에만 한 번</span></div>
+      <div class="card" style="display:grid;gap:10px">
+        <div class="hdr drag" style="border-radius:var(--r-sm);border:1px solid var(--border)">
+          <span class="title">CLAUDE OFFICE</span>
+          <div class="right"><div class="winbtns nodrag"><span class="wb"><svg viewBox="0 0 12 12"><path d="M1 6h10"/></svg></span><span class="wb close" style="background:var(--danger);color:#fff"><svg viewBox="0 0 12 12"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9"/></svg></span></div></div>
+        </div>
+        <div class="toast"><span class="ic">▣</span><div>트레이에 남아 있습니다<small>다시 열기 <kbd>Ctrl+Alt+O</kbd> · 완전히 끄려면 트레이 메뉴 › 종료</small></div></div>
+      </div>
+      <p class="note">OS 닫기 버튼이 하던 일(hide → 트레이)을 그대로 잇는다. 툴팁은 형제 앱 문구 그대로 <b>"닫기 (트레이에 남습니다)"</b>. 토스트는 첫 닫기에만 — 설정에 <code>seenTrayHint</code> 하나.</p>
+    </div>
+    <div class="mock">
+      <div class="cap">macOS <span>신호등은 OS에 맡긴다</span></div>
+      <div class="card">
+        <div class="hdr drag mac" style="border-radius:var(--r-sm);border:1px solid var(--border)">
+          <span class="title">CLAUDE OFFICE</span>
+          <div class="right"><span class="clock">15:50</span></div>
+        </div>
+      </div>
+      <p class="note">맥은 <code>frame:false</code> 대신 <code>titleBarStyle:'hidden'</code> + <code>trafficLightPosition</code>으로 신호등을 남기고 헤더 왼쪽에 76px을 비운다(<code>body.mac</code>). 우리 최소화·닫기 버튼은 맥에서 숨긴다 — 같은 일을 하는 버튼이 양끝에 둘 서면 안 된다. 창을 둥글게 깎는 것도 OS(<code>roundedCorners</code>).</p>
+    </div>
+    <div class="mock">
+      <div class="cap">목록 행에 바로가기 <span>hover에서만</span></div>
+      <div class="card">
+        <div class="rail" style="height:auto">
+          <div class="grp waiting">입력 대기 <span class="c">2</span></div>
+          <div class="row"><span class="d" style="background:var(--wait)"></span><span class="nm">api-gateway</span><time class="t">3m</time></div>
+          <div class="row hover"><span class="d" style="background:var(--wait)"></span><span class="nm">portal</span><span class="go"><svg viewBox="0 0 10 10"><path d="M2 8l6-6M4 2h4v4"/></svg></span><time class="t">1m</time></div>
+          <div class="grp">작업 중 <span class="c">2</span></div>
+          <div class="row on"><span class="d" style="background:var(--accent)"></span><span class="nm">claude-office</span><time>47m</time></div>
+        </div>
+      </div>
+      <p class="note">이 앱에서 가장 잦은 동작은 "기다리는 세션의 터미널로 가기"인데 지금은 행 클릭 → 패널 바닥 버튼의 두 번이다. hover한 행에 <b>터미널 열기</b>가 떠서 한 번이 된다. 고른 행의 띠는 노랑에서 <b>파랑</b>으로 — 노랑은 대기에만.</p>
+    </div>
+    <div class="mock">
+      <div class="cap">키보드 <span>손이 터미널에 있는 사람의 앱이다</span></div>
+      <div class="card"><div class="kbdrow">
+        <kbd>/</kbd><span>방 이름 거르기 칸으로</span>
+        <kbd>↑ ↓</kbd><span>목록에서 다음·이전 자리</span>
+        <kbd>Enter</kbd><span>고른 자리의 터미널 열기</span>
+        <kbd>1 2 3</kbd><span>패널 탭 — 세션 · 출근부 · 설정</span>
+        <kbd>Esc</kbd><span>도움말·캡션 닫기 → 거르기 비우기 → 창 내리기(단계적)</span>
+        <kbd>Space</kbd><span>사무실 가운데로 (지금도 있다)</span>
+      </div></div>
+      <p class="note">단축키 힌트는 거르기 칸 끝의 <kbd>/</kbd>처럼 <b>그 컨트롤 안에</b> 적는다. 전역 단축키(Ctrl+Alt+O…)는 그대로다.</p>
+    </div>
+    <div class="mock">
+      <div class="cap">빈 화면이 고장으로 안 읽히게 <span>전부 걸러졌을 때</span></div>
+      <div class="card"><div class="empty"><b>조건에 맞는 방이 없습니다</b>"bill"로 거르는 중 · 접어 둔 방 2<br><span class="btn" style="justify-content:center">거르기와 접기를 모두 푼다</span></div></div>
+      <p class="note">지금 문구(<code>topbar.allHidden</code>)에 <b>왜 비었는지</b>(거르기 값·접힌 수)와 푸는 버튼을 붙인다. 걸러진 개수 배지(<code>#room-shown</code>)는 ㉡에서는 "출근 7" 칩이, ㉢에서는 목록 머리가 대신한다.</p>
+    </div>
+    <div class="mock">
+      <div class="cap">패널 탭 모양 <span>㉠·㉡ 공통</span></div>
+      <div class="card" style="display:grid;gap:8px">
+        <div class="ptabs" style="padding:0 0 0"><span class="ptab on">세션</span><span class="ptab">출근부</span><span class="ptab">설정</span></div>
+        <div class="ptabs pills" style="padding:0"><span class="ptab on">세션</span><span class="ptab">출근부</span><span class="ptab">설정</span></div>
+      </div>
+      <p class="note">위는 지금처럼 밑줄(색만 accent로), 아래는 형제 앱의 알약 탭. 패널 안에는 하위 탭(설정의 일반·알림·방·단축키)이 또 있어 <b>두 층이 다른 모양이어야 한다</b> — 위 밑줄 + 아래 알약을 추천. ㉢는 탭이 헤더로 가므로 헤더가 알약, 패널 안 하위 탭도 알약이 되어 한 층만 남는다.</p>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────────── §5 비교·결정 ─────────────────────────────── -->
+  <h2><span class="n">§5</span>비교와 결정할 것</h2>
+  <table class="cmp">
+    <thead><tr><th></th><th>㉠ 최소 이식</th><th>㉡ 헤더 재편</th><th>㉢ 형제 앱 헤더</th></tr></thead>
+    <tbody>
+      <tr><td>대기 신호가 먼저 읽힘</td><td class="yes">지금과 같음</td><td class="yes">점 + 칩, 가장 강함</td><td class="yes">칩 하나뿐이라 오히려 또렷</td></tr>
+      <tr><td>목록 접은 채로 상태 다섯 보기</td><td class="yes">헤더에 남음</td><td class="yes">칩으로 남음</td><td class="no">못 봄(대기만)</td></tr>
+      <tr><td>좁은 창(560px)에서 헤더</td><td class="no">버튼 여섯이 먼저 밀림</td><td class="so">칩이 줄어 "출근 7"만 남게 접어야 함</td><td class="yes">가장 얇고 적음</td></tr>
+      <tr><td>형제 앱과의 닮음</td><td class="so">토큰만</td><td class="so">토큰 + 워드마크</td><td class="yes">헤더 문법까지</td></tr>
+      <tr><td>새 기능</td><td>없음</td><td>상태 칩 거르기 · 행 바로가기 · 모드 전환기</td><td>헤더 탭 · 하단 상태줄</td></tr>
+      <tr><td>건드리는 곳</td><td>style.css :root · index.html 헤더 · main 창 옵션</td><td>+ app.mjs 거르기(<code>roomsToDraw</code>) · 목록 바닥 · 접기 손잡이</td><td>+ 패널 탭 이동(<code>applyPanelTab</code>이 보는 DOM) · 상태줄 · 미니 모드 예외</td></tr>
+      <tr><td>대략 작업량</td><td>1일</td><td>3일</td><td>3일</td></tr>
+      <tr><td>회귀 위험</td><td class="yes">낮음</td><td class="so">중간 — 거르기 축이 하나 는다</td><td class="so">중간 — 패널 탭 DOM이 옮겨 간다</td></tr>
+    </tbody>
+  </table>
+
+  <div class="decide">
+    <div class="q"><b>① 어느 안으로 가나.</b> <span class="pick">㉢로 확정(#208)</span>. 추천은 ㉡이었다. 이 앱은 형제 앱과 달리 "상태를 세는 앱"이라 상태가 헤더에 있어야 하고, 아이콘 넷을 글자 있는 컨트롤 하나로 접는 것이 쓰기 편함의 가장 큰 몫이다. ㉢의 하단 상태줄과 헤더 탭은 ㉡ 위에 나중에 얹을 수도 있다(배타적이지 않다).</div>
+    <div class="q"><b>② 대기 노랑.</b> <span class="pick">이 앱만의 <code>--wait #ffcf5c</code>를 더한다</span>(whenmusic의 <code>--music</code>처럼) vs 형제 팔레트의 <code>--warning #e0af68</code>을 그대로 대기에 쓴다. 후자는 팔레트가 완전히 같아지지만 "헤매는 중"과 색이 겹쳐 둘 중 하나가 색을 잃는다. 캔버스의 선택 테두리(<code>COLORS.sel</code>)와 대기 ❗도 같은 노랑이라 전자가 캔버스와도 이어진다.</div>
+    <div class="q"><b>③ 본문 글자 13 → 14.</b> 형제 앱은 14다. 이 앱의 패널은 330px에 라벨·값 열두 개가 들어가 14면 줄바꿈이 는다. <span class="pick">헤더·목록은 13, 패널 본문도 13을 유지하고 <code>--fs-md</code>만 13으로 둔다</span>(토큰 이름은 같고 값만 다른 유일한 자리로 주석에 남긴다) vs 전부 14로 올리고 패널을 350px로 넓힌다.</div>
+    <div class="q"><b>④ 워드마크.</b> <span class="pick">CLAUDE OFFICE</span>(제품명, 형제 앱식 대문자) vs 지금의 Claw'd Office(캐릭터 이름). 트레이 툴팁·창 제목이 "Claude Office"라 전자가 한 이름이 된다. 점은 상태등(파랑/노랑/보라).</div>
+    <div class="q"><b>⑤ 미니 모드 손잡이(22px)와 산책 창.</b> 토큰만 따라가고 모양은 그대로 둔다(미니는 이미 프레임이 없다). 산책 창은 캔버스뿐이라 해당 없음.</div>
+  </div>
+</div>
+<script>
+  (function () {
+    var t = document.getElementById('dragToggle');
+    if (!t) return;
+    t.addEventListener('change', function () { document.body.classList.toggle('show-drag', t.checked); });
+  })();
+</script>
+</body>
+</html>

@@ -32,56 +32,47 @@
 }
 
 :root {
-  /* ── 바탕. 위로 갈수록 밝다 — s0(창 바닥) → s3(눌린 것·막대 트랙) */
-  --s0: #0b0d12;
-  --s1: #12151c;
-  --s2: #171b23;
-  --s3: #232936;
+  /* ── 형제 앱(whennote·whenwork·whencalendar·whenmusic·whencommand)의 renderer/tokens.css와
+     같은 팔레트(D-09). 다섯 앱과 한 트레이에 살면서 이 앱만 남처럼 생겨서는 안 된다 — #208.
+     단일 원본은 그쪽이고 여기는 사본이다. 이 앱이 더하는 것은 아래 "뜻이 있는 색"의
+     --wait 계열과 --broken, 그리고 상태색의 -dim 변형뿐이다. */
+  --bg-app: #16171c; /* 창·열·헤더 */
+  --bg-raised: #1e2027; /* 카드·버튼·입력칸 */
+  --bg-inset: #131419; /* 한 겹 가라앉은 곳 — 사무실이 들어앉는 무대, 패널 바닥의 주 동작 */
+  --bg-hover: #262933; /* hover·켜진 것 */
+  --border: #2e323d;
+  --border-focus: #7aa2f7;
 
-  /* ── 선. b0는 줄 사이를 겨우 가르는 정도, b2는 초점·hover에서만 드러난다 */
-  --b0: #171c25;
-  --b1: #1e232d;
-  --b2: #39414f;
+  --text-primary: #e6e8ee; /* 값 */
+  --text-secondary: #a8afbd; /* 설명 */
+  --text-muted: #7b8294; /* 라벨 · 있는 줄만 알면 되는 것 · 진한 선(hover 테두리) */
 
-  /* ── 글자. t1이 값, t2가 설명, t3가 라벨, t4는 있는 줄만 알면 되는 것 */
-  --t1: #dde3ee;
-  --t2: #7b8698;
-  --t3: #5d6779;
-  --t4: #4d5768;
-  --t-code: #8f9bb0;
-  --dot: #3d4553;
+  --accent: #7aa2f7; /* 작업 중 · 초점 · 고른 것 */
+  --accent-dim: rgba(122, 162, 247, 0.14);
+  --success: #9ece6a; /* 끝남 · 주 동작(터미널 열기 — "끝났다"가 아니라 "누르라"는 뜻이지만 같은 초록을 쓴다) */
+  --success-dim: rgba(158, 206, 106, 0.12);
+  --success-line: rgba(158, 206, 106, 0.4);
+  --warning: #e0af68; /* 헤매는 중 · 게이지 60% · 걸러진 방 배지 */
+  --warning-dim: rgba(224, 175, 104, 0.14);
+  --danger: #f7768e; /* 실패 · 게이지 85% · 닫기 버튼 hover */
+  --danger-dim: rgba(247, 118, 142, 0.14);
 
-  /* ── 뜻이 있는 색.
-     **노랑(--acc)은 "나를 기다린다"에만 쓴다.** 다른 것에 쓰면 이 앱에서 유일해야 하는
-     신호가 묻힌다 — 문턱 중간값처럼 노란 것이 또 필요하면 --warn을 쓴다. */
-  --acc: #ffcf5c;
-  --acc-line: #4a3c15;
-  --acc-bg: #3d3315;
-  --acc-card: #201b0d;
-  --acc-sunk: #191507;
-  --warn: #e7b24a;
-
-  --work: #58a6e0;
-  --work-fg: #7cc4f5;
-  --work-bg: #14304a;
-  --done: #4fbf7f;
-  --done-fg: #7fd6a0;
-  --done-bg: #17331f;
-  --stuck: #e0a95c;
-  --stuck-bg: #3d2c15;
-  --fail: #e2624a;
-  --fail-fg: #f18a72;
-  --fail-bg: #3d1d18;
+  /* ── 뜻이 있는 색 — 이 앱이 더하는 것.
+     **노랑(--wait)은 "나를 기다린다"에만 쓴다.** 다른 것에 쓰면 이 앱에서 유일해야 하는
+     신호가 묻힌다 — 문턱 중간값처럼 노란 것이 또 필요하면 --warning을 쓴다.
+     형제 팔레트의 --warning(#e0af68)을 대기에 쓰지 않는 이유: 톤이 가라앉아 "유일한 신호"
+     역할이 약하고, 헤매는 중과 색이 겹친다. 캔버스의 선택 테두리·❗(render.mjs COLORS.sel)와
+     같은 값이라 사무실과도 이어진다. */
+  --wait: #ffcf5c;
+  --wait-line: rgba(255, 207, 92, 0.38);
+  --wait-dim: rgba(255, 207, 92, 0.16); /* 칩 배경 */
+  --wait-card: rgba(255, 207, 92, 0.07); /* 패널의 "나를 기다림" 카드 */
+  --wait-sunk: rgba(255, 207, 92, 0.04); /* 그 카드 안의 버튼 */
   /* 서버 장애로 응답을 못 받는 중. **캔버스에서 도는 별과 같은 색이어야 한다**
      (sprites.mjs의 dizzy) — 사무실에서 본 보라 별과 패널의 칩이 같은 것을 가리킨다는 게
-     색으로만 이어진다. 남은 색이 보라뿐인 사정도 그쪽에 적어 뒀다. */
-  --broken: #b9a1f0;
-  --broken-bg: #2a2245;
-
-  /* 주 동작(터미널 열기) — 초록이지만 --done과 다른 축이다. 끝났다는 뜻이 아니라 누르라는 뜻이다 */
-  --go-line: #2d6a4a;
-  --go-bg: #142019;
-  --go-fg: #bfe3cd;
+     색으로만 이어진다. 값은 형제 앱의 보라(whenwork --ai · whencalendar --cal-3)다. */
+  --broken: #bb9af7;
+  --broken-dim: rgba(187, 154, 247, 0.16);
 
   /* ── 캔버스 거울. render.mjs의 BUBBLE_STYLE과 **같은 값이어야 한다** —
      도움말의 말풍선 범례가 실제로 그려지는 색을 가리키기 때문이다 */
@@ -90,26 +81,31 @@
   --bubble-idle: #333b4a;
   --bubble-idle-line: #596375;
 
-  /* ── 모서리·여백·글자 크기. 셋 다 단이 정해져 있고 그 사이 값은 쓰지 않는다.
+  /* ── 모서리·여백·글자 크기. 단이 정해져 있고 그 사이 값은 쓰지 않는다.
      예외는 **모양이 값을 정하는 곳**이다 — 15px 원 안의 `?`(9px), 24칸 시간대 축(10px),
-     원(50%). 단에 올리면 글자가 원을 넘치고 축 라벨이 서로 붙는다. */
-  --r0: 2px;
-  --r1: 4px;
-  --r2: 8px;
+     원(50%). 단에 올리면 글자가 원을 넘치고 축 라벨이 서로 붙는다.
+     글자 크기는 형제 앱(12/13/14/16)보다 한 단 작다 — 패널 330px에 라벨·값 열두 개가
+     들어가는데 14px면 줄바꿈이 는다. 이름은 같고 값만 다른 유일한 자리다. */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
   --r-pill: 999px;
-  --sp1: 4px;
-  --sp2: 8px;
-  --sp3: 12px;
-  --sp4: 16px;
-  --sp5: 24px;
-  --fs-cap: 11px;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --fs-xs: 11px;
   --fs-sm: 12px;
-  --fs: 13px;
+  --fs-md: 13px;
   --fs-lg: 16px;
   --fs-xl: 22px;
 
-  --shadow: 0 8px 24px rgba(4, 6, 10, 0.55);
+  --shadow-pop: 0 12px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35);
 
+  /* 헤더·하단 상태줄 높이. main이 100%에서 둘을 빼고, 우측 하단 물음표가 상태줄 위에 선다. */
+  --top-h: 36px;
+  --sbar-h: 26px;
   /* 양쪽 열의 폭. 우측 하단 물음표가 --panel-w를 보고 **사무실 위**에 서므로 한 곳에서
      정한다 — 패널을 접으면 이 값이 0이 되고 물음표가 따라 움직인다(body.panel-off). */
   --rail-w: 200px;
@@ -117,14 +113,12 @@
 
   /* 본문 서체는 renderer/fonts/에 번들한 Pretendard Variable이다 (위 @font-face).
      **MonaS12가 뒤에 서 있는 이유가 있다.** Pretendard에는 `▭ ▣ ▤ ▥ ⊞`가 없다 —
-     미니 모드 버튼과 방 표시(고정·접기·묶기)가 쓰는 글자다. Malgun Gothic이 첫 순위였을
-     때는 그쪽이 대줬는데, Pretendard를 앞에 세우면 그 다섯 글자만 **글자별로** 대체 폰트를
-     찾아 내려가 사람마다 다른 모양(가끔 색까지 다른 기호 폰트)이 나온다.
-     사무실 픽셀 폰트에는 다 있으므로 그 다음 자리에 세워 대는 곳을 못 박아 둔다.
-     이 글자들은 11~13px로만 쓰여 12px 전용 폰트와 크기가 맞는다.
-
-     (제대로는 글자가 아니라 도형으로 그려야 한다 — #116에 적어 뒀다.) */
-  font-family: 'Pretendard Variable', 'Pretendard', 'MonaS12', 'Malgun Gothic', system-ui, sans-serif;
+     방 표시(고정·접기·묶기)가 쓰는 글자다. Pretendard를 앞에 세우면 그 다섯 글자만
+     **글자별로** 대체 폰트를 찾아 내려가 사람마다 다른 모양이 나온다. 사무실 픽셀 폰트에는
+     다 있으므로 그 다음 자리에 세워 대는 곳을 못 박아 둔다(11~13px로만 쓰여 12px 폰트와 맞는다). */
+  --font-sans: 'Pretendard Variable', 'Pretendard', 'MonaS12', 'Malgun Gothic', system-ui, sans-serif;
+  --font-mono: 'Cascadia Code', 'D2Coding', Consolas, monospace;
+  font-family: var(--font-sans);
 }
 
 * {
@@ -135,9 +129,9 @@ html,
 body {
   margin: 0;
   height: 100%;
-  background: var(--s0);
-  color: var(--t1);
-  font-size: var(--fs);
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-size: var(--fs-md);
   overflow: hidden;
 }
 
@@ -149,26 +143,26 @@ body {
    진짜 문제였다 — **동작을 가리키는 클래스(.copy·.go·.hint-btn 등)는 그대로 두고**
    생김새만 여기로 모았다. JS가 잡는 선택자는 건드리지 않는다. */
 .btn {
-  padding: var(--sp1) 9px;
-  border: 1px solid var(--b1);
-  border-radius: var(--r1);
-  background: var(--s2);
-  color: var(--t2);
+  padding: var(--sp-1) 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
+  color: var(--text-secondary);
   font: inherit;
   font-size: var(--fs-sm);
   line-height: 1.35;
   cursor: pointer;
 }
 .btn:hover:not(:disabled) {
-  border-color: var(--b2);
-  color: var(--t1);
+  border-color: var(--text-muted);
+  color: var(--text-primary);
 }
 /* 키보드로 옮겨 다닐 때 지금 어디인지 — 전에는 표시가 아예 없었다.
    노랑은 대기 전용이라 초점에는 파랑을 쓴다 */
 .btn:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 2px solid var(--work);
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 .btn:disabled {
@@ -179,20 +173,20 @@ select:focus-visible {
 /* 주 동작 — 누르라는 뜻의 초록이다(--done의 "끝났다"와 다른 축이라 색을 따로 둔다).
    :hover에서 글자색을 되돌려야 한다 — 위 .btn:hover가 t1로 덮기 때문이다 */
 .btn-go {
-  border-color: var(--go-line);
-  background: var(--go-bg);
-  color: var(--go-fg);
+  border-color: var(--success-line);
+  background: var(--success-dim);
+  color: var(--success);
 }
 .btn-go:hover:not(:disabled) {
-  border-color: var(--done);
-  color: var(--go-fg);
+  border-color: var(--success);
+  color: var(--success);
 }
 
 /* 켜진 상태가 있는 것 — 탭 · 고정/접기 표시 */
 .btn-toggle.on {
-  border-color: var(--b2);
-  background: var(--s3);
-  color: var(--t1);
+  border-color: var(--text-muted);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .btn-round {
@@ -213,7 +207,7 @@ select:focus-visible {
 .btn-pill {
   padding: 2px 9px;
   border-radius: var(--r-pill);
-  font-size: var(--fs-cap);
+  font-size: var(--fs-xs);
 }
 .btn-quiet {
   border-color: transparent;
@@ -224,7 +218,7 @@ select:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: var(--sp1) 7px;
+  padding: var(--sp-1) 7px;
 }
 /* 도형 아이콘. stroke가 currentColor라 버튼 글자색을 그대로 따라온다 —
    hover·켜짐에서 따로 칠할 것이 없다. */
@@ -239,29 +233,99 @@ select:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--sp2);
+  gap: var(--sp-2);
   width: 100%;
-  padding: var(--sp2) 10px;
-  border-radius: var(--r2);
+  padding: var(--sp-2) 10px;
+  border-radius: var(--r-md);
 }
 
+/* ── 헤더. OS 제목 표시줄이 없으므로 **여기가 드래그 바다**(형제 앱과 같은 방식, #208) —
+   버튼·칩·탭만 no-drag로 빼고 나머지를 잡으면 창이 움직인다. 생김새도 형제 앱 문법이다:
+   워드마크 → 대기 칩 → (오른쪽) 패널 탭 → 시각 → 최소화·닫기. 상태 수치는 하단 상태줄로
+   내려갔다(#statusbar) — 왼쪽 목록의 묶음 머리가 같은 수를 세고 있어 헤더에서는 뺐다. */
 #topbar {
   display: flex;
   align-items: center;
-  gap: 16px;
-  height: 42px;
-  padding: 0 14px;
-  border-bottom: 1px solid var(--b1);
-  background: var(--s1);
+  gap: 12px;
+  height: var(--top-h);
+  padding: 0 0 0 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-app);
+  -webkit-app-region: drag;
+}
+#topbar button,
+#topbar nav,
+#topbar input {
+  -webkit-app-region: no-drag;
+}
+/* 맥은 OS 신호등이 왼쪽에 남는다(titleBarStyle: hidden) — 그만큼 비우고 우리 창 버튼은 숨긴다.
+   같은 일을 하는 버튼이 양끝에 둘 서면 안 된다. */
+body.mac #topbar {
+  padding-left: 76px;
+}
+body.mac #winbtns {
+  display: none;
 }
 
-/* 워드마크. 노랑이지만 **글자색**이다 — 대기는 채워진 칩이라 형태로 갈린다 */
+/* 워드마크. 형제 앱식 대문자 + 점. **점이 상태등이다** — 평소 파랑, 대기가 있으면 노랑,
+   서버 응답이 끊긴 자리가 있으면 보라(app.mjs drawStats가 class를 건다). 글자색은 중립이다 —
+   노랑은 대기 칩 하나로 족하다. */
 #topbar h1 {
   margin: 0;
   flex: none;
-  font-size: var(--fs);
-  letter-spacing: 0.04em;
-  color: var(--acc);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--fs-sm);
+  font-weight: 750;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+#topbar h1::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  box-shadow: 0 0 9px var(--accent-dim);
+}
+#topbar h1.waiting::before {
+  background: var(--wait);
+  box-shadow: 0 0 10px var(--wait-dim);
+}
+#topbar h1.broken::before {
+  background: var(--broken);
+  box-shadow: 0 0 10px var(--broken-dim);
+}
+
+/* 최소화·닫기. 형제 앱과 같은 자리·같은 크기(38×28). 닫기는 종료가 아니라 트레이로 내려가는
+   것이라 툴팁에 그렇게 적는다(topbar.close). hover에서만 빨갛다. */
+#winbtns {
+  display: flex;
+  gap: 2px;
+  align-self: stretch;
+  align-items: center;
+  padding-right: 4px;
+}
+#winbtns button {
+  width: 38px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: default;
+}
+#winbtns button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+#winbtns #win-close:hover {
+  background: var(--danger);
+  color: #fff;
 }
 
 /* ── 대기 칩. 상단바에서 유일하게 배경이 찬 것이고, 대기가 없으면 자리째 사라진다.
@@ -273,10 +337,10 @@ select:focus-visible {
   align-items: center;
   gap: 6px;
   padding: 3px 10px;
-  border: 1px solid var(--acc-line);
+  border: 1px solid var(--wait-line);
   border-radius: var(--r-pill);
-  background: var(--acc-bg);
-  color: var(--acc);
+  background: var(--wait-dim);
+  color: var(--wait);
   font: inherit;
   font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
@@ -290,7 +354,7 @@ select:focus-visible {
   display: none;
 }
 #wait-chip:hover {
-  border-color: var(--acc);
+  border-color: var(--wait);
 }
 #wait-chip b {
   font-weight: 700;
@@ -300,7 +364,7 @@ select:focus-visible {
 }
 /* 기다린 시간은 개수보다 한 겹 가라앉힌다 — 먼저 읽어야 하는 것은 "몇 건"이다 */
 #wait-chip .t {
-  color: var(--stuck);
+  color: var(--warning);
 }
 
 /* 가운데는 **상태만**. 수치는 오른쪽에서 가라앉는다. */
@@ -311,21 +375,21 @@ select:focus-visible {
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
-  color: var(--t2);
+  color: var(--text-secondary);
 }
 #stats b {
-  color: var(--t1);
+  color: var(--text-primary);
 }
 #stats i {
-  color: var(--b2);
+  color: var(--text-muted);
   font-style: normal;
 }
 #stats .t {
-  color: var(--work);
+  color: var(--accent);
   font-weight: 700;
 }
 #stats .s {
-  color: var(--stuck);
+  color: var(--warning);
   font-weight: 700;
 }
 #stats .b {
@@ -333,16 +397,20 @@ select:focus-visible {
   font-weight: 700;
 }
 #stats .f {
-  color: var(--fail);
+  color: var(--danger);
   font-weight: 700;
 }
-#topbar .right {
+#topbar .right,
+#statusbar .right {
   margin-left: auto;
   display: flex;
   gap: 12px;
   align-items: center;
-  color: var(--t2);
+  color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
+}
+#clock {
+  font-size: var(--fs-sm);
 }
 
 /* 토큰 총량·사용률. 늘 있지만 급한 적이 없는 값이라 모노스페이스로 가라앉힌다 —
@@ -350,20 +418,74 @@ select:focus-visible {
 #usage-mini {
   display: flex;
   gap: 10px;
-  font-family: 'Cascadia Code', Consolas, monospace;
-  font-size: var(--fs-cap);
-  color: var(--t3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
 }
 #conn.ok {
-  color: var(--done);
+  color: var(--success);
 }
 #conn.bad {
-  color: var(--fail);
+  color: var(--danger);
 }
 
 main {
   display: flex;
-  height: calc(100% - 42px);
+  height: calc(100% - var(--top-h) - var(--sbar-h));
+}
+
+/* ── 하단 상태줄. 늘 있지만 급한 적이 없는 것들 — 상태 수치 · 토큰 총량 · 사용률 · 걸러진 방 ·
+   모습 전환(사무실·미니·산책) · 버전. 헤더가 "지금 나를 기다리는 것"만 말하게 하려고 내려왔다. */
+#statusbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: var(--sbar-h);
+  padding: 0 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-app);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+#statusbar #stats {
+  font-size: var(--fs-sm);
+}
+#statusbar #version {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+/* 모습 전환기. 셋이 배타라(settings.mode) 이어붙인 토글로 세운다 — 지금 모습이 켜져 있고
+   누를 수 없다. 미니·산책은 별도 창이라 main이 갈아 끼운다. */
+#mode-seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--bg-inset);
+}
+#mode-seg button {
+  padding: 1px 9px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  cursor: pointer;
+}
+#mode-seg button:last-child {
+  border-right: 0;
+}
+#mode-seg button:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+#mode-seg button.on {
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  cursor: default;
 }
 
 /* ── 미니 모드. 같은 페이지를 작은 창에서 열고 사무실만 남긴다.
@@ -372,7 +494,10 @@ main {
   display: none;
 }
 body.mini #topbar,
+body.mini #statusbar,
 body.mini #rail,
+body.mini #rail-toggle,
+body.mini #panel-toggle,
 body.mini #panel,
 body.mini #help-open,
 body.mini #help {
@@ -384,10 +509,10 @@ body.mini #mini-bar {
   gap: 8px;
   height: 22px;
   padding: 0 6px 0 9px;
-  border-bottom: 1px solid var(--b1);
-  background: var(--s1);
-  font-size: var(--fs-cap);
-  color: var(--t2);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-app);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
   /* 창을 끄는 자리 — 버튼만 빼고 전부 손잡이다 */
   -webkit-app-region: drag;
 }
@@ -422,7 +547,7 @@ body.mini #stage-empty {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  color: var(--acc);
+  color: var(--wait);
   font-weight: 700;
 }
 #mini-stats .ico {
@@ -430,11 +555,11 @@ body.mini #stage-empty {
   height: 10px;
 }
 #mini-stats .n {
-  color: var(--t3);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 #mini-stats i {
-  color: var(--b2);
+  color: var(--text-muted);
   font-style: normal;
 }
 /* 마우스를 올린 게가 어느 방인지 — 숫자 대신 이 줄이 뜬다. 방이 먼저고 이름이 뒤로 물러난다.
@@ -443,7 +568,7 @@ body.mini #stage-empty {
 #mini-stats .rm {
   flex: 0 1 auto;
   min-width: 0;
-  color: var(--t1);
+  color: var(--text-primary);
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -455,7 +580,7 @@ body.mini #stage-empty {
 #mini-stats .nm {
   flex: 0 3 auto;
   min-width: 0;
-  color: var(--t3);
+  color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -467,22 +592,22 @@ body.mini #stage-empty {
   font-variant-numeric: tabular-nums;
 }
 #mini-stats .ct.ok {
-  color: var(--done);
+  color: var(--success);
 }
 #mini-stats .ct.mid {
-  color: var(--warn);
+  color: var(--warning);
 }
 #mini-stats .ct.hi {
-  color: var(--fail);
+  color: var(--danger);
 }
 #mini-stats .s {
-  color: var(--stuck);
+  color: var(--warning);
 }
 #mini-stats .b {
   color: var(--broken);
 }
 #mini-stats .f {
-  color: var(--fail);
+  color: var(--danger);
 }
 /* 계정 사용률 — 늘 있지만 급하지 않다. 큰 창의 #usage-mini와 같은 톤으로 가라앉힌다 */
 #mini-usage {
@@ -490,7 +615,7 @@ body.mini #stage-empty {
   flex: none;
   align-items: center;
   gap: 6px;
-  color: var(--t3);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -521,6 +646,46 @@ body.mini #stage-empty {
 #stage > canvas {
   position: absolute;
 }
+/* 양쪽 열 접기 손잡이. 헤더에서 무대 가장자리로 내려왔다 — 접는 열 바로 옆에 있어야
+   무엇을 접는지 설명이 필요 없다. 캔버스 위에 떠 있고(absolute), 세로 가운데에 선다. */
+#rail-toggle,
+#panel-toggle {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  width: 14px;
+  height: 44px;
+  margin-top: -22px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  opacity: 0.55;
+  cursor: pointer;
+}
+#rail-toggle {
+  left: 0;
+  border-left: 0;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+}
+#panel-toggle {
+  right: 0;
+  border-right: 0;
+  border-radius: var(--r-sm) 0 0 var(--r-sm);
+}
+#rail-toggle:hover,
+#panel-toggle:hover {
+  opacity: 1;
+  color: var(--text-primary);
+}
+#rail-toggle .ico,
+#panel-toggle .ico {
+  width: 10px;
+  height: 10px;
+}
 
 /* 전부 걸러졌을 때의 안내 — 빈 캔버스는 고장으로 읽힌다 */
 #stage-empty {
@@ -529,7 +694,7 @@ body.mini #stage-empty {
   text-align: center;
   font-size: var(--fs-sm);
   line-height: 1.7;
-  color: var(--t3);
+  color: var(--text-muted);
 }
 
 /* 방 거르기. 평소엔 배경에 묻어 있다가 초점이 오면 드러난다 — 방이 서넛일 땐 쓸 일이 없다 */
@@ -538,28 +703,28 @@ body.mini #stage-empty {
 #room-filter {
   width: 100%;
   padding: 4px 9px;
-  border: 1px solid var(--b1);
+  border: 1px solid var(--border);
   border-radius: var(--r-pill);
-  background: var(--s2);
-  color: var(--t1);
+  background: var(--bg-raised);
+  color: var(--text-primary);
   font: inherit;
   font-size: var(--fs-sm);
 }
 #room-filter:hover {
-  border-color: var(--b1);
+  border-color: var(--border);
 }
 #room-filter:focus {
-  border-color: var(--b2);
-  background: var(--s2);
+  border-color: var(--border-focus);
+  background: var(--bg-raised);
 }
 /* 걸러진 방이 있다는 배지. "지금 화면이 다가 아니다"는 주의 신호여서 --warn을 쓴다 —
    노랑 계열이지만 대기(--acc)와는 다른 축이다 */
 #room-shown {
-  color: var(--warn);
+  color: var(--warning);
 }
 #room-shown:hover {
-  border-color: var(--warn);
-  color: var(--warn);
+  border-color: var(--warning);
+  color: var(--warning);
 }
 
 #office {
@@ -580,18 +745,18 @@ body.mini #stage-empty {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-right: 1px solid var(--b1);
-  background: var(--s1);
+  border-right: 1px solid var(--border);
+  background: var(--bg-app);
 }
 .rail-head {
   flex: none;
-  padding: var(--sp2) 10px;
+  padding: var(--sp-2) 10px;
 }
 #rail-list {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 0 var(--sp3);
+  padding: 0 0 var(--sp-3);
 }
 
 /* 묶음 머리. 대기만 노랑이고 나머지는 라벨 색이다 — 목록에서도 노랑은 하나뿐이어야 한다. */
@@ -599,14 +764,14 @@ body.mini #stage-empty {
   display: flex;
   align-items: baseline;
   gap: 6px;
-  padding: var(--sp3) 10px var(--sp1);
-  font-size: var(--fs-cap);
+  padding: var(--sp-3) 10px var(--sp-1);
+  font-size: var(--fs-xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--t3);
+  color: var(--text-muted);
 }
 .rail-group.waiting {
-  color: var(--acc);
+  color: var(--wait);
 }
 .rail-group.broken {
   color: var(--broken);
@@ -621,28 +786,28 @@ body.mini #stage-empty {
 .rail-row {
   display: flex;
   align-items: center;
-  gap: var(--sp2);
+  gap: var(--sp-2);
   width: 100%;
   padding: 5px 10px;
   border: 0;
   border-left: 2px solid transparent;
   background: none;
-  color: var(--t2);
+  color: var(--text-secondary);
   font: inherit;
   font-size: var(--fs-sm);
   text-align: left;
   cursor: pointer;
 }
 .rail-row:hover {
-  background: var(--s2);
-  color: var(--t1);
+  background: var(--bg-raised);
+  color: var(--text-primary);
 }
 /* 고른 행. 왼쪽 띠는 노랑이다 — 여기서는 "대기"가 아니라 **지금 보고 있는 것**을 뜻하고,
    한 화면에 하나뿐이라 대기 신호와 헷갈릴 여지가 없다. */
 .rail-row.on {
-  background: var(--s2);
-  color: var(--t1);
-  border-left-color: var(--acc);
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  border-left-color: var(--wait);
 }
 .rail-row .nm {
   min-width: 0;
@@ -653,24 +818,24 @@ body.mini #stage-empty {
 }
 .rail-row time {
   flex: none;
-  font-family: 'Cascadia Code', Consolas, monospace;
-  font-size: var(--fs-cap);
-  color: var(--t3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 /* 기다린 시간만 색이 있다 */
 .rail-row time.t {
-  color: var(--acc);
+  color: var(--wait);
 }
 .rail-empty {
-  margin: var(--sp5) 10px;
+  margin: var(--sp-5) 10px;
   font-size: var(--fs-sm);
   line-height: 1.6;
-  color: var(--t3);
+  color: var(--text-muted);
 }
 .rail-empty small {
-  color: var(--t4);
-  font-size: var(--fs-cap);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
 }
 
 /* ── 접기. 열을 없애면 사무실이 그만큼 넓어진다. 둘 다 접으면 창 전체가 사무실이다.
@@ -688,8 +853,8 @@ body.panel-off {
 #panel {
   width: var(--panel-w);
   flex: none;
-  border-left: 1px solid var(--b1);
-  background: var(--s1);
+  border-left: 1px solid var(--border);
+  background: var(--bg-app);
   /* 패널은 두 층이다 — 굴러가는 몸통과 바닥에 붙는 주 동작. 스크롤은 몸통이 맡으므로
      여기서는 넘치는 것을 잘라 둔다. */
   display: flex;
@@ -703,25 +868,24 @@ body.panel-off {
   flex: none;
   display: flex;
   gap: 2px;
-  padding: var(--sp2) 10px 0;
-  border-bottom: 1px solid var(--b1);
 }
 .panel-tab {
-  padding: 5px 11px 7px;
+  padding: 4px 12px;
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-radius: var(--r-sm);
   background: none;
-  color: var(--t3);
+  color: var(--text-secondary);
   font: inherit;
   font-size: var(--fs-sm);
   cursor: pointer;
 }
 .panel-tab:hover {
-  color: var(--t1);
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 .panel-tab.on {
-  color: var(--t1);
-  border-bottom-color: var(--acc);
+  color: var(--text-primary);
+  background: var(--bg-raised);
 }
 
 /* 세 판이 들어가는 자리. 판마다 자기 스크롤을 갖는다. */
@@ -750,17 +914,9 @@ body.panel-off {
   overflow-y: auto;
   padding: 14px;
 }
-/* 기본 화면만 flex 열이다 — 버전 한 줄을 바닥으로 밀기 위해서다(.version).
-   자리 하나를 고른 화면에서는 이걸 걸지 않는다. 섹션을 flex item으로 흩어 놓으면
-   블록 사이 margin 병합이 사라져 간격이 다 벌어진다. */
-.panel-body.idle {
-  display: flex;
-  flex-direction: column;
-  min-height: 100%;
-}
 
 .empty p {
-  color: var(--t2);
+  color: var(--text-secondary);
   line-height: 1.6;
 }
 
@@ -775,11 +931,11 @@ body.panel-off {
   gap: 8px;
   margin-bottom: 4px;
   font-size: var(--fs-sm);
-  color: var(--t2);
+  color: var(--text-secondary);
 }
 .gauge-head b {
   font-variant-numeric: tabular-nums;
-  font-size: var(--fs);
+  font-size: var(--fs-md);
 }
 .gauge-foot {
   display: flex;
@@ -788,73 +944,60 @@ body.panel-off {
   margin-top: 3px;
 }
 .gauge-foot small {
-  font-size: var(--fs-cap);
-  color: var(--t3);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
 .bar {
   height: 6px;
   border-radius: var(--r-pill);
-  background: var(--s3);
+  background: var(--bg-hover);
   overflow: hidden;
 }
 .bar i {
   display: block;
   height: 100%;
   border-radius: var(--r-pill);
-  background: var(--dot);
+  background: var(--border);
   transition: width 0.4s ease;
 }
 .bar i.lv-ok {
-  background: var(--done);
+  background: var(--success);
 }
 .bar i.lv-mid {
-  background: var(--warn);
+  background: var(--warning);
 }
 .bar i.lv-hi {
-  background: var(--fail);
+  background: var(--danger);
 }
 b.lv-ok {
-  color: var(--done);
+  color: var(--success);
 }
 b.lv-mid {
-  color: var(--warn);
+  color: var(--warning);
 }
 b.lv-hi {
-  color: var(--fail);
+  color: var(--danger);
 }
 b.lv-na {
-  color: var(--t3);
-}
-
-/* 패널 바닥에 붙는 버전 한 줄. 기본 화면에서만 몸통이 flex 열이 되고(idlePanel이 .idle을
-   달고 온다) margin-top: auto가 남은 공간을 위로 몰아 버전을 맨 밑으로 내린다.
-   내용이 길어 스크롤이 생기면 auto가 0이 되어 자연스럽게 내용 끝에 붙는다. */
-.version {
-  /* top이 auto — 간격은 padding으로 잡는다. 스크롤이 생기면 auto가 0이 되므로
-     margin에 기대면 내용과 붙어 버린다. */
-  margin: auto 0 0;
-  padding-top: 14px;
-  border-top: 1px solid var(--b0);
-  font-size: var(--fs-cap);
-  color: var(--t4);
+  color: var(--text-muted);
 }
 
 .hint {
   margin: 12px 0 0;
-  font-size: var(--fs-cap);
+  font-size: var(--fs-xs);
   line-height: 1.6;
-  color: var(--t3);
+  color: var(--text-muted);
 }
 .hint.warn {
-  color: var(--warn);
+  color: var(--warning);
 }
 .hint code,
 .block code {
-  font-family: 'Cascadia Code', Consolas, monospace;
-  font-size: var(--fs-cap);
-  color: var(--t-code);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
   word-break: break-all;
 }
 
@@ -866,13 +1009,13 @@ b.lv-na {
 .who .subtitle {
   margin: 0 0 3px;
   font-size: var(--fs-sm);
-  color: var(--t2);
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 .who .cwd {
   margin: 0;
-  font-size: var(--fs-cap);
-  color: var(--t3);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
   word-break: break-all;
 }
 
@@ -880,33 +1023,33 @@ b.lv-na {
   display: inline-block;
   padding: 2px 8px;
   border-radius: var(--r-pill);
-  font-size: var(--fs-cap);
+  font-size: var(--fs-xs);
   font-weight: 700;
-  background: var(--s3);
-  color: var(--t2);
+  background: var(--bg-hover);
+  color: var(--text-secondary);
 }
 .mood.typing {
-  background: var(--work-bg);
-  color: var(--work-fg);
+  background: var(--accent-dim);
+  color: var(--accent);
 }
 .mood.waiting {
-  background: var(--acc-bg);
-  color: var(--acc);
+  background: var(--wait-dim);
+  color: var(--wait);
 }
 .mood.stuck {
-  background: var(--stuck-bg);
-  color: var(--stuck);
+  background: var(--warning-dim);
+  color: var(--warning);
 }
 .mood.failed {
-  background: var(--fail-bg);
-  color: var(--fail-fg);
+  background: var(--danger-dim);
+  color: var(--danger);
 }
 .mood.done {
-  background: var(--done-bg);
-  color: var(--done-fg);
+  background: var(--success-dim);
+  color: var(--success);
 }
 .mood.broken {
-  background: var(--broken-bg);
+  background: var(--broken-dim);
   color: var(--broken);
 }
 
@@ -914,17 +1057,17 @@ b.lv-na {
    <details>라 JS가 없고, 요약 줄 전체가 손잡이다(summary 안에 다 들어 있다). */
 .sum {
   margin: 14px 0;
-  border: 1px solid var(--b1);
-  border-radius: var(--r2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
 }
 .sum > summary {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--sp1) 10px;
-  padding: var(--sp2) 10px;
+  gap: var(--sp-1) 10px;
+  padding: var(--sp-2) 10px;
   font-size: var(--fs-sm);
-  color: var(--t2);
+  color: var(--text-secondary);
   cursor: pointer;
   /* 기본 삼각형을 지운다 — 오른쪽 끝의 "자세히"가 그 역할을 한다 */
   list-style: none;
@@ -933,21 +1076,21 @@ b.lv-na {
   display: none;
 }
 .sum > summary:hover {
-  color: var(--t1);
+  color: var(--text-primary);
 }
 .sum > summary b {
-  color: var(--t1);
+  color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
 .sum > summary em {
   margin-left: auto;
-  color: var(--work);
+  color: var(--accent);
   font-style: normal;
-  font-size: var(--fs-cap);
+  font-size: var(--fs-xs);
   white-space: nowrap;
 }
 .sum[open] > summary {
-  border-bottom: 1px solid var(--b0);
+  border-bottom: 1px solid var(--border);
 }
 /* 펼친 표는 요약 줄 아래 칸에 들어간다 — 테두리는 바깥 <details>가 이미 그렸다 */
 .sum > .facts {
@@ -961,8 +1104,8 @@ b.lv-na {
   gap: 6px 10px;
   margin: 14px 0;
   padding: 10px;
-  border: 1px solid var(--b1);
-  border-radius: var(--r2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
 }
 .facts div {
   display: flex;
@@ -973,7 +1116,7 @@ b.lv-na {
   flex: none;
   /* 값이 길면 라벨이 눌려 "모/델"로 쪼개진다 — 라벨은 접지 않고 값을 흘린다 */
   white-space: nowrap;
-  color: var(--t3);
+  color: var(--text-muted);
 }
 .facts dd {
   margin: 0;
@@ -991,10 +1134,10 @@ b.lv-na {
 }
 .block h3 {
   margin: 0 0 6px;
-  font-size: var(--fs-cap);
+  font-size: var(--fs-xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--t3);
+  color: var(--text-muted);
 }
 .block p {
   margin: 0;
@@ -1002,27 +1145,27 @@ b.lv-na {
   word-break: break-word;
 }
 .block .dim {
-  color: var(--t2);
+  color: var(--text-secondary);
 }
 
 .block.need {
   padding: 10px;
-  border: 1px solid var(--acc-line);
-  border-radius: var(--r2);
-  background: var(--acc-card);
+  border: 1px solid var(--wait-line);
+  border-radius: var(--r-md);
+  background: var(--wait-card);
 }
 .block.need h3 {
-  color: var(--acc);
+  color: var(--wait);
 }
 .block.need .reply {
   margin-top: 8px;
-  color: var(--t2);
+  color: var(--text-secondary);
   font-size: var(--fs-sm);
 }
 /* 기다린 시간 — 1초마다 갈아 끼운다. 첫 tick 전에는 비어 있으므로 여백째로 접어둔다. */
 .block.need .waited {
   margin-bottom: 6px;
-  color: var(--acc);
+  color: var(--wait);
   font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
 }
@@ -1036,12 +1179,12 @@ b.lv-na {
 }
 /* 파일을 여는 버튼이라 글자는 파랑으로 둔다 — 링크와 같은 몸짓이다 */
 .plan-open {
-  margin-top: var(--sp2);
-  color: var(--work);
+  margin-top: var(--sp-2);
+  color: var(--accent);
 }
 .plan-open:hover:not(:disabled) {
-  border-color: var(--work);
-  color: var(--work);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 /* 실패했을 때만 글자가 들어온다 — 빈 동안은 여백째로 접어 둔다 */
 .plan-msg:empty {
@@ -1051,12 +1194,12 @@ b.lv-na {
 /* ── 세션이 세운 할 일 목록. 진행 막대 + 아직 안 끝난 항목. */
 .block h3 .todo-count {
   margin-left: 6px;
-  color: var(--t2);
+  color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
 /* 다 찬 것이 좋은 막대라서 문턱 색(lv-*)을 쓰지 않고 초록 한 색으로 둔다 */
 .bar.todo i {
-  background: var(--done);
+  background: var(--success);
 }
 .todos {
   list-style: none;
@@ -1076,22 +1219,22 @@ b.lv-na {
   margin: 0;
   font-size: var(--fs-sm);
   line-height: 1.5;
-  color: var(--t2);
+  color: var(--text-secondary);
 }
 /* 진행 중인 항목만 또렷하다 — 목록에서 눈이 먼저 가야 하는 한 줄이다 */
 .todos li.in_progress p {
-  color: var(--t1);
+  color: var(--text-primary);
 }
 .todos .mark {
   width: 7px;
   height: 7px;
-  border: 1px solid var(--dot);
-  border-radius: var(--r0);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
   transform: translateY(-1px);
 }
 .todos li.in_progress .mark {
-  border-color: var(--work);
-  background: var(--work);
+  border-color: var(--accent);
+  background: var(--accent);
 }
 /* 막힌 항목은 **빨강으로 칠하지 않는다.** 이 앱에서 빨강은 실패·위험이고(실패 점, 컨텍스트 85%),
    순서를 기다리는 항목은 잘못된 게 아니라 아직 차례가 아닌 것이다. 목록에서 또렷해야 하는 것은
@@ -1101,8 +1244,8 @@ b.lv-na {
 }
 .todos em {
   margin-left: 6px;
-  color: var(--t3);
-  font-size: var(--fs-cap);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
   font-style: normal;
   white-space: nowrap;
 }
@@ -1114,42 +1257,42 @@ b.lv-na {
 #help-open {
   position: fixed;
   right: calc(var(--panel-w) + 14px);
-  bottom: 14px;
+  bottom: calc(var(--sbar-h) + 14px);
   z-index: 20;
-  font-size: var(--fs);
+  font-size: var(--fs-md);
 }
 /* 열려 있는 동안은 hover와 같은 모습으로 둔다 — 눌린 채라는 표시다 */
 #help-open:hover,
 #help-open.on {
-  border-color: var(--b2);
-  background: var(--s3);
-  color: var(--t1);
+  border-color: var(--text-muted);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 #help {
   position: fixed;
   right: calc(var(--panel-w) + 14px);
-  bottom: 46px;
+  bottom: calc(var(--sbar-h) + 46px);
   z-index: 20;
   width: min(310px, calc(100vw - 28px));
   padding: 12px 13px;
-  border: 1px solid var(--b2);
-  border-radius: var(--r2);
-  background: var(--s2);
-  box-shadow: var(--shadow);
+  border: 1px solid var(--text-muted);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-pop);
 }
 #help h3 {
   margin: 0 0 8px;
-  font-size: var(--fs-cap);
+  font-size: var(--fs-xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--t3);
+  color: var(--text-muted);
 }
 #help p {
   margin: 10px 0 0;
   font-size: var(--fs-sm);
   line-height: 1.6;
-  color: var(--t2);
+  color: var(--text-secondary);
 }
 
 /* 말풍선 두 종류 안내 — render.mjs의 BUBBLE_STYLE과 색을 맞춰 둔다 */
@@ -1166,7 +1309,7 @@ b.lv-na {
   gap: 8px;
   align-items: flex-start;
   font-size: var(--fs-sm);
-  color: var(--t2);
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 .legend .chip {
@@ -1174,7 +1317,7 @@ b.lv-na {
   width: 16px;
   height: 12px;
   margin-top: 2px;
-  border-radius: var(--r0);
+  border-radius: var(--r-sm);
 }
 .legend .chip.real {
   background: var(--bubble-real);
@@ -1198,19 +1341,19 @@ b.lv-na {
   gap: 8px;
   align-items: baseline;
   padding: 5px 8px;
-  border: 1px solid var(--b1);
-  border-left: 2px solid var(--work);
-  border-radius: var(--r1);
-  background: var(--s2);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
 }
 .aides b {
   flex: none;
-  font-size: var(--fs-cap);
-  color: var(--work);
+  font-size: var(--fs-xs);
+  color: var(--accent);
 }
 .aides span {
   font-size: var(--fs-sm);
-  color: var(--t2);
+  color: var(--text-secondary);
   line-height: 1.4;
 }
 
@@ -1225,14 +1368,14 @@ b.lv-na {
 .links a {
   display: inline-block;
   padding: 3px 8px;
-  border: 1px solid var(--b1);
-  border-radius: var(--r1);
-  color: var(--work);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--accent);
   text-decoration: none;
   font-variant-numeric: tabular-nums;
 }
 .links a:hover {
-  border-color: var(--work);
+  border-color: var(--accent);
 }
 
 .timeline,
@@ -1255,73 +1398,73 @@ b.lv-na {
   grid-template-columns: 8px 1fr;
 }
 .timeline time {
-  color: var(--t3);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
-  font-size: var(--fs-cap);
+  font-size: var(--fs-xs);
 }
 .timeline p,
 .recent p {
   margin: 0;
   font-size: var(--fs-sm);
-  color: var(--t2);
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 .recent b {
   display: block;
   font-size: var(--fs-sm);
-  color: var(--t1);
+  color: var(--text-primary);
 }
 .recent small {
-  color: var(--t3);
-  font-size: var(--fs-cap);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
 }
 
 .dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--dot);
+  background: var(--border);
   transform: translateY(-1px);
 }
 .dot.working {
-  background: var(--work);
+  background: var(--accent);
 }
 /* 목록의 점은 **mood 어휘**를 쓴다(waiting·typing·stuck·idle) — 타임라인의 잡 상태
    어휘(working·done·failed·stopped)와 다른 축이라 둘 다 있어야 한다.
    말풍선·이름표와 같은 뜻을 같은 색으로 낸다. */
 .dot.waiting {
-  background: var(--acc);
+  background: var(--wait);
 }
 .dot.typing {
-  background: var(--work);
+  background: var(--accent);
 }
 .dot.stuck {
-  background: var(--stuck);
+  background: var(--warning);
 }
 /* mood는 아니지만 목록에서 한 묶음을 이루므로 여기 나란히 둔다 (shared/status.mjs) */
 .dot.broken {
   background: var(--broken);
 }
 .dot.idle {
-  background: var(--dot);
+  background: var(--border);
 }
 .dot.done {
-  background: var(--done);
+  background: var(--success);
 }
 .dot.failed {
-  background: var(--fail);
+  background: var(--danger);
 }
 .dot.stopped {
-  background: var(--dot);
+  background: var(--border);
 }
 /* 터미널 세션 타임라인 — 잡처럼 상태가 없으니 "받은 지시 / 한 말"로 구분한다 */
 /* 내가 친 지시. 노랑이었지만 그건 대기의 색이라 밝은 중립색으로 바꿨다 —
    이 줄이 뜻하는 건 "내가 한 말"이지 "나를 기다린다"가 아니다 */
 .dot.prompt {
-  background: var(--t1);
+  background: var(--text-primary);
 }
 .dot.said {
-  background: var(--work);
+  background: var(--accent);
 }
 
 /* ── 패널 바닥에 **고정된** 주 동작: 터미널 열기 + 명령 복사.
@@ -1332,10 +1475,10 @@ b.lv-na {
   flex: none;
   display: flex;
   flex-wrap: wrap;
-  gap: var(--sp2);
+  gap: var(--sp-2);
   padding: 10px 14px;
-  border-top: 1px solid var(--b1);
-  background: var(--s0);
+  border-top: 1px solid var(--border);
+  background: var(--bg-inset);
 }
 .jump .copy {
   flex: 1;
@@ -1350,9 +1493,9 @@ b.lv-na {
 /* 색은 .btn-go가 낸다 — 여기는 이 자리에서만 필요한 크기와 줄 유지뿐이다 */
 .go {
   flex: none;
-  padding: var(--sp2) var(--sp3);
-  border-radius: var(--r2);
-  font-size: var(--fs-cap);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md);
+  font-size: var(--fs-xs);
   white-space: nowrap;
 }
 /* 실패 안내는 있을 때만 자리를 차지한다 */
@@ -1362,8 +1505,8 @@ b.lv-na {
 
 /* 생김새는 .btn .btn-wide가 낸다 */
 .copy {
-  margin-top: var(--sp4);
-  color: var(--t1);
+  margin-top: var(--sp-4);
+  color: var(--text-primary);
 }
 .copy code {
   flex: 1;
@@ -1372,39 +1515,39 @@ b.lv-na {
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: left;
-  font-family: 'Cascadia Code', Consolas, monospace;
-  font-size: var(--fs-cap);
-  color: var(--t-code);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
 }
 .copy span {
   flex: none;
   white-space: nowrap;
-  font-size: var(--fs-cap);
-  color: var(--t3);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
 }
 /* 눌렀다는 표시는 색만 여기서 낸다 — 글자는 app.mjs가 갈아 끼운다.
    CSS의 content로 "됨"을 덧붙이던 방식은 한국어에서만 말이 된다(Copy + 됨). */
 .copy.done span {
-  color: var(--done);
+  color: var(--success);
 }
 /* 추천 답 복사는 "나를 기다리는 중" 블록 안에 들어간다 — 그 블록의 노란 톤을 따르고,
    재접속 명령 버튼처럼 폭을 다 쓰지 않는다(주 동작이 아니다). */
 .block.need .reply-copy {
   width: auto;
-  margin-top: var(--sp2);
-  padding: var(--sp1) 10px;
-  border-color: var(--acc-line);
-  background: var(--acc-sunk);
+  margin-top: var(--sp-2);
+  padding: var(--sp-1) 10px;
+  border-color: var(--wait-line);
+  background: var(--wait-sunk);
   justify-content: center;
 }
 .block.need .reply-copy span {
-  color: var(--acc);
+  color: var(--wait);
 }
 .block.need .reply-copy:hover {
-  border-color: var(--acc);
+  border-color: var(--wait);
 }
 .block.need .reply-copy.done span {
-  color: var(--done);
+  color: var(--success);
 }
 
 /* ── 설정·출근부. 창(<dialog>)에서 패널 판으로 들어왔다 — 420px 폭 압박이 사라지고
@@ -1446,7 +1589,7 @@ b.lv-na {
 .att-range-pick {
   display: inline-flex;
   flex: none;
-  border: 1px solid var(--b1);
+  border: 1px solid var(--border);
   border-radius: var(--r-pill);
   overflow: hidden;
 }
@@ -1456,10 +1599,10 @@ b.lv-na {
   padding: 3px 11px;
   border: 0;
   border-radius: 0;
-  font-size: var(--fs-cap);
+  font-size: var(--fs-xs);
 }
 .att-range-pick button + button {
-  border-left: 1px solid var(--b1);
+  border-left: 1px solid var(--border);
 }
 
 /* 탭 버튼의 생김새는 .btn .btn-toggle이 낸다.
@@ -1469,8 +1612,8 @@ b.lv-na {
 /* 구간을 적는 문장. 토글과 한 줄에 서므로 margin 없이 둔다. */
 .att-range {
   margin: 0;
-  font-size: var(--fs-cap);
-  color: var(--t3);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1482,12 +1625,12 @@ b.lv-na {
 }
 .att-rooms th {
   padding: 4px 6px;
-  border-bottom: 1px solid var(--b1);
-  font-size: var(--fs-cap);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-xs);
   font-weight: 400;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--t3);
+  color: var(--text-muted);
   text-align: right;
 }
 .att-rooms th:first-child {
@@ -1495,7 +1638,7 @@ b.lv-na {
 }
 .att-rooms td {
   padding: 5px 6px;
-  border-bottom: 1px solid var(--b0);
+  border-bottom: 1px solid var(--border);
   font-size: var(--fs-sm);
   text-align: right;
 }
@@ -1507,11 +1650,11 @@ b.lv-na {
   white-space: nowrap;
 }
 .att-rooms .w {
-  color: var(--acc);
+  color: var(--wait);
 }
 /* 0인 칸은 눈에서 빼 준다 — 숫자가 있는 칸만 읽히게 */
 .att-rooms .z {
-  color: var(--t4);
+  color: var(--text-muted);
 }
 
 .att-waits {
@@ -1527,15 +1670,15 @@ b.lv-na {
   gap: 8px;
   align-items: baseline;
   padding: 5px 8px;
-  border: 1px solid var(--b1);
-  border-left: 2px solid var(--acc);
-  border-radius: var(--r1);
-  background: var(--s2);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--wait);
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
   font-size: var(--fs-sm);
 }
 .att-waits b {
   flex: none;
-  color: var(--acc);
+  color: var(--wait);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1554,10 +1697,10 @@ b.lv-na {
   gap: 8px;
   align-items: baseline;
   padding: 5px 8px;
-  border: 1px solid var(--b1);
-  border-left: 2px solid var(--work);
-  border-radius: var(--r1);
-  background: var(--s2);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
   font-size: var(--fs-sm);
 }
 .att-mine span {
@@ -1569,7 +1712,7 @@ b.lv-na {
 }
 .att-mine b {
   flex: none;
-  color: var(--work);
+  color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
 .att-waits span {
@@ -1578,11 +1721,11 @@ b.lv-na {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--t2);
+  color: var(--text-secondary);
 }
 .att-waits time {
   flex: none;
-  color: var(--t3);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1593,7 +1736,7 @@ b.lv-na {
   padding: 7px 0;
 }
 .cfg-row + .cfg-row {
-  border-top: 1px solid var(--b0);
+  border-top: 1px solid var(--border);
 }
 .cfg-row label {
   min-width: 0;
@@ -1609,8 +1752,8 @@ b.lv-na {
 .cfg-row label small {
   display: block;
   margin-top: 1px;
-  font-size: var(--fs-cap);
-  color: var(--t3);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1621,16 +1764,16 @@ b.lv-na {
   flex: none;
   width: 132px;
   padding: 4px 6px;
-  border: 1px solid var(--b1);
-  border-radius: var(--r1);
-  background: var(--s2);
-  color: var(--t1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
+  color: var(--text-primary);
   font: inherit;
   font-size: var(--fs-sm);
   cursor: pointer;
 }
 .cfg-row select:hover {
-  border-color: var(--b2);
+  border-color: var(--text-muted);
 }
 
 /* ── 방 행. 이름 + 종류 + 별칭 + 세기 넷이 들어간다.
@@ -1678,7 +1821,7 @@ b.lv-na {
   cursor: pointer;
 }
 .cfg-check + .cfg-check {
-  border-top: 1px solid var(--b0);
+  border-top: 1px solid var(--border);
 }
 .cfg-check span {
   min-width: 0;
@@ -1687,13 +1830,13 @@ b.lv-na {
   white-space: nowrap;
 }
 .cfg-check + .cfg-row {
-  border-top: 1px solid var(--b0);
+  border-top: 1px solid var(--border);
 }
 
 /* 켜진 체크박스는 "나를 기다린다"가 아니라 "켜져 있다"다 — 파랑을 쓴다 */
 input[type='checkbox'] {
   flex: none;
-  accent-color: var(--work);
+  accent-color: var(--accent);
   cursor: pointer;
 }
 
@@ -1702,19 +1845,19 @@ input[type='checkbox'] {
   flex: none;
   width: 118px;
   padding: 4px 6px;
-  border: 1px solid var(--b1);
-  border-radius: var(--r1);
-  background: var(--s2);
-  color: var(--t1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
+  color: var(--text-primary);
   font: inherit;
   font-size: var(--fs-sm);
 }
 .cfg-row input[type='time']:hover {
-  border-color: var(--b2);
+  border-color: var(--text-muted);
 }
 .cfg-sep {
   flex: none;
-  color: var(--t3);
+  color: var(--text-muted);
 }
 
 /* 단축키 칸 — 누르면 조합을 받는다. select와 같은 폭이라 줄이 흔들리지 않는다 */
@@ -1722,23 +1865,23 @@ input[type='checkbox'] {
 .cfg-key {
   flex: none;
   width: 132px;
-  padding: var(--sp1) 6px;
-  color: var(--t1);
+  padding: var(--sp-1) 6px;
+  color: var(--text-primary);
 }
 /* 키를 받는 중 — 앱이 내 입력을 기다리는 순간이라 노랑이 맞다.
    :hover까지 같이 적어야 한다. .btn:hover가 더 구체적이어서 글자색을 되돌려 버린다. */
 .cfg-key.on,
 .cfg-key.on:hover {
-  border-color: var(--acc);
-  color: var(--acc);
+  border-color: var(--wait);
+  color: var(--wait);
 }
 .cfg-key.bad,
 .cfg-key.bad:hover {
-  border-color: var(--fail);
-  color: var(--fail-fg);
+  border-color: var(--danger);
+  color: var(--danger);
 }
 .cfg-row label small.warn {
-  color: var(--fail-fg);
+  color: var(--danger);
 }
 
 /* ── `?` 설명. 자기가 설명하는 것 **옆에** 붙는다 — 제목 안이거나 탭 바 끝이다.
@@ -1746,7 +1889,7 @@ input[type='checkbox'] {
    크기와 원 모양은 .btn .btn-round.sm이 낸다 — 우측 하단 물음표(#help-open)와 같은 몸짓이다. */
 .hint-btn {
   margin-left: 6px;
-  color: var(--t3);
+  color: var(--text-muted);
 }
 /* 탭 바의 ?는 탭과 **같은 줄** 오른쪽 끝에 붙는다 — 그 판 전체에 관한 설명이다.
    자리가 모자라면 `flex-wrap: wrap`이 알아서 다음 줄로 내린다. */
@@ -1761,30 +1904,30 @@ input[type='checkbox'] {
   z-index: 30;
   width: min(300px, calc(100vw - 28px));
   padding: 10px 12px;
-  border: 1px solid var(--b2);
-  border-radius: var(--r2);
-  background: var(--s2);
-  box-shadow: var(--shadow);
-  font-size: var(--fs-cap);
+  border: 1px solid var(--text-muted);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-pop);
+  font-size: var(--fs-xs);
   line-height: 1.6;
-  color: var(--t2);
+  color: var(--text-secondary);
 }
 .caption code {
-  font-family: 'Cascadia Code', Consolas, monospace;
-  font-size: var(--fs-cap);
-  color: var(--t-code);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
 }
 .caption b {
-  color: var(--t1);
+  color: var(--text-primary);
 }
 .hint-btn:hover,
 .hint-btn.on {
-  border-color: var(--b2);
-  background: var(--s3);
-  color: var(--t1);
+  border-color: var(--text-muted);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 .cfg-reset {
-  margin-top: var(--sp3);
+  margin-top: var(--sp-3);
 }
 
 ::-webkit-scrollbar {
@@ -1792,8 +1935,8 @@ input[type='checkbox'] {
   height: 9px;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--s3);
-  border-radius: var(--r1);
+  background: var(--bg-hover);
+  border-radius: var(--r-sm);
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -1805,16 +1948,16 @@ input[type='checkbox'] {
 }
 .att-code h3 {
   margin: 0 0 6px;
-  font-size: var(--fs-cap);
+  font-size: var(--fs-xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--t3);
+  color: var(--text-muted);
 }
 .att-code h4 {
   margin: 14px 0 6px;
-  font-size: var(--fs-cap);
+  font-size: var(--fs-xs);
   font-weight: 400;
-  color: var(--t3);
+  color: var(--text-muted);
 }
 
 /* 막대 그래프. 패널의 .bar는 가로로 차지만 이쪽은 세로로 자란다 — 높이는 app.mjs의
@@ -1837,8 +1980,8 @@ input[type='checkbox'] {
 }
 .spark i {
   width: 100%;
-  background: var(--work);
-  border-radius: var(--r0);
+  background: var(--accent);
+  border-radius: var(--r-sm);
   opacity: 0.75;
 }
 .spark li:hover i {
@@ -1850,12 +1993,12 @@ input[type='checkbox'] {
   gap: 4px;
 }
 .spark.trend i {
-  background: var(--acc);
+  background: var(--wait);
   opacity: 0.85;
 }
 /* 앱을 안 켠 날 — 막대 대신 점선 바닥만. 0으로 그리면 "아무도 안 기다렸다"는 거짓말이 된다 */
 .spark.trend li.unseen {
-  border-bottom: 1px dashed var(--b2);
+  border-bottom: 1px dashed var(--text-muted);
 }
 .spark.trend li.unseen i {
   background: none;
@@ -1867,7 +2010,7 @@ input[type='checkbox'] {
   display: flex;
   gap: 4px;
   font-size: 10px;
-  color: var(--t4);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 .spark-axis li {
@@ -1882,24 +2025,24 @@ input[type='checkbox'] {
   gap: 1px;
 }
 .spark.hours i {
-  background: var(--t2);
+  background: var(--text-secondary);
 }
 
 /* 방 별칭 칸. 종류·세기 셀렉트와 한 줄에 서므로 좁게 둔다. */
 .cfg-alias {
   width: 92px;
   padding: 3px 6px;
-  border: 1px solid var(--b1);
-  border-radius: var(--r1);
-  background: var(--s2);
-  color: var(--t1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
+  color: var(--text-primary);
   font: inherit;
   font-size: var(--fs-sm);
 }
 .cfg-alias:focus {
   outline: none;
-  border-color: var(--b2);
+  border-color: var(--text-muted);
 }
 .cfg-alias::placeholder {
-  color: var(--t4);
+  color: var(--text-muted);
 }
