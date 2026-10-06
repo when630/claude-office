@@ -276,6 +276,11 @@ export default {
     strollMaxValue: '{n}마리',
     strollScale: '게 크기',
     strollSpeed: '걷는 속도',
+    // 어느 모니터에 내보낼까. OS가 주는 모니터 이름은 비는 일이 많아 번호와 해상도로 부른다
+    strollDisplay: '내보낼 모니터',
+    strollDisplayPrimary: '주 모니터 (자동)',
+    strollDisplayValue: '모니터 {n} — {desc}',
+    strollDisplayValuePrimary: '모니터 {n} — {desc} (주)',
     roomTheme: '방 종류',
     roomNotify: '알림 세기',
     roomPin: '맨 앞에 고정',

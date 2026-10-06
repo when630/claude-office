@@ -36,6 +36,8 @@ import {
   STROLL_SCALES,
   STROLL_SPEEDS,
   STROLL_DEFAULTS,
+  STROLL_DISPLAY_PRIMARY,
+  pickStrollDisplay,
   pickStroll,
 } from '../shared/stroll-choices.mjs';
 
@@ -1622,8 +1624,12 @@ function normalizeView(v) {
     strollMax: pickStroll(v?.strollMax, STROLL_MAXES, STROLL_DEFAULTS.strollMax),
     strollScale: pickStroll(v?.strollScale, STROLL_SCALES, STROLL_DEFAULTS.strollScale),
     strollSpeed: pickStroll(v?.strollSpeed, STROLL_SPEEDS, STROLL_DEFAULTS.strollSpeed),
+    strollDisplay: pickStrollDisplay(v?.strollDisplay),
   };
 }
+
+// 산책을 내보낼 모니터 목록. 설정 판을 열 때 main에 물어 온다(openCfgTab) — 모니터는 꽂혔다 빠진다.
+let displays = [];
 
 function options(entries, picked) {
   return entries
@@ -1874,6 +1880,24 @@ function generalPane() {
         )}</select>
       </div>
       <div class="cfg-row">
+        <label for="cfg-stroll-display"><b>${t('cfg.strollDisplay')}</b></label>
+        <select id="cfg-stroll-display">${options(
+          [
+            [STROLL_DISPLAY_PRIMARY, t('cfg.strollDisplayPrimary')],
+            ...displays.map((d) => [
+              String(d.id),
+              // OS가 모니터 이름을 주면 붙인다('LG IPS QHD') — 같은 해상도가 둘이면 번호만으로는 못 가른다
+              t(d.primary ? 'cfg.strollDisplayValuePrimary' : 'cfg.strollDisplayValue', {
+                n: d.index,
+                desc: d.label ? `${d.label} · ${d.width}×${d.height}` : `${d.width}×${d.height}`,
+              }),
+            ]),
+          ],
+          // 고른 모니터가 지금 안 꽂혀 있으면 주 모니터로 보여 준다 — strollArea가 그렇게 돌린다
+          displays.some((d) => d.id === cfg.strollDisplay) ? String(cfg.strollDisplay) : STROLL_DISPLAY_PRIMARY,
+        )}</select>
+      </div>
+      <div class="cfg-row">
         <label for="cfg-stroll-speed"><b>${t('cfg.strollSpeed')}</b></label>
         <select id="cfg-stroll-speed">${options(
           [
@@ -2000,6 +2024,8 @@ async function openCfgTab() {
   notifyCfg = (await window.office?.getNotify?.().catch(() => null)) ?? notifyCfg;
   hotkeyCfg = (await window.office?.getHotkeys?.().catch(() => null)) ?? hotkeyCfg;
   updateCfg = (await window.office?.getUpdate?.().catch(() => null)) ?? updateCfg;
+  // 모니터는 꽂혔다 빠지므로 열 때마다 다시 센다 — 가짜 preload(캡처)에는 없어 빈 목록으로 떨어진다
+  displays = (await window.office?.displays?.().catch(() => null)) ?? [];
   capturing = null;
   setPanelTab('cfg');
 }
@@ -2057,6 +2083,11 @@ cfgBody.addEventListener('change', (e) => {
   const stroll = { 'cfg-stroll-max': 'strollMax', 'cfg-stroll-scale': 'strollScale', 'cfg-stroll-speed': 'strollSpeed' };
   if (stroll[el.id]) {
     saveView({ [stroll[el.id]]: Number(el.value) });
+    return;
+  }
+  // 모니터는 'primary' 아니면 display.id(정수) — 숫자로만 바꾸면 'primary'가 NaN이 된다
+  if (el.id === 'cfg-stroll-display') {
+    saveView({ strollDisplay: pickStrollDisplay(el.value) });
     return;
   }
   if (el.dataset?.notify) {
