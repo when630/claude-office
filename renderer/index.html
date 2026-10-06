@@ -13,30 +13,28 @@
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <!-- 상단바는 세 덩이다 — 왼쪽은 이름, 가운데는 상태, 오른쪽은 도구와 수치.
-         전에는 여덟 항목이 `·`로 이어진 한 줄이었고 전부 같은 크기여서, 이 앱의 존재
-         이유인 "입력 대기"가 토큰 총량과 같은 무게로 읽혔다. -->
+    <!-- 헤더는 형제 앱 문법이다 — 워드마크 → 대기 칩 → (오른쪽) 패널 탭 → 시각 → 최소화·닫기.
+         OS 제목 표시줄이 없으므로(frame: false) **여기가 드래그 바다**(style.css의 #topbar).
+         전에는 여덟 항목이 `·`로 이어진 한 줄이었고 전부 같은 크기여서, 이 앱의 존재 이유인
+         "입력 대기"가 토큰 총량과 같은 무게로 읽혔다. 지금은 헤더에 남은 수치가 대기 하나뿐이다 —
+         상태 수치·토큰·사용률은 하단 상태줄(#statusbar)로 내려갔다(#208). -->
     <header id="topbar">
-      <h1>Claw'd Office</h1>
-      <!-- 대기만 **채워진 칩**으로 세운다. 워드마크도 노랑이지만 그건 글자색이라 형태가
-           다르고, 여기만 배경이 차 있어 눈이 먼저 온다. 대기가 없으면 사라진다. -->
+      <!-- 점이 상태등이다 — app.mjs가 waiting·broken class를 건다 -->
+      <h1>Claude Office</h1>
+      <!-- 대기만 **채워진 칩**으로 세운다. 헤더에서 유일하게 배경이 차 있어 눈이 먼저 온다.
+           대기가 없으면 사라진다. -->
       <button id="wait-chip" type="button" hidden></button>
-      <div id="stats"></div>
       <div class="right">
-        <!-- 수치는 늘 있지만 급하지 않다 — 모노스페이스로 가라앉혀 자리만 지킨다 -->
-        <div id="usage-mini"></div>
-        <!-- 걸러진 방이 있다는 배지. 거르기 칸은 목록 위로 옮겼지만 이건 상단바에 남는다 —
-             목록을 접어 둔 동안에도 "화면이 다가 아니다"는 알려야 하고, 여기가 푸는 문이다. -->
-        <button id="room-shown" class="btn btn-pill" type="button" hidden></button>
+        <!-- 패널 탭(세션 · 출근부 · 설정). 패널 안에 있다가 헤더로 올라왔다 — 패널을 접어 둔
+             채로도 보이고, 형제 앱과 같은 자리다. 내용은 app.mjs의 drawPanelTabs가 채운다. -->
+        <nav id="panel-tabs" role="tablist"></nav>
         <span id="clock"></span>
-        <!-- 양쪽 열 접기. 캔버스를 침범하지 않게 도구 묶음에 둔다. -->
-        <button id="rail-toggle" class="btn btn-ico" type="button" data-icon="paneL" data-i18n-title="topbar.railToggle"></button>
-        <button id="panel-toggle" class="btn btn-ico" type="button" data-icon="paneR" data-i18n-title="topbar.panelToggle"></button>
-        <button id="mini-open" class="btn btn-ico" type="button" data-icon="win" data-i18n-title="topbar.mini"></button>
-        <!-- 창을 접고 게만 바탕화면으로 내보낸다 (산책 모드) -->
-        <button id="stroll-open" class="btn btn-ico" type="button" data-icon="stroll" data-i18n-title="topbar.stroll"></button>
-        <!-- 출근부·설정 버튼은 여기 없다. 두 판이 패널 탭으로 들어간 뒤로 같은 곳으로 가는
-             두 번째 문이었고, 오른쪽 도구 묶음은 좁은 창에서 먼저 밀리는 자리다. -->
+        <!-- 최소화·닫기. 닫기는 트레이로 내려간다(main의 close 처리 그대로). 맥은 OS 신호등이
+             있어 style.css가 숨긴다(body.mac). -->
+        <div id="winbtns">
+          <button id="win-min" type="button" data-icon="winMin" data-i18n-title="topbar.minimize"></button>
+          <button id="win-close" type="button" data-icon="winClose" data-i18n-title="topbar.close"></button>
+        </div>
       </div>
     </header>
 
@@ -61,13 +59,18 @@
         <div id="rail-list"></div>
       </aside>
       <!-- 전부 걸러지거나 접히면 빈 화면이 남는데, 그건 고장으로 읽힌다 — 이유를 적어 둔다 -->
-      <div id="stage"><canvas id="office"></canvas><p id="stage-empty" hidden></p></div>
+      <div id="stage">
+        <canvas id="office"></canvas>
+        <p id="stage-empty" hidden></p>
+        <!-- 양쪽 열 접기 손잡이. 접는 열 바로 옆, 무대 가장자리에 선다. -->
+        <button id="rail-toggle" class="btn-toggle" type="button" data-icon="chevL" data-i18n-title="topbar.railToggle"></button>
+        <button id="panel-toggle" class="btn-toggle" type="button" data-icon="chevR" data-i18n-title="topbar.panelToggle"></button>
+      </div>
       <!-- 오른쪽 패널은 세 갈래다. 설정·출근부가 창(<dialog>)에서 여기로 들어왔다 —
            420px 창의 폭 압박이 사라지고, 사무실을 보면서 설정을 만질 수 있다.
            세 판의 뼈대는 **고정이고 숨겨 둔다.** 갈아 끼우면 안쪽 id가 매번 새로 생겨
            그때마다 이벤트를 다시 달아야 한다. -->
       <aside id="panel">
-        <nav id="panel-tabs" role="tablist"></nav>
         <div id="panel-view">
           <div id="pane-session"></div>
           <div id="pane-att" hidden>
@@ -83,6 +86,25 @@
         </div>
       </aside>
     </main>
+
+    <!-- 하단 상태줄. 늘 있지만 급한 적이 없는 것들이 여기 산다 — 헤더가 대기만 말하게 하려고 내려왔다. -->
+    <footer id="statusbar">
+      <div id="stats"></div>
+      <!-- 수치는 모노스페이스로 가라앉혀 자리만 지킨다 -->
+      <div id="usage-mini"></div>
+      <!-- 걸러진 방이 있다는 배지. 목록을 접어 둔 동안에도 "화면이 다가 아니다"는 알려야 하고,
+           여기가 푸는 문이다. -->
+      <button id="room-shown" class="btn btn-pill" type="button" hidden></button>
+      <div class="right">
+        <!-- 모습 전환 — 사무실(지금) · 미니 · 산책. 셋이 배타라 이어붙인 토글이다. -->
+        <div id="mode-seg" role="group">
+          <button id="mode-normal" class="on" type="button" disabled data-i18n="topbar.modeNormal"></button>
+          <button id="mini-open" type="button" data-i18n="topbar.modeMini" data-i18n-title="topbar.mini"></button>
+          <button id="stroll-open" type="button" data-i18n="topbar.modeStroll" data-i18n-title="topbar.stroll"></button>
+        </div>
+        <span id="version"></span>
+      </div>
+    </footer>
 
     <!-- 한 번 읽으면 되는 안내는 기본 화면에서 빼고 여기 접어둔다.
          뼈대는 고정이고 문구만 app.mjs가 채운다(data-i18n) — 언어를 바꾸면 다시 채워진다. -->

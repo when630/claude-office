@@ -141,8 +141,9 @@ export const SPR = {
   // 궤도의 **앞뒤를 이 두 색이 가른다** — 모양은 같고 뒤쪽만 흐리다. 뒤쪽을 작은 점으로
   // 줄여 봤더니 한 바퀴의 절반 동안 별이 먼지가 되어, 도는 것이 아니라 깜빡이는 것으로
   // 보였다(실제 크기로 굽어 확인했다).
-  dizzy: glyph(PX.DIZZY_STAR, '#b9a1f0'),
-  dizzyFar: glyph(PX.DIZZY_STAR, '#6f5f9c'),
+  // 껍데기의 --broken과 같은 값이어야 한다(style.css) — 패널의 칩과 사무실의 별이 같은 것을 가리킨다
+  dizzy: glyph(PX.DIZZY_STAR, '#bb9af7'),
+  dizzyFar: glyph(PX.DIZZY_STAR, '#705e9e'),
 };
 
 export function drawSprite(ctx, spr, x, y) {

@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('office', {
   setNotify: (patch) => ipcRenderer.invoke('office:setNotify', patch),
   // 어느 모습으로 쓸까 — 'normal'(큰 창) · 'mini'(작게 띄워 두는 사무실) · 'stroll'(바탕화면 산책).
   // 셋 다 별도 창이라 렌더러는 갈아타 달라고만 한다.
+  // 창 버튼 — OS 제목 표시줄이 없어 최소화·닫기를 렌더러가 그린다. 닫기는 트레이로 내려간다.
+  winCmd: (cmd) => ipcRenderer.send('office:win', cmd),
   getMode: () => ipcRenderer.invoke('office:getMode'),
   setMode: (mode) => ipcRenderer.send('office:setMode', mode),
   // 미니·산책에서 게를 누르면 큰 창이 올라오며 그 세션이 펼쳐진다

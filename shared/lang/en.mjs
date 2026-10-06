@@ -50,6 +50,11 @@ export default {
     waitChipTitle: 'Jump to the one waiting longest',
     railToggle: 'Show or hide the session list',
     panelToggle: 'Show or hide the panel',
+    minimize: 'Minimize',
+    close: 'Close (stays in the tray)',
+    modeNormal: 'Office',
+    modeMini: 'Mini',
+    modeStroll: 'Stroll',
   },
 
   // ── The question mark in the bottom right

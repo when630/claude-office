@@ -44,6 +44,8 @@ const ctx = canvas.getContext('2d');
 const stage = document.getElementById('stage');
 const panel = document.getElementById('panel');
 const statsEl = document.getElementById('stats');
+// 워드마크의 점이 상태등이다 — 대기가 있으면 노랑, 서버 응답이 끊긴 자리가 있으면 보라
+const wordmark = document.querySelector('#topbar h1');
 const clockEl = document.getElementById('clock');
 const waitChip = document.getElementById('wait-chip');
 const railList = document.getElementById('rail-list');
@@ -820,7 +822,7 @@ function idlePanel() {
   // 상단바에도 있다. 그 자리는 사무실 요약이 받는다 — 이 패널에서 유일하게 "지금 사무실이
   // 어떤가"를 답하는 것이다.
   return `
-    <div class="panel-body idle">
+    <div class="panel-body">
     <div class="idle-body">
     <section class="block">
       <h3>${t('idle.office')}</h3>
@@ -856,10 +858,6 @@ function idlePanel() {
 
     </div>
 
-    ${
-      // 버전은 패널 바닥에. Electron 버전은 쓰는 사람에게 아무 뜻이 없어 적지 않는다.
-      meta ? `<p class="version">Claude Office ${esc(meta.version)}</p>` : ''
-    }
     </div>
   `;
 }
@@ -1386,7 +1384,10 @@ function drawStats() {
     waitChip.title = t('topbar.waitChipTitle');
   }
 
-  // 가운데는 **상태만**. 수치는 오른쪽에서 가라앉는다.
+  wordmark.classList.toggle('waiting', waiting > 0);
+  wordmark.classList.toggle('broken', waiting === 0 && (s.broken ?? 0) > 0);
+
+  // 상태 수치는 하단 상태줄에. 대기는 헤더 칩이 세므로 여기서는 뺀다.
   statsEl.innerHTML = [
     `<b>${s.total ?? 0}</b> ${t('topbar.in')}`,
     s.typing ? `<span class="t">${s.typing}</span> ${t('topbar.typing')}` : '',
@@ -2468,6 +2469,11 @@ document.getElementById('mini-open').addEventListener('click', () => window.offi
 document.getElementById('stroll-open')?.addEventListener('click', () => window.office?.setMode?.('stroll'));
 document.getElementById('mini-grow').addEventListener('click', () => window.office?.setMode?.('normal'));
 
+// ── 창 버튼. OS 제목 표시줄이 없으므로 최소화·닫기를 우리가 그린다(#208). 닫기는 main의
+// close 처리를 그대로 타서 트레이로 내려간다 — 종료가 아니다.
+document.getElementById('win-min')?.addEventListener('click', () => window.office?.winCmd?.('minimize'));
+document.getElementById('win-close')?.addEventListener('click', () => window.office?.winCmd?.('close'));
+
 // 캡션은 눌린 버튼 자리에 고정돼 있으므로, 그 자리가 움직이면 닫는다 —
 // 판이 스크롤될 때, 창 크기가 바뀔 때. (탭을 옮길 때는 setPanelTab이 닫는다.)
 for (const el of [cfgBody, attBody]) el.addEventListener('scroll', closeCaption, { passive: true });
@@ -2558,6 +2564,12 @@ const ICONS = {
   stroll: '<rect x="1.5" y="3.5" width="5.5" height="6" rx="1"/><path d="M6 6.5h4.5M8.5 4.5l2 2-2 2"/>',
   // 나를 기다린다
   bang: '<circle cx="6" cy="6" r="4.5"/><path d="M6 3.7v2.9"/><circle cx="6" cy="8.6" r="0.7" fill="currentColor" stroke="none"/>',
+  // 창 버튼 — 최소화·닫기. 형제 앱의 것과 같은 획(1.2px 선 하나·가위표)
+  winMin: '<path d="M1 6h10"/>',
+  winClose: '<path d="M1.5 1.5l9 9M10.5 1.5l-9 9"/>',
+  // 무대 가장자리의 열 접기 손잡이 — 접히는 쪽을 가리키는 꺾쇠
+  chevL: '<path d="M7.5 2.5 4 6l3.5 3.5"/>',
+  chevR: '<path d="M4.5 2.5 8 6l-3.5 3.5"/>',
 };
 
 function icon(name) {
@@ -2623,6 +2635,10 @@ function connect() {
   window.office.onLang?.(applyLang);
   window.office.meta().then((m) => {
     meta = m;
+    // 맥은 OS 신호등이 왼쪽에 남는다 — 헤더가 그만큼 비우고 우리 창 버튼은 숨긴다(style.css body.mac)
+    document.body.classList.toggle('mac', m.platform === 'darwin');
+    const ver = document.getElementById('version');
+    if (ver) ver.textContent = m.version ? `v${m.version}` : '';
     // 언어가 스냅샷보다 먼저 정해져야 첫 화면이 두 번 그려지지 않는다
     applyLang(m);
     if (!selected) drawPanel();

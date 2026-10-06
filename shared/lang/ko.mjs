@@ -48,6 +48,13 @@ export default {
     waitChipTitle: '가장 오래 기다리는 자리로',
     railToggle: '세션 목록 접기·펴기',
     panelToggle: '패널 접기·펴기',
+    // 창 버튼 — OS 제목 표시줄 대신 우리가 그린다. 닫기는 종료가 아니라서 그렇게 적는다
+    minimize: '최소화',
+    close: '닫기 (트레이에 남습니다)',
+    // 하단 상태줄의 모습 전환기
+    modeNormal: '사무실',
+    modeMini: '미니',
+    modeStroll: '산책',
   },
 
   // ── 우측 하단 물음표
