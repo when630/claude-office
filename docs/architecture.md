@@ -91,6 +91,14 @@ test/               `npm test` (node --test, 의존성 없음) — 알림 문턱
 
 ## 손댈 만한 곳
 
+- **큰 창을 숨기는 길은 `hideWindow` 하나다**(`main/index.mjs`). Esc·헤더 ×(둘 다 `close`를 탄다)·단축키
+  토글·미니/산책 전환이 전부 거기를 지난다. Windows는 `hide()`만으로는 **직전 창에 포커스가 돌아오지
+  않는다** — 창을 숨기면 OS가 Z순서에서 아무 창이나 고른다(whencommand 실측 2026-09-21). 숨기기 전에
+  `minimize()`를 거치면 최소화의 정규 활성화 경로가 직전 포그라운드 창을 복귀시킨다. 그래서 보일 때는
+  `restore()`가 먼저고, 그 뒤 `show()`를 **반드시** 부른다 — restore만으로는 렌더러가 프레임을 내지 않아
+  직전 화면이 굳은 채 키를 안 받는다(whencommand D-29). 최소화 중의 `setPosition`은 버려지므로(실측
+  2026-10-07) 자리를 옮기려면 restore 뒤여야 하고, `remember`는 최소화 중의 bounds(-32000)를 적지 않는다.
+  맥은 `hide()`로 직전 앱에 돌아가므로 최소화를 거치지 않는다
 - **산책 모드는 "없는 척하는 창"이다**(`main/index.mjs`의 `createStroll`). 작업 영역을 통째로
   덮으므로 잘못 만들면 **화면 전체가 클릭을 먹는다** — 그래서 기본은
   `setIgnoreMouseEvents(true, { forward: true })`이고, 커서가 게 위에 왔을 때만 렌더러가
