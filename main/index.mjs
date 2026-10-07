@@ -313,7 +313,7 @@ function toggleWindow() {
   }
   const w = settings.mode === 'mini' ? mini : win;
   if (w && !w.isDestroyed() && w.isVisible() && w.isFocused()) {
-    w.hide();
+    hideWindow(w); // 직전 창으로 포커스가 돌아가게 — Windows는 minimize를 거쳐 숨긴다
     return;
   }
   if (settings.mode === 'mini') {
@@ -433,6 +433,19 @@ function trayImage(base) {
 }
 
 // ── 창
+
+// 큰 창을 숨긴다 — 직전 창으로 포커스가 돌아가게. Esc·헤더 ×(둘 다 close를 탄다)·단축키 토글·미니/산책 전환이 전부 여기를 탄다.
+// Windows는 **`hide()`만으로는 직전 창에 포커스가 돌아오지 않는다** — 창을 숨기면 OS가 Z순서에서 아무 창이나 고른다
+// (whencommand 실측 2026-09-21). 숨기기 전에 `minimize()`를 거치면 최소화의 정규 활성화 경로가 직전 포그라운드 창을 복귀시킨다.
+// 최소화된 창은 `isVisible()=false`라 보일 때 `restore()`가 먼저다(`showWindow`·`setMode`가 이미 그렇게 한다) — 그 뒤 `show()`는
+// **반드시** 부른다. restore만으로는 렌더러가 프레임을 내지 않아 직전 화면이 굳은 채 키를 안 받는다(whencommand D-29).
+// 맥은 `hide()`로 직전 앱에 돌아간다. `remember`는 최소화 중의 bounds(-32000)를 적지 않는다.
+function hideWindow(w) {
+  if (!w || w.isDestroyed()) return;
+  if (process.platform === 'win32' && !w.isMinimized()) w.minimize();
+  w.hide();
+}
+
 function createWindow(show = true) {
   win = new BrowserWindow({
     width: 1120,
@@ -483,7 +496,7 @@ function createWindow(show = true) {
     remember();
     if (quitting) return;
     e.preventDefault();
-    win.hide();
+    hideWindow(win); // Esc·헤더 × — 직전 창으로 포커스가 돌아가게
     if (!settings.trayHintShown) {
       settings.trayHintShown = true;
       saveSettings();
@@ -767,8 +780,9 @@ function setMode(next) {
       win.focus();
     }
   } else {
-    // 큰 창은 감추기만 한다 — 자리를 누르고 올라올 때 렌더러 로드를 기다리지 않게 남겨 둔다
-    if (win && !win.isDestroyed()) win.hide();
+    // 큰 창은 감추기만 한다 — 자리를 누르고 올라올 때 렌더러 로드를 기다리지 않게 남겨 둔다.
+    // Windows의 미니·산책은 초점을 못 받는 창이라, 큰 창이 내려갈 때 직전 창으로 포커스가 돌아가야 한다
+    hideWindow(win);
     if (mode === 'mini') {
       if (!mini || mini.isDestroyed()) createMini();
       else mini.show();
